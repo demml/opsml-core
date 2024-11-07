@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/opsml-core",
+  "py-opsml-core",
+]
+default-members = [
+  "crates/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Steven Forrester <sjforrester32@gmail.com>"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/demml/scouter"
+
+
+[workspace.dependencies]
+pyo3 = { version = "0.21", features = ["chrono", "anyhow"] }
+
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
