@@ -1,0 +1,19 @@
+[package]
+name = "py-opsml-core"
+version = { workspace = true }
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "scouter"
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+opsml-core = { workspace = true }
+pyo3 = { version = "0.21", features = ["extension-module"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
