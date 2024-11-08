@@ -28,6 +28,8 @@ google-cloud-auth = { version ="0.17.1", optional = true }
 google-cloud-token = { version = "0.1.2", optional = true }
 base64 = "0.22.1"
 bytes = "1.8.0"
+mockall = "0.13.0"
+async-trait = "0.1.83"
 
 
 [features]
@@ -35,6 +37,7 @@ default = []
 google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token"]
 
 [dev-dependencies]
+mockall = "0.13.0"
 mockito = "1.4.0"
 reqwest_mock = "0.7.0"
 tempfile = "3.13.0"

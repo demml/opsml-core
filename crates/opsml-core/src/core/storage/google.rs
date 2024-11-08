@@ -1,16 +1,20 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
-
-    use crate::core::utils::error::GoogleStorageError;
+    use crate::core::storage::base::StorageClientTrait;
+    use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use bytes::Bytes;
     use futures::stream::Stream;
+    use futures::TryStream;
     use futures::TryStreamExt;
     use google_cloud_auth::credentials::CredentialsFile;
     use google_cloud_storage::client::{Client, ClientConfig};
     use google_cloud_storage::http::objects::download::Range;
     use google_cloud_storage::http::objects::get::GetObjectRequest;
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
+    use google_cloud_storage::http::objects::upload::UploadType;
+    use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest};
+    use mockall::automock;
     use serde_json::Value;
     use std::{env, path::PathBuf};
 
@@ -23,7 +27,7 @@ pub mod google_storage {
     }
 
     impl GcpCreds {
-        pub async fn new() -> Result<Self, GoogleStorageError> {
+        pub async fn new() -> Result<Self, StorageError> {
             let mut creds = GcpCreds {
                 creds: None,
                 project: None,
@@ -33,19 +37,19 @@ pub mod google_storage {
             creds
                 .check_model()
                 .await
-                .map_err(|e| GoogleStorageError::Error(format!("Unable to check model: {}", e)))?;
+                .map_err(|e| StorageError::Error(format!("Unable to check model: {}", e)))?;
             Ok(creds)
         }
 
-        async fn check_model(&mut self) -> Result<(), GoogleStorageError> {
+        async fn check_model(&mut self) -> Result<(), StorageError> {
             if let Ok(base64_creds) = env::var("GOOGLE_ACCOUNT_JSON_BASE64") {
-                let cred_string = self.decode_base64(&base64_creds).map_err(|e| {
-                    GoogleStorageError::Error(format!("Unable to decode base64: {}", e))
-                })?;
+                let cred_string = self
+                    .decode_base64(&base64_creds)
+                    .map_err(|e| StorageError::Error(format!("Unable to decode base64: {}", e)))?;
 
                 self.creds = Some(CredentialsFile::new_from_str(&cred_string).await.map_err(
                     |e| {
-                        GoogleStorageError::Error(format!(
+                        StorageError::Error(format!(
                             "Unable to create credentials file from string: {}",
                             e
                         ))
@@ -55,7 +59,7 @@ pub mod google_storage {
 
             if let Ok(_service_account_file) = env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON") {
                 self.creds = Some(CredentialsFile::new().await.map_err(|e| {
-                    GoogleStorageError::Error(format!(
+                    StorageError::Error(format!(
                         "Unable to create credentials file from file: {}",
                         e
                     ))
@@ -65,39 +69,31 @@ pub mod google_storage {
             Ok(())
         }
 
-        fn decode_base64(
-            &mut self,
-            service_base64_creds: &str,
-        ) -> Result<String, GoogleStorageError> {
-            let decoded = BASE64_STANDARD.decode(service_base64_creds).map_err(|e| {
-                GoogleStorageError::Error(format!("Unable to decode base64: {}", e))
-            })?;
-            let decoded_str = String::from_utf8(decoded).map_err(|e| {
-                GoogleStorageError::Error(format!("Unable to convert to string: {}", e))
-            })?;
+        fn decode_base64(&mut self, service_base64_creds: &str) -> Result<String, StorageError> {
+            let decoded = BASE64_STANDARD
+                .decode(service_base64_creds)
+                .map_err(|e| StorageError::Error(format!("Unable to decode base64: {}", e)))?;
+            let decoded_str = String::from_utf8(decoded)
+                .map_err(|e| StorageError::Error(format!("Unable to convert to string: {}", e)))?;
             Ok(decoded_str)
         }
     }
 
+    #[derive(Clone)]
     pub struct GoogleStorageClient {
         pub client: Client,
-        creds: GcpCreds,
         pub bucket: String,
     }
 
     impl GoogleStorageClient {
-        pub async fn new(bucket: String) -> Result<Self, GoogleStorageError> {
-            let creds = GcpCreds::new().await?;
-            let client = GoogleStorageClient::build_client(creds.clone()).await?;
+        pub async fn new(bucket: String) -> Result<Self, StorageError> {
+            let client = GoogleStorageClient::build_client().await?;
 
-            Ok(GoogleStorageClient {
-                client,
-                creds,
-                bucket,
-            })
+            Ok(GoogleStorageClient { client, bucket })
         }
 
-        pub async fn build_client(creds: GcpCreds) -> Result<Client, GoogleStorageError> {
+        pub async fn build_client() -> Result<Client, StorageError> {
+            let creds = GcpCreds::new().await?;
             // If no credentials, attempt to create a default client pulling from the environment
             if creds.creds.is_none() {
                 let config = ClientConfig::default().with_auth().await;
@@ -116,7 +112,7 @@ pub mod google_storage {
                     .with_credentials(creds.creds.unwrap())
                     .await
                     .map_err(|e| {
-                        GoogleStorageError::Error(format!(
+                        StorageError::Error(format!(
                             "Unable to create client with credentials: {}",
                             e
                         ))
@@ -137,11 +133,10 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A stream of bytes
-        async fn get_object_stream(
+        pub async fn get_object_stream(
             &self,
             rpath: &str,
-        ) -> Result<impl Stream<Item = Result<Bytes, GoogleStorageError>>, GoogleStorageError>
-        {
+        ) -> Result<impl Stream<Item = Result<Bytes, StorageError>>, StorageError> {
             // open a bucket and blob and return the stream
             let result = self
                 .client
@@ -154,13 +149,52 @@ pub mod google_storage {
                     &Range::default(),
                 )
                 .await
-                .map_err(|e| {
-                    GoogleStorageError::Error(format!("Unable to download object: {}", e))
-                })?;
+                .map_err(|e| StorageError::Error(format!("Unable to download object: {}", e)))?;
 
-            Ok(result.map_err(|e| {
-                GoogleStorageError::Error(format!("Error while streaming object: {}", e))
-            }))
+            Ok(result
+                .map_err(|e| StorageError::Error(format!("Error while streaming object: {}", e))))
+        }
+
+        /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        /// * `stream` - The stream of bytes to upload
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object name if successful
+
+        pub async fn upload_stream_to_object<S>(
+            &self,
+            path: &str,
+            stream: S,
+        ) -> Result<String, StorageError>
+        where
+            S: TryStream + Send + Sync + 'static,
+            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+            bytes::Bytes: From<S::Ok>,
+        {
+            let filename = path.to_string();
+            let object_file = Media::new(filename);
+            let upload_type = UploadType::Simple(object_file);
+
+            let result = self
+                .client
+                .upload_streamed_object(
+                    &UploadObjectRequest {
+                        bucket: self.bucket.clone(),
+
+                        ..Default::default()
+                    },
+                    stream,
+                    &upload_type,
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
+
+            Ok(result.name)
         }
 
         /// List all objects in a path
@@ -172,7 +206,7 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A list of objects in the path
-        pub async fn find(&self, path: &str) -> Result<Vec<String>, GoogleStorageError> {
+        pub async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
             let result = self
                 .client
                 .list_objects(&ListObjectsRequest {
@@ -181,7 +215,7 @@ pub mod google_storage {
                     ..Default::default()
                 })
                 .await
-                .map_err(|e| GoogleStorageError::Error(format!("Unable to list objects: {}", e)))?;
+                .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
 
             // return a list of object names if results.items is not None, Else return empty list
             Ok(result

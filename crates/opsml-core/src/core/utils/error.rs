@@ -7,7 +7,10 @@ pub enum ApiError {
 }
 
 #[derive(Error, Debug)]
-pub enum GoogleStorageError {
-    #[error("Google storage client failure: {0}")]
+pub enum StorageError {
+    #[error("Storage client failure: {0}")]
     Error(String),
+
+    #[error("Storage client failure. Unsupported client.")]
+    UnsupportedClient,
 }
