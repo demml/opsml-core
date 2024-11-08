@@ -22,10 +22,22 @@ serde_json = "1.0.132"
 futures = "0.3.31"
 tokio-util = { version = "0.7.12",  features = ["codec"]}
 
+# storage dependencies
+google-cloud-storage = { version = "0.22.1", features  = ["auth"], optional = true }
+google-cloud-auth = { version ="0.17.1", optional = true }
+google-cloud-token = { version = "0.1.2", optional = true }
+base64 = "0.22.1"
+bytes = "1.8.0"
+
+
+[features]
+default = []
+google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token"]
 
 [dev-dependencies]
 mockito = "1.4.0"
 reqwest_mock = "0.7.0"
+tempfile = "3.13.0"
 
 
 [profile.release]

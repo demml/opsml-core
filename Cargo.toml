@@ -17,7 +17,7 @@ repository = "https://github.com/demml/scouter"
 
 
 [workspace.dependencies]
-pyo3 = { version = "0.21", features = ["chrono", "anyhow", "experimental-async"] }
+pyo3 = { version = "0.22", features = ["chrono", "anyhow", "experimental-async"] }
 opsml-core = { path = "crates/opsml-core" }
 
 [profile.release]
