@@ -1,6 +1,5 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
-    use crate::core::storage::base::StorageClientTrait;
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use bytes::Bytes;
@@ -14,9 +13,8 @@ pub mod google_storage {
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
     use google_cloud_storage::http::objects::upload::UploadType;
     use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest};
-    use mockall::automock;
     use serde_json::Value;
-    use std::{env, path::PathBuf};
+    use std::env;
 
     #[derive(Clone)]
     pub struct GcpCreds {
