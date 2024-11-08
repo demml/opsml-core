@@ -1,5 +1,6 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
+    use crate::core::storage::base::ResumableClient;
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use bytes::Bytes;
@@ -13,6 +14,9 @@ pub mod google_storage {
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
     use google_cloud_storage::http::objects::upload::UploadType;
     use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest};
+    use google_cloud_storage::http::resumable_upload_client::ChunkSize;
+    use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
+    use google_cloud_storage::http::resumable_upload_client::UploadStatus;
     use serde_json::Value;
     use std::env;
 
@@ -74,6 +78,56 @@ pub mod google_storage {
             let decoded_str = String::from_utf8(decoded)
                 .map_err(|e| StorageError::Error(format!("Unable to convert to string: {}", e)))?;
             Ok(decoded_str)
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct GoogleResumableUploadClient {
+        pub client: ResumableUploadClient,
+        first_byte: u64,
+        last_byte: u64,
+        total_size: u64,
+        chunk_size: u64,
+    }
+
+    impl GoogleResumableUploadClient {
+        pub async fn upload_multiple_chunks(
+            &mut self,
+            chunk: bytes::Bytes,
+        ) -> Result<Option<String>, StorageError> {
+            let size = ChunkSize::new(self.first_byte, self.last_byte, Some(self.total_size));
+            let result = self
+                .client
+                .upload_multiple_chunk(chunk, &size)
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!(
+                        "Unable to upload multiple chunks to resumable upload: {}",
+                        e
+                    ))
+                })?;
+
+            // extract the range from the result and update the first_byte and last_byte
+            // check if enum is Ok
+            match result {
+                UploadStatus::Ok(object) => return Ok(Some(object.name)),
+                UploadStatus::ResumeIncomplete(range) => {
+                    self.first_byte = range.last_byte + 1;
+
+                    // if the last_byte + chunk_size is greater than the total size, set the last_byte to the total size
+                    if range.last_byte + self.chunk_size > self.total_size {
+                        self.last_byte = self.total_size;
+                    } else {
+                        self.last_byte = range.last_byte + self.chunk_size;
+                    }
+                }
+                UploadStatus::NotStarted => {
+                    self.first_byte = 0;
+                    self.last_byte = self.chunk_size;
+                }
+            }
+
+            Ok(None)
         }
     }
 
@@ -222,6 +276,45 @@ pub mod google_storage {
                 .iter()
                 .map(|o| o.name.clone())
                 .collect())
+        }
+
+        /// Create a resumable upload session
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        ///
+        ///
+        pub async fn create_resumable_upload_session(
+            &self,
+            path: &str,
+            chunk_size: u64,
+            total_size: u64,
+        ) -> Result<ResumableClient, StorageError> {
+            let filename = path.to_string();
+            let object_file = Media::new(filename);
+            let upload_type = UploadType::Simple(object_file);
+
+            let result = self
+                .client
+                .prepare_resumable_upload(
+                    &UploadObjectRequest {
+                        bucket: self.bucket.clone(),
+
+                        ..Default::default()
+                    },
+                    &upload_type,
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
+
+            Ok(ResumableClient::GCS(GoogleResumableUploadClient {
+                client: result,
+                first_byte: 0,
+                last_byte: chunk_size,
+                total_size,
+                chunk_size: chunk_size,
+            }))
         }
     }
 

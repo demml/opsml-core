@@ -1,3 +1,4 @@
+use pyo3::PyErr;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,4 +14,10 @@ pub enum StorageError {
 
     #[error("Storage client failure. Unsupported client.")]
     UnsupportedClient,
+}
+
+impl From<StorageError> for PyErr {
+    fn from(err: StorageError) -> PyErr {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }

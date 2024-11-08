@@ -1,6 +1,7 @@
 use crate::core::utils::error::StorageError;
 use bytes::Bytes;
 use futures::{Stream, TryStream};
+use pyo3::prelude::*;
 
 #[cfg(feature = "google_storage")]
 use super::google::google_storage;
@@ -62,9 +63,28 @@ impl Client {
             _ => Err(StorageError::UnsupportedClient),
         }
     }
+
+    pub async fn create_resumable_upload_session(
+        &self,
+        path: &str,
+        chunk_size: u64,
+        total_size: u64,
+    ) -> Result<ResumableClient, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            Client::GCS(client) => {
+                client
+                    .create_resumable_upload_session(path, chunk_size, total_size)
+                    .await
+            }
+            #[allow(unreachable_patterns)]
+            _ => Err(StorageError::UnsupportedClient),
+        }
+    }
 }
 
-#[derive(Clone)]
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
 pub enum ClientType {
     #[cfg(feature = "google_storage")]
     GCS,
@@ -77,6 +97,24 @@ pub trait StorageClientTrait {
         &self,
         rpath: &str,
     ) -> Result<impl Stream<Item = Result<Bytes, StorageError>>, StorageError>;
+}
+
+pub enum ResumableClient {
+    #[cfg(feature = "google_storage")]
+    GCS(google_storage::GoogleResumableUploadClient),
+}
+impl ResumableClient {
+    pub async fn upload_multiple_chunks(
+        &mut self,
+        chunk: bytes::Bytes,
+    ) -> Result<Option<String>, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            ResumableClient::GCS(client) => client.upload_multiple_chunks(chunk).await,
+            #[allow(unreachable_patterns)]
+            _ => Err(StorageError::UnsupportedClient),
+        }
+    }
 }
 
 pub struct StorageClient {
@@ -130,5 +168,48 @@ impl StorageClient {
     /// A list of objects in the path
     pub async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
         self.client.find(path).await
+    }
+
+    /// Upload a stream of bytes to a remote object.
+    /// The stream will return `Bytes` chunks.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The remote path to the object.
+    ///
+    /// * `stream` - The stream of bytes to upload.
+    ///
+    /// # Returns
+    ///
+    /// The remote path to the object.
+    pub async fn upload_stream_to_object<S>(
+        &self,
+        path: &str,
+        stream: S,
+    ) -> Result<String, StorageError>
+    where
+        S: TryStream + Send + Sync + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+    {
+        self.client.upload_stream_to_object(path, stream).await
+    }
+
+    /// Create a resumable upload session
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the object in the bucket
+    ///
+    ///
+    pub async fn create_resumable_upload_session(
+        &self,
+        path: &str,
+        chunk_size: u64,
+        total_size: u64,
+    ) -> Result<ResumableClient, StorageError> {
+        self.client
+            .create_resumable_upload_session(path, chunk_size, total_size)
+            .await
     }
 }
