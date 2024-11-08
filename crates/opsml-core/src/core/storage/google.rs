@@ -10,6 +10,7 @@ pub mod google_storage {
     use google_cloud_storage::client::{Client, ClientConfig};
     use google_cloud_storage::http::objects::download::Range;
     use google_cloud_storage::http::objects::get::GetObjectRequest;
+    use google_cloud_storage::http::objects::list::ListObjectsRequest;
     use serde_json::Value;
     use std::{env, path::PathBuf};
 
@@ -160,8 +161,35 @@ pub mod google_storage {
             Ok(result.map_err(|e| {
                 GoogleStorageError::Error(format!("Error while streaming object: {}", e))
             }))
+        }
 
-            //
+        /// List all objects in a path
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to list objects from
+        ///
+        /// # Returns
+        ///
+        /// A list of objects in the path
+        pub async fn find(&self, path: &str) -> Result<Vec<String>, GoogleStorageError> {
+            let result = self
+                .client
+                .list_objects(&ListObjectsRequest {
+                    bucket: self.bucket.clone(),
+                    prefix: Some(path.to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| GoogleStorageError::Error(format!("Unable to list objects: {}", e)))?;
+
+            // return a list of object names if results.items is not None, Else return empty list
+            Ok(result
+                .items
+                .unwrap_or_else(|| vec![])
+                .iter()
+                .map(|o| o.name.clone())
+                .collect())
         }
     }
 
