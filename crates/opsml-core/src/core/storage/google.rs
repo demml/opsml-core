@@ -126,12 +126,22 @@ pub mod google_storage {
             }
         }
 
+        /// Get an object from the storage bucket and return a stream of bytes to pass to
+        /// an async iterator
+        ///
+        /// # Arguments
+        ///
+        /// * `rpath` - The path to the object in the bucket
+        ///
+        /// # Returns
+        ///
+        /// A stream of bytes
         async fn get_object_stream(
             &self,
             rpath: &str,
         ) -> Result<impl Stream<Item = Result<Bytes, GoogleStorageError>>, GoogleStorageError>
         {
-            // open a bucket and blob and read it in chunks
+            // open a bucket and blob and return the stream
             let result = self
                 .client
                 .download_streamed_object(
@@ -172,7 +182,7 @@ pub mod google_storage {
         #[tokio::test]
         async fn test_create_client_with_anonymous() {
             setup();
-            let client = GoogleStorageClient::new().await;
+            let client = GoogleStorageClient::new("bucket".to_string()).await;
 
             assert!(client.is_ok());
         }
@@ -205,7 +215,7 @@ pub mod google_storage {
                 env::set_var("GOOGLE_APPLICATION_CREDENTIALS_JSON", file.path());
             }
 
-            let client = GoogleStorageClient::new().await;
+            let client = GoogleStorageClient::new("bucket".to_string()).await;
 
             // this will fail because the credentials are fake. We are just testing the client creation
             assert!(client.is_err());
@@ -237,7 +247,7 @@ pub mod google_storage {
                 env::set_var("GOOGLE_ACCOUNT_JSON_BASE64", base64_credentials);
             }
 
-            let client = GoogleStorageClient::new().await;
+            let client = GoogleStorageClient::new("bucket".to_string()).await;
 
             // this will fail because the credentials are fake. We are just testing the client creation
             assert!(client.is_err());
