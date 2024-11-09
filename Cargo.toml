@@ -1,11 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/opsml-core",
-  "py-opsml-core",
+  "crates/opsml_storage",
+  "py_packages/opsml_storage",
 ]
 default-members = [
   "crates/*",
+  "py_packages/*",
 ]
 
 [workspace.package]
@@ -13,12 +14,12 @@ version = "0.1.0"
 authors = ["Steven Forrester <sjforrester32@gmail.com>"]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/demml/scouter"
+repository = "https://github.com/demml/opsml-core"
 
 
 [workspace.dependencies]
 pyo3 = { version = "0.22", features = ["experimental-async"] }
-opsml-core = { path = "crates/opsml-core" }
+opsml-storage = { path = "crates/opsml_storage" }
 
 [profile.release]
 lto = "fat"

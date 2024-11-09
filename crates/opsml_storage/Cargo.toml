@@ -1,0 +1,49 @@
+[package]
+name = "opsml-storage"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+
+authors = [
+  "Steven Forrester <sjforrester32@gmail.com>"
+]
+
+license = "MIT"
+description = "Core rust library for the opsml project"
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+native-tls = { version = "0.2", features = ["vendored"] }
+reqwest = { version = "0.11", features = ["blocking", "json", "stream", ], default-features = false }
+tokio = { version = "1.34", features = ["full"] }
+thiserror = "2.0.0"
+serde_json = "1.0.132"
+futures = "0.3.31"
+tokio-util = { version = "0.7.12",  features = ["codec"]}
+
+# storage dependencies
+google-cloud-storage = { version = "0.22.1", features  = ["auth"], optional = true }
+google-cloud-auth = { version ="0.17.1", optional = true }
+google-cloud-token = { version = "0.1.2", optional = true }
+base64 = "0.22.1"
+bytes = "1.8.0"
+mockall = "0.13.0"
+async-trait = "0.1.83"
+
+
+[features]
+default = []
+google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token"]
+
+[dev-dependencies]
+mockall = "0.13.0"
+mockito = "1.4.0"
+reqwest_mock = "0.7.0"
+tempfile = "3.13.0"
+
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
