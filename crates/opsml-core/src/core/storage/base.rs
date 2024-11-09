@@ -28,12 +28,10 @@ impl Client {
     pub async fn get_object_stream(
         &self,
         rpath: &str,
-    ) -> Result<impl Stream<Item = Result<Bytes, StorageError>>, StorageError> {
+    ) -> Result<impl Stream<Item = Result<bytes::Bytes, StorageError>>, StorageError> {
         match self {
             #[cfg(feature = "google_storage")]
             Client::GCS(client) => client.get_object_stream(rpath).await,
-            #[allow(unreachable_patterns)]
-            _ => Err(StorageError::UnsupportedClient),
         }
     }
 
@@ -41,6 +39,7 @@ impl Client {
         match self {
             #[cfg(feature = "google_storage")]
             Client::GCS(client) => client.find(path).await,
+
             #[allow(unreachable_patterns)]
             _ => Err(StorageError::UnsupportedClient),
         }
@@ -86,7 +85,6 @@ impl Client {
 #[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub enum ClientType {
-    #[cfg(feature = "google_storage")]
     GCS,
 }
 // create a trait that will return the correct storage client
@@ -153,7 +151,7 @@ impl StorageClient {
     pub async fn get_object_stream(
         &self,
         rpath: &str,
-    ) -> Result<impl Stream<Item = Result<Bytes, StorageError>>, StorageError> {
+    ) -> Result<impl Stream<Item = Result<bytes::Bytes, StorageError>>, StorageError> {
         self.client.get_object_stream(rpath).await
     }
 

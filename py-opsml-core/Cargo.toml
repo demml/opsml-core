@@ -16,6 +16,11 @@ opsml-core = { workspace = true }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 tokio = "1.41.1"
 
+[features]
+default = []
+google_storage = ["opsml-core/google-cloud-storage", "opsml-core/google-cloud-auth", "opsml-core/google-cloud-token"]
+
+
 [profile.release]
 lto = "fat"
 codegen-units = 1

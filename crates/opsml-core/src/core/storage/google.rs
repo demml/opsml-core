@@ -17,8 +17,11 @@ pub mod google_storage {
     use google_cloud_storage::http::resumable_upload_client::ChunkSize;
     use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
     use google_cloud_storage::http::resumable_upload_client::UploadStatus;
+    use pyo3::prelude::*;
     use serde_json::Value;
     use std::env;
+    use std::path::PathBuf;
+    use tokio::runtime::Runtime;
 
     #[derive(Clone)]
     pub struct GcpCreds {
@@ -315,6 +318,35 @@ pub mod google_storage {
                 total_size,
                 chunk_size: chunk_size,
             }))
+        }
+    }
+
+    #[pyclass]
+    pub struct GCSFSStorageClient {
+        client: GoogleStorageClient,
+    }
+
+    #[pymethods]
+    impl GCSFSStorageClient {
+        #[new]
+        pub fn new(bucket: String) -> Self {
+            let client = Runtime::new()
+                .unwrap()
+                .block_on(GoogleStorageClient::new(bucket))
+                .unwrap();
+
+            GCSFSStorageClient { client }
+        }
+
+        pub async fn find(&self, path: PathBuf) -> Vec<String> {
+            // remove bucket from path
+            let stripped_path = path
+                .strip_prefix(&self.client.bucket)
+                .unwrap()
+                .to_str()
+                .unwrap();
+
+            self.client.find(&stripped_path).await.unwrap()
         }
     }
 
