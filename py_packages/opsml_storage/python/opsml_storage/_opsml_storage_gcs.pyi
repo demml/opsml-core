@@ -1,8 +1,8 @@
-from typing import List
+from typing import List, Iterable
 from pathlib import Path
 
 class GCSFSStorageClient:
-    def __init__(self, bucket_name: str):
+    def __init__(self, bucket: str):
         """Initialize the storage client.
 
         Args:
@@ -11,7 +11,7 @@ class GCSFSStorageClient:
         """
         ...
 
-    async def find(self, path: Path) -> List[str]:
+    def find(self, path: Path) -> List[str]:
         """Returns all the files in the path.
 
         Args:
@@ -20,5 +20,17 @@ class GCSFSStorageClient:
 
         Returns:
             A list of file paths.
+        """
+        ...
+
+    def iterfile(self, path: Path) -> Iterable[bytes]:
+        """Returns an iterator over all the files in the path.
+
+        Args:
+            path:
+                The path to search for files.
+
+        Returns:
+            An iterator over file paths.
         """
         ...

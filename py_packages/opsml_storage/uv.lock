@@ -283,7 +283,7 @@ wheels = [
 ]
 
 [[package]]
-name = "opsml-core"
+name = "opsml-storage-gcs"
 version = "0.1.0"
 source = { editable = "." }
 

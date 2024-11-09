@@ -1,8 +1,8 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
+    use crate::core::storage::base::ByteIterator;
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
-    use bytes::Bytes;
     use futures::stream::Stream;
     use futures::TryStream;
     use futures::TryStreamExt;
@@ -190,7 +190,10 @@ pub mod google_storage {
         pub async fn get_object_stream(
             &self,
             rpath: &str,
-        ) -> Result<impl Stream<Item = Result<Bytes, StorageError>>, StorageError> {
+        ) -> Result<
+            impl Stream<Item = Result<bytes::Bytes, google_cloud_storage::http::Error>>,
+            StorageError,
+        > {
             // open a bucket and blob and return the stream
             let result = self
                 .client
@@ -205,8 +208,10 @@ pub mod google_storage {
                 .await
                 .map_err(|e| StorageError::Error(format!("Unable to download object: {}", e)))?;
 
-            Ok(result
-                .map_err(|e| StorageError::Error(format!("Error while streaming object: {}", e))))
+            // chunk the stream and return a stream of bytes
+
+            // return the stream
+            Ok(result)
         }
 
         /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
@@ -337,15 +342,56 @@ pub mod google_storage {
             GCSFSStorageClient { client }
         }
 
-        pub async fn find(&self, path: PathBuf) -> Vec<String> {
-            // remove bucket from path
-            let stripped_path = path
-                .strip_prefix(&self.client.bucket)
-                .unwrap()
-                .to_str()
-                .unwrap();
+        pub fn find(&self, path: PathBuf) -> PyResult<Vec<String>> {
+            let rt = Runtime::new().unwrap();
+            let result = rt.block_on(async {
+                // remove bucket from path if exists
+                let stripped_path = path
+                    .strip_prefix(&self.client.bucket)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap();
 
-            self.client.find(&stripped_path).await.unwrap()
+                self.client
+                    .find(&stripped_path)
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))
+            });
+
+            Ok(
+                result
+                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?,
+            )
+        }
+
+        pub fn iterfile(&self, path: PathBuf) -> PyResult<ByteIterator> {
+            let rt = Runtime::new().unwrap();
+            let result = rt.block_on(async {
+                // remove bucket from path if exists
+                let stripped_path = path
+                    .strip_prefix(&self.client.bucket)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap();
+
+                self.client.get_object_stream(&stripped_path).await
+            });
+
+            let stream = match result {
+                Ok(stream) => stream,
+                Err(e) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Unable to get object stream: {}",
+                        e
+                    )))
+                }
+            };
+
+            Ok(ByteIterator {
+                stream: Box::new(
+                    stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+                ),
+            })
         }
     }
 
