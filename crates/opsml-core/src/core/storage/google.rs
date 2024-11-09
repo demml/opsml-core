@@ -1,6 +1,5 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
-    use crate::core::storage::base::ResumableClient;
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use bytes::Bytes;
@@ -293,7 +292,7 @@ pub mod google_storage {
             path: &str,
             chunk_size: u64,
             total_size: u64,
-        ) -> Result<ResumableClient, StorageError> {
+        ) -> Result<GoogleResumableUploadClient, StorageError> {
             let filename = path.to_string();
             let object_file = Media::new(filename);
             let upload_type = UploadType::Simple(object_file);
@@ -311,13 +310,13 @@ pub mod google_storage {
                 .await
                 .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
 
-            Ok(ResumableClient::GCS(GoogleResumableUploadClient {
+            Ok(GoogleResumableUploadClient {
                 client: result,
                 first_byte: 0,
                 last_byte: chunk_size,
                 total_size,
                 chunk_size: chunk_size,
-            }))
+            })
         }
     }
 
