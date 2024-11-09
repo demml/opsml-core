@@ -3,13 +3,15 @@ use futures::StreamExt;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use tokio::runtime::Runtime;
+
+use crate::core::utils::error::StorageError;
 // take a stream of bytes
 #[pyclass]
 pub struct ByteIterator {
     // stream of bytes
-    pub stream: Box<
-        dyn futures::stream::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Unpin + Send,
-    >,
+    pub stream:
+        Box<dyn futures::stream::Stream<Item = Result<bytes::Bytes, StorageError>> + Unpin + Send>,
+    pub runtime: Runtime,
 }
 
 #[pymethods]
@@ -19,13 +21,12 @@ impl ByteIterator {
     }
 
     fn __next__<'a>(&mut self, py: Python<'a>) -> PyResult<pyo3::Bound<'a, PyBytes>> {
-        let rt = Runtime::new().unwrap();
-
-        let result = rt.block_on(async {
+        let result = self.runtime.block_on(async {
             let chunk = self.stream.next().await;
-            println!("{:?}", chunk);
             chunk
         });
+
+        println!("chunk {:?}", result);
 
         match result {
             Some(Ok(chunk)) => Ok(PyBytes::new_bound(py, &chunk)),

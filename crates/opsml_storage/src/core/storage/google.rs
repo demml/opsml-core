@@ -4,6 +4,7 @@ pub mod google_storage {
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use futures::stream::Stream;
+    use futures::StreamExt;
     use futures::TryStream;
     use futures::TryStreamExt;
     use google_cloud_auth::credentials::CredentialsFile;
@@ -210,7 +211,8 @@ pub mod google_storage {
 
             // chunk the stream and return a stream of bytes
 
-            // return the stream
+            // return stream of bytes
+
             Ok(result)
         }
 
@@ -377,20 +379,13 @@ pub mod google_storage {
                 self.client.get_object_stream(&stripped_path).await
             });
 
-            let stream = match result {
-                Ok(stream) => stream,
-                Err(e) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Unable to get object stream: {}",
-                        e
-                    )))
-                }
-            };
+            let stream = result
+                .unwrap()
+                .map_err(|e| StorageError::Error(format!("Stream error: {}", e)));
 
             Ok(ByteIterator {
-                stream: Box::new(
-                    stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
-                ),
+                stream: Box::new(stream),
+                runtime: rt,
             })
         }
     }
