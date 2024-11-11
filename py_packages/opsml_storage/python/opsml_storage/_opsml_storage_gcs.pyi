@@ -45,3 +45,14 @@ class GCSFSStorageClient:
                 The path to the remote file.
         """
         ...
+
+    def copy(self, src: Path, dest: Path, recursive: bool = False):
+        """Copy the data from the source to the destination.
+
+        Args:
+            src:
+                The source path.
+            dest:
+                The destination path.
+        """
+        ...

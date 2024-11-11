@@ -7,7 +7,9 @@ pub mod google_storage {
     use futures::TryStream;
     use futures::TryStreamExt;
     use google_cloud_auth::credentials::CredentialsFile;
+    use google_cloud_storage::client;
     use google_cloud_storage::client::{Client, ClientConfig};
+    use google_cloud_storage::http::objects::download;
     use google_cloud_storage::http::objects::download::Range;
     use google_cloud_storage::http::objects::get::GetObjectRequest;
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
@@ -395,6 +397,34 @@ pub mod google_storage {
 
             Ok(resumable_client.file_completed)
         }
+
+        /// copy object from one bucket to another without deleting the source object
+        ///
+        /// # Arguments
+        ///
+        /// * `src` - The path to the source object
+        /// * `dest` - The path to the destination object
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object name if successful
+        pub async fn copy_object(&self, src: &str, dest: &str) -> Result<String, StorageError> {
+            let result = self
+                .client
+                .copy_object(
+                    &google_cloud_storage::http::objects::copy::CopyObjectRequest {
+                        source_bucket: self.bucket.clone(),
+                        source_object: src.to_string(),
+                        destination_bucket: self.bucket.clone(),
+                        destination_object: dest.to_string(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to copy object: {}", e)))?;
+
+            Ok(result.name)
+        }
     }
 
     #[pyclass]
@@ -464,16 +494,7 @@ pub mod google_storage {
             let rt = Runtime::new().unwrap();
 
             // remove bucket from path if exists
-            let stripped_lpath = lpath
-                .strip_prefix(&self.client.bucket)
-                .unwrap_or(&lpath)
-                .to_path_buf();
-
-            // remove bucket from path if exists
-            let stripped_rpath = rpath
-                .strip_prefix(&self.client.bucket)
-                .unwrap_or(&rpath)
-                .to_path_buf();
+            let (stripped_lpath, stripped_rpath) = self.strip_paths(lpath, rpath);
 
             // set chunk size (8 mib)
             let chunk_size = 1024 * 1024 * 8;
@@ -575,6 +596,85 @@ pub mod google_storage {
 
             Ok(result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to upload file: {}", e))
+            })?)
+        }
+
+        fn strip_paths(&self, src: PathBuf, dest: PathBuf) -> (PathBuf, PathBuf) {
+            // remove bucket from path if exists
+            let stripped_src = src
+                .strip_prefix(&self.client.bucket)
+                .unwrap_or(&src)
+                .to_path_buf();
+
+            // remove bucket from path if exists
+            let stripped_dest = dest
+                .strip_prefix(&self.client.bucket)
+                .unwrap_or(&dest)
+                .to_path_buf();
+
+            (stripped_src, stripped_dest)
+        }
+
+        pub fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> PyResult<()> {
+            let rt = Runtime::new().unwrap();
+
+            let result = rt.block_on(async {
+                // remove bucket from path if exists
+                let (stripped_src, stripped_dest) = self.strip_paths(src, dest);
+
+                if recursive {
+                    let files = self.client.find(stripped_src.to_str().unwrap()).await?;
+                    let mut upload_tasks = Vec::new();
+
+                    for file in files {
+                        // clone the client
+                        let stripped_lpath_clone = stripped_src.clone();
+                        let stripped_rpath = stripped_dest.clone();
+                        let client = self.client.clone();
+
+                        let upload_task = tokio::spawn(async move {
+                            let src_path = file.strip_prefix(&client.bucket).unwrap_or(&file);
+
+                            // get the relative path of the file to the stripped lpath
+                            let relative_path = file
+                                .strip_prefix(stripped_lpath_clone.to_str().unwrap())
+                                .unwrap();
+
+                            let joined_path = Path::new(&stripped_rpath).join(relative_path);
+                            let dest_path = joined_path.to_str().unwrap();
+
+                            client.copy_object(src_path, dest_path).await?;
+
+                            Ok::<(), StorageError>(())
+                        });
+
+                        upload_tasks.push(upload_task);
+                    }
+                } else {
+                    let copied = self
+                        .client
+                        .copy_object(
+                            stripped_src.to_str().unwrap(),
+                            stripped_dest.to_str().unwrap(),
+                        )
+                        .await;
+
+                    match copied {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(StorageError::Error(format!(
+                                "Unable to copy object: {}",
+                                e
+                            )));
+                        }
+                    }
+                }
+
+                Ok(())
+            });
+
+            Ok(result.map_err(|e| -> pyo3::PyErr {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to copy file: {}", e))
             })?)
         }
     }

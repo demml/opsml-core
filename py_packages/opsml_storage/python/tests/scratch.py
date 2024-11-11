@@ -9,8 +9,10 @@ def main():
 
     # Find all the files in the path
     files = storage_client.find(
-        path=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1")
+        path=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/check")
     )
+
+    # print(files)
 
     # stream = storage_client.iterfile(
     #    path=Path(
@@ -18,10 +20,10 @@ def main():
     #    )
     # )
 
-    storage_client.put(
-        lpath=Path("tests/assets"),
-        rpath=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/check"),
-    )
+    # storage_client.put(
+    # lpath=Path("tests/assets"),
+    # rpath=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/check"),
+    # )
 
 
 if __name__ == "__main__":
