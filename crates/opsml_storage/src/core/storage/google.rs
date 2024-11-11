@@ -316,8 +316,6 @@ pub mod google_storage {
                 ..Default::default()
             };
 
-            println!("metadata: {:?}", metadata);
-
             let result = self
                 .client
                 .prepare_resumable_upload(
@@ -462,64 +460,95 @@ pub mod google_storage {
         }
 
         pub fn put(&self, lpath: PathBuf, rpath: PathBuf) -> PyResult<()> {
+            // start a new runtime
             let rt = Runtime::new().unwrap();
-            let result = rt.block_on(async {
-                let stripped_lpath = lpath.strip_prefix(&self.client.bucket).unwrap_or(&lpath);
-                let stripped_rpath = rpath.strip_prefix(&self.client.bucket).unwrap_or(&rpath);
-                let mut chunk_size = 1024 * 1024;
 
+            // remove bucket from path if exists
+            let stripped_lpath = lpath
+                .strip_prefix(&self.client.bucket)
+                .unwrap_or(&lpath)
+                .to_path_buf();
+
+            // remove bucket from path if exists
+            let stripped_rpath = rpath
+                .strip_prefix(&self.client.bucket)
+                .unwrap_or(&rpath)
+                .to_path_buf();
+
+            // set chunk size (8 mib)
+            let chunk_size = 1024 * 1024 * 8;
+
+            let result: Result<(), StorageError> = rt.block_on(async {
                 // check if stripped path is a directory
                 if stripped_lpath.is_dir() {
-                    // if recursive is false, return error
-
-                    // get all files in the directory including subdirectories
-                    let files = walkdir::WalkDir::new(stripped_lpath)
+                    // get all files in the directory
+                    let files: Vec<_> = walkdir::WalkDir::new(stripped_lpath.clone())
                         .into_iter()
-                        .filter_map(|e| e.ok());
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().is_file())
+                        .map(|e| e.path().to_path_buf())
+                        .collect();
+
+                    // create a vector to hold all the upload tasks
+                    let mut upload_tasks = Vec::new();
 
                     // iterate over the files and upload them
                     for file in files {
-                        let path = file.path();
-                        let stripped_path = path.strip_prefix(&self.client.bucket).unwrap_or(&path);
+                        // clone the client
+                        let client = self.client.clone();
+                        let stripped_lpath_clone = stripped_lpath.clone();
+                        let stripped_rpath = stripped_rpath.clone();
 
-                        // get file size for stripped path to pass to resumable upload session
-                        let metadata = std::fs::metadata(stripped_path).unwrap();
+                        // create a new task for each file upload
+                        let upload_task = tokio::spawn(async move {
+                            let stripped_path = file.strip_prefix(&client.bucket).unwrap_or(&file);
 
-                        // get the relative path of the file to the stripped lpath
-                        let relative_path = path.strip_prefix(stripped_lpath).unwrap();
+                            // get file size for stripped path to pass to resumable upload session
+                            let metadata = std::fs::metadata(&stripped_path).unwrap();
 
-                        // add the relative path to the stripped rpath
-                        let remote_path = Path::new(stripped_rpath).join(relative_path);
+                            // get the relative path of the file to the stripped lpath
+                            let relative_path = file.strip_prefix(stripped_lpath_clone).unwrap();
 
-                        //create a resumable upload session
-                        let resumable_upload = self
-                            .client
-                            .create_resumable_upload_session(
-                                remote_path.to_str().unwrap(), // create file at remote path
-                                1024 * 1024,                   // chunk size
-                                metadata.len(),                // total size
-                            )
-                            .await
-                            .map_err(|e| {
-                                StorageError::Error(format!(
-                                    "Unable to create resumable upload session: {}",
-                                    e
-                                ))
-                            });
+                            // add the relative path to the stripped rpath
+                            let remote_path = Path::new(&stripped_rpath).join(relative_path);
 
-                        match resumable_upload {
-                            Ok(mut resumable_client) => {
-                                self.client
-                                    .upload_file_in_chunks(&mut resumable_client, stripped_path)
-                                    .await?;
+                            //create a resumable upload session
+                            let resumable_upload = client
+                                .create_resumable_upload_session(
+                                    remote_path.to_str().unwrap(), // create file at remote path
+                                    std::cmp::min(chunk_size, metadata.len()),
+                                    metadata.len(), // total size
+                                )
+                                .await
+                                .map_err(|e| {
+                                    StorageError::Error(format!(
+                                        "Unable to create resumable upload session: {}",
+                                        e
+                                    ))
+                                });
+
+                            match resumable_upload {
+                                Ok(mut resumable_client) => {
+                                    client
+                                        .upload_file_in_chunks(&mut resumable_client, stripped_path)
+                                        .await?;
+                                }
+                                Err(e) => {
+                                    return Err(e);
+                                }
                             }
-                            Err(e) => {
-                                return Err(e);
-                            }
-                        }
+
+                            Ok::<(), StorageError>(())
+                        });
+
+                        // add the task to the vector
+                        upload_tasks.push(upload_task);
                     }
+
+                    // wait for all tasks to complete
+                    futures::future::join_all(upload_tasks).await;
                 } else {
-                    let metadata = std::fs::metadata(stripped_lpath).unwrap();
+                    let metadata = std::fs::metadata(&stripped_lpath).unwrap();
 
                     //create a resumable upload session
                     let mut resumable_client = self
@@ -538,13 +567,13 @@ pub mod google_storage {
                         })?;
 
                     self.client
-                        .upload_file_in_chunks(&mut resumable_client, stripped_lpath)
+                        .upload_file_in_chunks(&mut resumable_client, &stripped_lpath)
                         .await?;
                 }
                 Ok(())
             });
 
-            Ok(result.map_err(|e| {
+            Ok(result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to upload file: {}", e))
             })?)
         }

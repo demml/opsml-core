@@ -19,8 +19,8 @@ def main():
     # )
 
     storage_client.put(
-        lpath=Path("tests/assets/cats.jpg"),
-        rpath=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/test/cats.jpg"),
+        lpath=Path("tests/assets"),
+        rpath=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/check"),
     )
 
 
