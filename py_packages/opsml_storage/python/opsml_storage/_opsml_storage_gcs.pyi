@@ -56,3 +56,42 @@ class GCSFSStorageClient:
                 The destination path.
         """
         ...
+
+    def rm(self, path: Path, recursive: bool = False):
+        """Remove the data from the source.
+
+        Args:
+            path:
+                The source path.
+        """
+        ...
+
+    def exists(self, path: Path) -> bool:
+        """Check if the path exists.
+
+        Args:
+            path:
+                path to check.
+        """
+        ...
+
+    def get(self, lpath: Path, rpath: Path, recursive: bool = False) -> None:
+        """Get the data from the path.
+
+        Args:
+            lpath:
+                The path to the local file.
+            rpath:
+                The path to the remote file.
+        """
+        ...
+
+    def generate_presigned_url(self, path: Path, expiration: int = 600) -> str:
+        """Generate a signed URL for the path.
+
+        Args:
+            path:
+                The path to the file.
+            expiration:
+                The expiration time in seconds.
+        """

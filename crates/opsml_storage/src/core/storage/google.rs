@@ -4,12 +4,12 @@ pub mod google_storage {
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use futures::stream::Stream;
+    use futures::StreamExt;
     use futures::TryStream;
     use futures::TryStreamExt;
     use google_cloud_auth::credentials::CredentialsFile;
-    use google_cloud_storage::client;
     use google_cloud_storage::client::{Client, ClientConfig};
-    use google_cloud_storage::http::objects::download;
+    use google_cloud_storage::http::objects::delete::DeleteObjectRequest;
     use google_cloud_storage::http::objects::download::Range;
     use google_cloud_storage::http::objects::get::GetObjectRequest;
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
@@ -19,11 +19,16 @@ pub mod google_storage {
     use google_cloud_storage::http::resumable_upload_client::ChunkSize;
     use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
     use google_cloud_storage::http::resumable_upload_client::UploadStatus;
+    use google_cloud_storage::sign::SignBy;
+    use google_cloud_storage::sign::SignedURLMethod;
+    use google_cloud_storage::sign::SignedURLOptions;
     use pyo3::prelude::*;
     use serde_json::Value;
     use std::env;
+    use std::fs::File;
     use std::io::BufRead;
     use std::io::BufReader;
+    use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
     use tokio::runtime::Runtime;
@@ -425,6 +430,91 @@ pub mod google_storage {
 
             Ok(result.name)
         }
+
+        /// Delete an object from the storage bucket
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        ///
+        pub async fn delete_object(&self, path: &str) -> Result<(), StorageError> {
+            let request = DeleteObjectRequest {
+                bucket: self.bucket.clone(),
+                object: path.to_string(),
+                ..Default::default()
+            };
+
+            self.client
+                .delete_object(&request)
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to delete object: {}", e)))?;
+
+            Ok(())
+        }
+
+        /// Download a remote object as a stream to a local file
+        ///
+        /// # Arguments
+        ///
+        /// * `lpath` - The path to the local file
+        /// * `rpath` - The path to the remote file
+        ///
+        pub async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+            let mut stream = self
+                .get_object_stream(rpath)
+                .await?
+                .map_err(|e| StorageError::Error(format!("Unable to get object stream: {}", e)));
+
+            // create and open lpath file
+            let prefix = Path::new(lpath).parent().unwrap();
+
+            if !prefix.exists() {
+                // create the directory if it does not exist and skip errors
+                std::fs::create_dir_all(prefix).map_err(|e| {
+                    StorageError::Error(format!("Unable to create directory: {}", e))
+                })?;
+            }
+
+            // create and open lpath file
+            let mut file = File::create(lpath)
+                .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
+
+            // iterate over the stream and write to the file
+            while let Some(v) = stream.next().await {
+                let chunk = v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
+                file.write_all(&chunk)
+                    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+            }
+
+            Ok(())
+        }
+
+        pub async fn generate_presigned_url(
+            &self,
+            path: &str,
+            expiration: u64,
+        ) -> Result<String, StorageError> {
+            let presigned_url = self
+                .client
+                .signed_url(
+                    &self.bucket.clone(),
+                    path,
+                    None,
+                    None,
+                    SignedURLOptions {
+                        method: SignedURLMethod::GET,
+                        start_time: None,
+                        expires: std::time::Duration::from_secs(expiration),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to generate presigned url: {}", e))
+                })?;
+
+            Ok(presigned_url)
+        }
     }
 
     #[pyclass]
@@ -489,6 +579,13 @@ pub mod google_storage {
             })
         }
 
+        /// Upload a file to the storage bucket
+        ///
+        /// # Arguments
+        ///
+        /// * `lpath` - The path to the local file
+        /// * `rpath` - The path to the remote file
+        ///
         pub fn put(&self, lpath: PathBuf, rpath: PathBuf) -> PyResult<()> {
             // start a new runtime
             let rt = Runtime::new().unwrap();
@@ -624,32 +721,43 @@ pub mod google_storage {
 
                 if recursive {
                     let files = self.client.find(stripped_src.to_str().unwrap()).await?;
+
                     let mut upload_tasks = Vec::new();
 
                     for file in files {
                         // clone the client
+
                         let stripped_lpath_clone = stripped_src.clone();
                         let stripped_rpath = stripped_dest.clone();
+
                         let client = self.client.clone();
 
                         let upload_task = tokio::spawn(async move {
-                            let src_path = file.strip_prefix(&client.bucket).unwrap_or(&file);
+                            let file_path = Path::new(&file);
+
+                            let src_path =
+                                file_path.strip_prefix(&client.bucket).unwrap_or(&file_path);
 
                             // get the relative path of the file to the stripped lpath
-                            let relative_path = file
-                                .strip_prefix(stripped_lpath_clone.to_str().unwrap())
-                                .unwrap();
+                            let relative_path =
+                                file_path.strip_prefix(stripped_lpath_clone).unwrap();
 
-                            let joined_path = Path::new(&stripped_rpath).join(relative_path);
-                            let dest_path = joined_path.to_str().unwrap();
+                            let dest_path = stripped_rpath.join(relative_path);
 
-                            client.copy_object(src_path, dest_path).await?;
+                            client
+                                .copy_object(
+                                    src_path.to_str().unwrap(),
+                                    dest_path.to_str().unwrap(),
+                                )
+                                .await?;
 
                             Ok::<(), StorageError>(())
                         });
 
                         upload_tasks.push(upload_task);
                     }
+
+                    futures::future::join_all(upload_tasks).await;
                 } else {
                     let copied = self
                         .client
@@ -675,6 +783,168 @@ pub mod google_storage {
 
             Ok(result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to copy file: {}", e))
+            })?)
+        }
+
+        pub fn rm(&self, path: PathBuf, recursive: bool) -> PyResult<()> {
+            let rt = Runtime::new().unwrap();
+
+            let result: Result<(), StorageError> = rt.block_on(async {
+                // remove bucket from path if exists
+                let stripped_path = path
+                    .strip_prefix(&self.client.bucket)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap();
+
+                if recursive {
+                    let files = self.client.find(stripped_path).await?;
+
+                    let mut upload_tasks = Vec::new();
+
+                    for file in files {
+                        // clone the client
+                        let client = self.client.clone();
+
+                        let upload_task = tokio::spawn(async move {
+                            client.delete_object(&file).await?;
+                            Ok::<(), StorageError>(())
+                        });
+
+                        upload_tasks.push(upload_task);
+                    }
+
+                    let results = futures::future::join_all(upload_tasks).await;
+                    for result in results {
+                        result.map_err(|e| StorageError::Error(format!("Join error: {}", e)))??;
+                    }
+                } else {
+                    self.client.delete_object(&stripped_path).await?;
+                }
+
+                Ok(())
+            });
+
+            Ok(result.map_err(|e| -> pyo3::PyErr {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to delete file: {}", e))
+            })?)
+        }
+
+        pub fn exists(&self, path: PathBuf) -> PyResult<bool> {
+            let rt = Runtime::new().unwrap();
+            let result: Result<bool, StorageError> = rt.block_on(async {
+                // remove bucket from path if exists
+                let stripped_path = path
+                    .strip_prefix(&self.client.bucket)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap();
+
+                let files = self.client.find(stripped_path).await?;
+
+                Ok(files.len() > 0)
+            });
+
+            Ok(result.map_err(|e| -> pyo3::PyErr {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Unable to check if file exists: {}",
+                    e
+                ))
+            })?)
+        }
+
+        pub fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
+            let rt = Runtime::new().unwrap();
+
+            let result = rt.block_on(async {
+                // remove bucket from path if exists
+                let (stripped_lpath, stripped_rpath) = self.strip_paths(lpath, rpath);
+
+                if recursive {
+                    let files = self.client.find(stripped_rpath.to_str().unwrap()).await?;
+
+                    let mut upload_tasks = Vec::new();
+
+                    for file in files {
+                        // clone the client
+                        let client = self.client.clone();
+
+                        let stripped_lpath_clone = stripped_lpath.clone();
+                        let stripped_rpath = stripped_rpath.clone();
+
+                        let upload_task = tokio::spawn(async move {
+                            let file_path = Path::new(&file);
+                            let stripped_path =
+                                file_path.strip_prefix(&client.bucket).unwrap_or(&file_path);
+
+                            // get the relative path of the file to the stripped lpath
+                            let relative_path = file_path.strip_prefix(stripped_rpath).unwrap();
+
+                            let local_path = stripped_lpath_clone.join(relative_path);
+
+                            client
+                                .get_object(
+                                    local_path.to_str().unwrap(),
+                                    stripped_path.to_str().unwrap(),
+                                )
+                                .await?;
+
+                            Ok::<(), StorageError>(())
+                        });
+
+                        upload_tasks.push(upload_task);
+                    }
+
+                    futures::future::join_all(upload_tasks).await;
+                } else {
+                    let copied = self
+                        .client
+                        .get_object(
+                            stripped_lpath.to_str().unwrap(),
+                            stripped_rpath.to_str().unwrap(),
+                        )
+                        .await;
+
+                    match copied {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(StorageError::Error(format!(
+                                "Unable to get object: {}",
+                                e
+                            )));
+                        }
+                    }
+                }
+
+                Ok(())
+            });
+
+            Ok(result.map_err(|e| -> pyo3::PyErr {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to get file: {}", e))
+            })?)
+        }
+
+        #[pyo3(signature = (path, expiration=600))]
+        pub fn generate_presigned_url(&self, path: PathBuf, expiration: u64) -> PyResult<String> {
+            let rt = Runtime::new().unwrap();
+            let result = rt.block_on(async {
+                // remove bucket from path if exists
+                let stripped_path = path
+                    .strip_prefix(&self.client.bucket)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap();
+
+                self.client
+                    .generate_presigned_url(stripped_path, expiration)
+                    .await
+            });
+
+            Ok(result.map_err(|e| -> pyo3::PyErr {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Unable to generate presigned url: {}",
+                    e
+                ))
             })?)
         }
     }
