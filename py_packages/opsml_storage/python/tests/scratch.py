@@ -5,23 +5,23 @@ from pathlib import Path
 
 def main():
     # Create a storage client
-    storage_client = GCSFSStorageClient(bucket="opsml-dev")
+    storage_client = GCSFSStorageClient(bucket="opsml-storage-integration")
 
     # Find all the files in the path
     files = storage_client.find(
         path=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1")
     )
 
-    stream = storage_client.iterfile(
-        path=Path(
-            "OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/quantized-model/config.json"
-        )
-    )
+    # stream = storage_client.iterfile(
+    #    path=Path(
+    #        "OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/quantized-model/config.json"
+    #    )
+    # )
 
-    # write the stream to a file
-    with open("config.json", "wb") as f:
-        for chunk in stream:
-            print(chunk)
+    storage_client.put(
+        lpath=Path("tests/assets/cats.jpg"),
+        rpath=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/test/cats.jpg"),
+    )
 
 
 if __name__ == "__main__":

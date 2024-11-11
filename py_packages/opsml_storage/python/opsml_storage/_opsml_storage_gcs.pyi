@@ -34,3 +34,14 @@ class GCSFSStorageClient:
             An iterator over file paths.
         """
         ...
+
+    def put(self, lpath: Path, rpath: Path):
+        """Put the data in the path.
+
+        Args:
+            lpath:
+                The path to the local file.
+            rpath:
+                The path to the remote file.
+        """
+        ...

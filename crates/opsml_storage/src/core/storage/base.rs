@@ -26,8 +26,6 @@ impl ByteIterator {
             chunk
         });
 
-        println!("chunk {:?}", result);
-
         match result {
             Some(Ok(chunk)) => Ok(PyBytes::new_bound(py, &chunk)),
             Some(Err(e)) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(

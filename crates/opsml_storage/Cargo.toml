@@ -30,6 +30,7 @@ base64 = "0.22.1"
 bytes = "1.8.0"
 mockall = "0.13.0"
 async-trait = "0.1.83"
+walkdir = "2.5.0"
 
 
 [features]

@@ -4,7 +4,6 @@ pub mod google_storage {
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use futures::stream::Stream;
-    use futures::StreamExt;
     use futures::TryStream;
     use futures::TryStreamExt;
     use google_cloud_auth::credentials::CredentialsFile;
@@ -14,14 +13,19 @@ pub mod google_storage {
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
     use google_cloud_storage::http::objects::upload::UploadType;
     use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest};
+    use google_cloud_storage::http::objects::Object;
     use google_cloud_storage::http::resumable_upload_client::ChunkSize;
     use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
     use google_cloud_storage::http::resumable_upload_client::UploadStatus;
     use pyo3::prelude::*;
     use serde_json::Value;
     use std::env;
+    use std::io::BufRead;
+    use std::io::BufReader;
+    use std::path::Path;
     use std::path::PathBuf;
     use tokio::runtime::Runtime;
+    use walkdir;
 
     #[derive(Clone)]
     pub struct GcpCreds {
@@ -91,6 +95,7 @@ pub mod google_storage {
         last_byte: u64,
         total_size: u64,
         chunk_size: u64,
+        file_completed: bool,
     }
 
     impl GoogleResumableUploadClient {
@@ -98,7 +103,8 @@ pub mod google_storage {
             &mut self,
             chunk: bytes::Bytes,
         ) -> Result<Option<String>, StorageError> {
-            let size = ChunkSize::new(self.first_byte, self.last_byte, Some(self.total_size));
+            let size = ChunkSize::new(self.first_byte, 63304, Some(self.total_size));
+
             let result = self
                 .client
                 .upload_multiple_chunk(chunk, &size)
@@ -113,7 +119,10 @@ pub mod google_storage {
             // extract the range from the result and update the first_byte and last_byte
             // check if enum is Ok
             match result {
-                UploadStatus::Ok(object) => return Ok(Some(object.name)),
+                UploadStatus::Ok(object) => {
+                    self.file_completed = true;
+                    return Ok(Some(object.name));
+                }
                 UploadStatus::ResumeIncomplete(range) => {
                     self.first_byte = range.last_byte + 1;
 
@@ -246,7 +255,6 @@ pub mod google_storage {
                 .upload_streamed_object(
                     &UploadObjectRequest {
                         bucket: self.bucket.clone(),
-
                         ..Default::default()
                     },
                     stream,
@@ -300,22 +308,29 @@ pub mod google_storage {
             chunk_size: u64,
             total_size: u64,
         ) -> Result<GoogleResumableUploadClient, StorageError> {
-            let filename = path.to_string();
-            let object_file = Media::new(filename);
-            let upload_type = UploadType::Simple(object_file);
+            let _filename = path.to_string();
+
+            let metadata = Object {
+                name: path.to_string(),
+                content_type: Some("application/octet-stream".to_string()),
+                ..Default::default()
+            };
+
+            println!("metadata: {:?}", metadata);
 
             let result = self
                 .client
                 .prepare_resumable_upload(
                     &UploadObjectRequest {
                         bucket: self.bucket.clone(),
-
                         ..Default::default()
                     },
-                    &upload_type,
+                    &UploadType::Multipart(Box::new(metadata)),
                 )
                 .await
-                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create resumable session: {}", e))
+                })?;
 
             Ok(GoogleResumableUploadClient {
                 client: result,
@@ -323,7 +338,64 @@ pub mod google_storage {
                 last_byte: chunk_size,
                 total_size,
                 chunk_size: chunk_size,
+                file_completed: false,
             })
+        }
+
+        /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
+        ///
+        /// # Arguments
+        ///
+        /// * `resumable_client` - GoogleResumableUploadClient
+        /// * `lpath` - The path to the file to upload
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object name if successful
+        ///    
+        pub async fn upload_file_in_chunks(
+            &self,
+            resumable_client: &mut GoogleResumableUploadClient,
+            lpath: &Path,
+        ) -> Result<bool, StorageError> {
+            // get chunk size
+            let chunk_size = resumable_client.chunk_size as usize;
+
+            // open file
+            let file = std::fs::File::open(lpath).map_err(|e| {
+                StorageError::Error(format!("Unable to open file for reading: {}", e))
+            })?;
+
+            // create a buffered reader
+            let mut reader = BufReader::with_capacity(chunk_size, file);
+            let mut first_byte = 0;
+
+            loop {
+                let buffer = &reader.fill_buf().map_err(|e| {
+                    StorageError::Error(format!("Unable to read buffer from file: {}", e))
+                })?;
+
+                let buffer_size = buffer.len();
+                if buffer_size == 0 {
+                    break;
+                }
+
+                let last_byte = first_byte + buffer_size as u64 - 1;
+                let size = ChunkSize::new(first_byte, last_byte, Some(resumable_client.total_size));
+
+                resumable_client
+                    .client
+                    .upload_multiple_chunk(bytes::Bytes::from(buffer.to_vec()), &size)
+                    .await
+                    .unwrap();
+
+                first_byte = last_byte + 1;
+
+                // consume buffer
+                reader.consume(buffer_size);
+            }
+
+            Ok(resumable_client.file_completed)
         }
     }
 
@@ -387,6 +459,94 @@ pub mod google_storage {
                 stream: Box::new(stream),
                 runtime: rt,
             })
+        }
+
+        pub fn put(&self, lpath: PathBuf, rpath: PathBuf) -> PyResult<()> {
+            let rt = Runtime::new().unwrap();
+            let result = rt.block_on(async {
+                let stripped_lpath = lpath.strip_prefix(&self.client.bucket).unwrap_or(&lpath);
+                let stripped_rpath = rpath.strip_prefix(&self.client.bucket).unwrap_or(&rpath);
+                let mut chunk_size = 1024 * 1024;
+
+                // check if stripped path is a directory
+                if stripped_lpath.is_dir() {
+                    // if recursive is false, return error
+
+                    // get all files in the directory including subdirectories
+                    let files = walkdir::WalkDir::new(stripped_lpath)
+                        .into_iter()
+                        .filter_map(|e| e.ok());
+
+                    // iterate over the files and upload them
+                    for file in files {
+                        let path = file.path();
+                        let stripped_path = path.strip_prefix(&self.client.bucket).unwrap_or(&path);
+
+                        // get file size for stripped path to pass to resumable upload session
+                        let metadata = std::fs::metadata(stripped_path).unwrap();
+
+                        // get the relative path of the file to the stripped lpath
+                        let relative_path = path.strip_prefix(stripped_lpath).unwrap();
+
+                        // add the relative path to the stripped rpath
+                        let remote_path = Path::new(stripped_rpath).join(relative_path);
+
+                        //create a resumable upload session
+                        let resumable_upload = self
+                            .client
+                            .create_resumable_upload_session(
+                                remote_path.to_str().unwrap(), // create file at remote path
+                                1024 * 1024,                   // chunk size
+                                metadata.len(),                // total size
+                            )
+                            .await
+                            .map_err(|e| {
+                                StorageError::Error(format!(
+                                    "Unable to create resumable upload session: {}",
+                                    e
+                                ))
+                            });
+
+                        match resumable_upload {
+                            Ok(mut resumable_client) => {
+                                self.client
+                                    .upload_file_in_chunks(&mut resumable_client, stripped_path)
+                                    .await?;
+                            }
+                            Err(e) => {
+                                return Err(e);
+                            }
+                        }
+                    }
+                } else {
+                    let metadata = std::fs::metadata(stripped_lpath).unwrap();
+
+                    //create a resumable upload session
+                    let mut resumable_client = self
+                        .client
+                        .create_resumable_upload_session(
+                            stripped_rpath.to_str().unwrap(),
+                            std::cmp::min(chunk_size, metadata.len()),
+                            metadata.len(),
+                        )
+                        .await
+                        .map_err(|e| {
+                            StorageError::Error(format!(
+                                "Unable to create resumable upload session: {}",
+                                e
+                            ))
+                        })?;
+
+                    self.client
+                        .upload_file_in_chunks(&mut resumable_client, stripped_lpath)
+                        .await?;
+                }
+                Ok(())
+            });
+
+            Ok(result.map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to upload file: {}", e))
+            })?)
         }
     }
 
