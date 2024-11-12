@@ -4,8 +4,6 @@ import shutil
 
 
 def test_storage_methods(gcs_storage_client: GCSFSStorageClient):
-  
-
     # Find all the files in the path
     _files = gcs_storage_client.find(
         path=Path("OPSML_MODEL_REGISTRY/mlops/test-model/v0.0.1/check")
@@ -87,6 +85,3 @@ def test_storage_methods(gcs_storage_client: GCSFSStorageClient):
     ), "Files present"
 
     shutil.rmtree("tests/assets/new", ignore_errors=True)
-
-
-def test_storage_client()
