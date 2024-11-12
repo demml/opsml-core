@@ -7,6 +7,6 @@ format:
 lints:
 	cargo clippy --workspace --all-targets --features "google_storage" -- -D warnings
 
-.PHONY: test
-test:
+.PHONY: test.gcs
+test.gcs:
 	cargo test --features "google_storage" -- --nocapture  --test-threads=1 

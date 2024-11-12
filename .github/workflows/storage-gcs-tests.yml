@@ -1,0 +1,135 @@
+name: Lints-Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
+
+jobs:
+  rust-lints-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup override set stable && rustup update
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo clippy
+        working-directory: ./crates/scouter
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: ./crates/opsml_storage
+        run: make test.gcs
+        env:
+          RUST_BACKTRACE: 1
+
+  test-os:
+    name: test ${{ matrix.os }}-${{ matrix.python-version }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    runs-on: ${{ matrix.os }}-latest
+    needs: [rust-lints-test]
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+    steps:
+      - uses: "google-github-actions/auth@v2"
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
+
+      - name: "Use gcloud CLI"
+        run: "gcloud info"
+
+      - uses: actions/checkout@v4
+
+      - name: install rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.python-version }}-v1
+
+      - name: Set up uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Create virtual environment
+        working-directory: ./py_packages/opsml_storage
+        run: make setup.project
+
+      - name: Lints
+        working-directory: ./py_packages/opsml_storage
+        run: make lints.ci
+
+      - name: Run tests and report coverage
+        working-directory: ./py_packages/opsml_storage
+        run: make test.unit
+
+  test-build:
+    needs: [test-os]
+    name: build - ubuntu - ${{ matrix.manylinux }} - ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, x86]
+        manylinux: [auto]
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
+
+      - name: build wheels
+        uses: PyO3/maturin-action@v1
+
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist --interpreter 3.11
+          rust-toolchain: stable
+          docker-options: -e CI
+          working-directory: ./py_packages/opsml_storage
+
+      - name: Check dist
+        working-directory: ./py_packages/opsml_storage
+        run: ls -lh dist/
+
+      - name: Check wheel
+        working-directory: ./py_packages/opsml_storage
+        run: twine check --strict dist/*

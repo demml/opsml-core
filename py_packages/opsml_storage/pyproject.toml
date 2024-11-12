@@ -70,7 +70,6 @@ testpaths = ["tests"]
 [tool.coverage.run]
 omit = [
     "tests/*",
-    "python/scouter/drift/base.py"
 ]
 
 [tool.mypy]
