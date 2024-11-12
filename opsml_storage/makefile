@@ -1,6 +1,6 @@
 PROJECT=opml-storage
-PYTHON_VERSION=3.11.2
-SOURCE_OBJECTS=./python/opsml_storage
+PYTHON_VERSION=3.11.9
+SOURCE_OBJECTS=python/opsml_storage
 
 format.isort:
 	uv run isort ${SOURCE_OBJECTS}

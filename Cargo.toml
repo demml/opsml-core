@@ -2,11 +2,11 @@
 resolver = "2"
 members = [
   "crates/opsml_storage",
-  "py_packages/opsml_storage",
+  "opsml_storage",
 ]
 default-members = [
   "crates/*",
-  "py_packages/*",
+  "opsml_storage/*",
 ]
 
 [workspace.package]

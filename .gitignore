@@ -72,4 +72,3 @@ test_scripts/
 # Pyenv
 .python-version
 
-py_packages/opsml_storage/tests/assets/distill-bert-tiny.pt

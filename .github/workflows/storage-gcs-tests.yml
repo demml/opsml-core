@@ -85,15 +85,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Create virtual environment
-        working-directory: ./py_packages/opsml_storage
+        working-directory: ./opsml_storage
         run: make setup.project
 
       - name: Lints
-        working-directory: ./py_packages/opsml_storage
+        working-directory: ./opsml_storage
         run: make lints.ci
 
       - name: Run tests and report coverage
-        working-directory: ./py_packages/opsml_storage
+        working-directory: ./opsml_storage
         run: make test.unit
 
   test-build:
@@ -125,12 +125,12 @@ jobs:
           args: --release --out dist --interpreter 3.11
           rust-toolchain: stable
           docker-options: -e CI
-          working-directory: ./py_packages/opsml_storage
+          working-directory: ./opsml_storage
 
       - name: Check dist
-        working-directory: ./py_packages/opsml_storage
+        working-directory: ./opsml_storage
         run: ls -lh dist/
 
       - name: Check wheel
-        working-directory: ./py_packages/opsml_storage
+        working-directory: ./opsml_storage
         run: twine check --strict dist/*
