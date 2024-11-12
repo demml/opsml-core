@@ -19,7 +19,6 @@ pub mod google_storage {
     use google_cloud_storage::http::resumable_upload_client::ChunkSize;
     use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
     use google_cloud_storage::http::resumable_upload_client::UploadStatus;
-    use google_cloud_storage::sign::SignBy;
     use google_cloud_storage::sign::SignedURLMethod;
     use google_cloud_storage::sign::SignedURLOptions;
     use pyo3::prelude::*;
@@ -228,7 +227,6 @@ pub mod google_storage {
             // chunk the stream and return a stream of bytes
 
             // return stream of bytes
-
             Ok(result)
         }
 

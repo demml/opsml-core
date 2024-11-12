@@ -50,6 +50,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     needs: [rust-lints-test]
     env:
+      GCP_BUCKET_NAME: ${{ secrets.GCP_BUCKET_NAME }}
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
