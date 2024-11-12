@@ -180,6 +180,7 @@ pub mod google_storage {
 
             // if creds are set (base64 for JSON file)
             } else {
+                // try with credentials
                 let config = ClientConfig::default()
                     .with_credentials(creds.creds.unwrap())
                     .await
