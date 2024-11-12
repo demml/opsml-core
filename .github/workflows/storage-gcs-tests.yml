@@ -40,13 +40,14 @@ jobs:
 
   test-os:
     name: test ${{ matrix.os }}-${{ matrix.python-version }}
-
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu, macos]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-
     runs-on: ${{ matrix.os }}-latest
     needs: [rust-lints-test]
     env:
