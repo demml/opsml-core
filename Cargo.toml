@@ -6,7 +6,6 @@ members = [
 ]
 default-members = [
   "crates/*",
-  "opsml_storage/*",
 ]
 
 [workspace.package]
