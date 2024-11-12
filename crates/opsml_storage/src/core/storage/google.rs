@@ -72,7 +72,9 @@ pub mod google_storage {
                 )?);
             }
 
-            if let Ok(_service_account_file) = env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON") {
+            if let Ok(_service_account_file) = env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+                .or_else(|_| env::var("GOOGLE_APPLICATION_CREDENTIALS"))
+            {
                 self.creds = Some(CredentialsFile::new().await.map_err(|e| {
                     StorageError::Error(format!(
                         "Unable to create credentials file from file: {}",
