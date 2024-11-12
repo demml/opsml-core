@@ -52,21 +52,22 @@ jobs:
     needs: [rust-lints-test]
     env:
       GCP_BUCKET_NAME: ${{ secrets.GCP_BUCKET_NAME }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+      GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
+      #GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      #WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
       - uses: actions/checkout@v4
-      - uses: "google-github-actions/auth@v2"
-        with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+      #- uses: "google-github-actions/auth@v2"
+      #with:
+      #project_id: ${{ env.GCP_PROJECT_ID }}
+      #workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v2"
+      #- name: "Set up Cloud SDK"
+      #uses: "google-github-actions/setup-gcloud@v2"
 
-      - name: "Use gcloud CLI"
-        run: "gcloud info"
+      #- name: "Use gcloud CLI"
+      #run: "gcloud info"
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
