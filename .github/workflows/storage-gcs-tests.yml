@@ -56,6 +56,7 @@ jobs:
       WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
+      - uses: actions/checkout@v4
       - uses: "google-github-actions/auth@v2"
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
@@ -66,8 +67,6 @@ jobs:
 
       - name: "Use gcloud CLI"
         run: "gcloud info"
-
-      - uses: actions/checkout@v4
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
