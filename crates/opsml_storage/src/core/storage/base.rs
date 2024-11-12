@@ -21,10 +21,7 @@ impl ByteIterator {
     }
 
     fn __next__<'a>(&mut self, py: Python<'a>) -> PyResult<pyo3::Bound<'a, PyBytes>> {
-        let result = self.runtime.block_on(async {
-            let chunk = self.stream.next().await;
-            chunk
-        });
+        let result = self.runtime.block_on(async { self.stream.next().await });
 
         match result {
             Some(Ok(chunk)) => Ok(PyBytes::new_bound(py, &chunk)),

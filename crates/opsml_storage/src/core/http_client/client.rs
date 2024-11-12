@@ -50,22 +50,14 @@ impl ApiClient {
             headers.insert(
                 "X-Prod-Token",
                 HeaderValue::from_str(&token).map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to create header with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to create header with error: {}", e))
                 })?,
             );
         }
         let client = client_builder
             .default_headers(headers)
             .build()
-            .map_err(|e| {
-                ApiError::Error(format!(
-                    "Failed to create client with error: {}",
-                    e.to_string()
-                ))
-            })?;
+            .map_err(|e| ApiError::Error(format!("Failed to create client with error: {}", e)))?;
 
         let mut api_client = Self {
             client,
@@ -104,20 +96,10 @@ impl ApiClient {
             .json(&form)
             .send()
             .await
-            .map_err(|e| {
-                ApiError::Error(format!(
-                    "Failed to send request with error: {}",
-                    e.to_string()
-                ))
-            })?
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
             .json::<Value>()
             .await
-            .map_err(|e| {
-                ApiError::Error(format!(
-                    "Failed to parse response with error: {}",
-                    e.to_string()
-                ))
-            })?;
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
         // check if the response has "access_token" field
         let token = response["access_token"]
@@ -147,10 +129,7 @@ impl ApiClient {
                 .send()
                 .await
                 .map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to send request with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to send request with error: {}", e))
                 })?,
             RequestType::Post => self
                 .client
@@ -163,10 +142,7 @@ impl ApiClient {
                 .send()
                 .await
                 .map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to send request with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to send request with error: {}", e))
                 })?,
             RequestType::Put => self
                 .client
@@ -179,19 +155,14 @@ impl ApiClient {
                 .send()
                 .await
                 .map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to send request with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to send request with error: {}", e))
                 })?,
         };
 
-        let response = response.json::<Value>().await.map_err(|e| {
-            ApiError::Error(format!(
-                "Failed to parse response with error: {}",
-                e.to_string()
-            ))
-        })?;
+        let response = response
+            .json::<Value>()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
         Ok(response)
     }
@@ -221,20 +192,13 @@ impl ApiClient {
 
             if response.is_err() {
                 self.refresh_token().await.map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to refresh token with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to refresh token with error: {}", e))
                 })?;
             }
         }
 
-        let response = response.map_err(|e| {
-            ApiError::Error(format!(
-                "Failed to send request with error: {}",
-                e.to_string()
-            ))
-        })?;
+        let response = response
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(response)
     }
@@ -247,14 +211,15 @@ impl ApiClient {
             .to_string();
 
         // Open file as async stream
-        let file = File::open(file_path).await.map_err(|e| {
-            ApiError::Error(format!("Failed to open file with error: {}", e.to_string()))
-        })?;
+        let file = File::open(file_path)
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to open file with error: {}", e)))?;
 
         // Get file size for Content-Length header
-        let metadata = file.metadata().await.map_err(|e| {
-            ApiError::Error(format!("Failed to get file metadata: {}", e.to_string()))
-        })?;
+        let metadata = file
+            .metadata()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         // get filename from pathBuf
 
@@ -300,19 +265,12 @@ impl ApiClient {
             .body(body)
             .send()
             .await
-            .map_err(|e| {
-                ApiError::Error(format!(
-                    "Failed to send request with error: {}",
-                    e.to_string()
-                ))
-            })?;
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
-        let response = response.json::<Value>().await.map_err(|e| {
-            ApiError::Error(format!(
-                "Failed to parse response with error: {}",
-                e.to_string()
-            ))
-        })?;
+        let response = response
+            .json::<Value>()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
         Ok(response)
     }
@@ -338,20 +296,13 @@ impl ApiClient {
 
             if response.is_err() {
                 self.refresh_token().await.map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to refresh token with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to refresh token with error: {}", e))
                 })?;
             }
         }
 
-        let response = response.map_err(|e| {
-            ApiError::Error(format!(
-                "Failed to send request with error: {}",
-                e.to_string()
-            ))
-        })?;
+        let response = response
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(response)
     }
@@ -364,9 +315,9 @@ impl ApiClient {
     ) -> Result<Value, ApiError> {
         // Create parent directories if they don't exist
         if let Some(parent) = local_path.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                ApiError::Error(format!("Failed to create directories: {}", e.to_string()))
-            })?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| ApiError::Error(format!("Failed to create directories: {}", e)))?;
         }
 
         // Convert read_path to string for header
@@ -398,7 +349,7 @@ impl ApiClient {
             .headers(headers)
             .send()
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request: {}", e.to_string())))?;
+            .map_err(|e| ApiError::Error(format!("Failed to send request: {}", e)))?;
 
         // Check if request was successful
         if !response.status().is_success() {
@@ -411,20 +362,18 @@ impl ApiClient {
         // Create file
         let mut file = File::create(&local_path)
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to create file: {}", e.to_string())))?;
+            .map_err(|e| ApiError::Error(format!("Failed to create file: {}", e)))?;
 
         // Stream chunks to file
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream
             .try_next()
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to read chunk: {}", e.to_string())))?
+            .map_err(|e| ApiError::Error(format!("Failed to read chunk: {}", e)))?
         {
             tokio::io::AsyncWriteExt::write_all(&mut file, &chunk)
                 .await
-                .map_err(|e| {
-                    ApiError::Error(format!("Failed to write chunk: {}", e.to_string()))
-                })?;
+                .map_err(|e| ApiError::Error(format!("Failed to write chunk: {}", e)))?;
         }
 
         Ok(json!({
@@ -457,20 +406,13 @@ impl ApiClient {
 
             if response.is_err() {
                 self.refresh_token().await.map_err(|e| {
-                    ApiError::Error(format!(
-                        "Failed to refresh token with error: {}",
-                        e.to_string()
-                    ))
+                    ApiError::Error(format!("Failed to refresh token with error: {}", e))
                 })?;
             }
         }
 
-        let response = response.map_err(|e| {
-            ApiError::Error(format!(
-                "Failed to send request with error: {}",
-                e.to_string()
-            ))
-        })?;
+        let response = response
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(response)
     }

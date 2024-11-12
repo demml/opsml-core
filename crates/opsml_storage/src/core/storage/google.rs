@@ -174,7 +174,7 @@ pub mod google_storage {
                     Err(_) => ClientConfig::default().anonymous(),
                 };
 
-                return Ok(Client::new(config));
+                Ok(Client::new(config))
 
             // if creds are set (base64 for JSON file)
             } else {
@@ -189,7 +189,7 @@ pub mod google_storage {
                     })?;
 
                 let client = Client::new(config);
-                return Ok(client);
+                Ok(client)
             }
         }
 
@@ -294,7 +294,7 @@ pub mod google_storage {
             // return a list of object names if results.items is not None, Else return empty list
             Ok(result
                 .items
-                .unwrap_or_else(|| vec![])
+                .unwrap_or_else(Vec::new)
                 .iter()
                 .map(|o| o.name.clone())
                 .collect())
@@ -340,7 +340,7 @@ pub mod google_storage {
                 first_byte: 0,
                 last_byte: chunk_size,
                 total_size,
-                chunk_size: chunk_size,
+                chunk_size,
                 file_completed: false,
             })
         }
@@ -543,7 +543,7 @@ pub mod google_storage {
                     .unwrap();
 
                 self.client
-                    .find(&stripped_path)
+                    .find(stripped_path)
                     .await
                     .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))
             });
@@ -564,7 +564,7 @@ pub mod google_storage {
                     .to_str()
                     .unwrap();
 
-                self.client.get_object_stream(&stripped_path).await
+                self.client.get_object_stream(stripped_path).await
             });
 
             let stream = result
@@ -620,7 +620,7 @@ pub mod google_storage {
                             let stripped_path = file.strip_prefix(&client.bucket).unwrap_or(&file);
 
                             // get file size for stripped path to pass to resumable upload session
-                            let metadata = std::fs::metadata(&stripped_path).unwrap();
+                            let metadata = std::fs::metadata(stripped_path).unwrap();
 
                             // get the relative path of the file to the stripped lpath
                             let relative_path = file.strip_prefix(stripped_lpath_clone).unwrap();
@@ -689,9 +689,9 @@ pub mod google_storage {
                 Ok(())
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to upload file: {}", e))
-            })?)
+            })
         }
 
         fn strip_paths(&self, src: PathBuf, dest: PathBuf) -> (PathBuf, PathBuf) {
@@ -734,7 +734,7 @@ pub mod google_storage {
                             let file_path = Path::new(&file);
 
                             let src_path =
-                                file_path.strip_prefix(&client.bucket).unwrap_or(&file_path);
+                                file_path.strip_prefix(&client.bucket).unwrap_or(file_path);
 
                             // get the relative path of the file to the stripped lpath
                             let relative_path =
@@ -779,9 +779,9 @@ pub mod google_storage {
                 Ok(())
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to copy file: {}", e))
-            })?)
+            })
         }
 
         pub fn rm(&self, path: PathBuf, recursive: bool) -> PyResult<()> {
@@ -817,15 +817,15 @@ pub mod google_storage {
                         result.map_err(|e| StorageError::Error(format!("Join error: {}", e)))??;
                     }
                 } else {
-                    self.client.delete_object(&stripped_path).await?;
+                    self.client.delete_object(stripped_path).await?;
                 }
 
                 Ok(())
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to delete file: {}", e))
-            })?)
+            })
         }
 
         pub fn exists(&self, path: PathBuf) -> PyResult<bool> {
@@ -840,15 +840,15 @@ pub mod google_storage {
 
                 let files = self.client.find(stripped_path).await?;
 
-                Ok(files.len() > 0)
+                Ok(!files.is_empty())
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!(
                     "Unable to check if file exists: {}",
                     e
                 ))
-            })?)
+            })
         }
 
         pub fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
@@ -873,7 +873,7 @@ pub mod google_storage {
                         let upload_task = tokio::spawn(async move {
                             let file_path = Path::new(&file);
                             let stripped_path =
-                                file_path.strip_prefix(&client.bucket).unwrap_or(&file_path);
+                                file_path.strip_prefix(&client.bucket).unwrap_or(file_path);
 
                             // get the relative path of the file to the stripped lpath
                             let relative_path = file_path.strip_prefix(stripped_rpath).unwrap();
@@ -917,9 +917,9 @@ pub mod google_storage {
                 Ok(())
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Unable to get file: {}", e))
-            })?)
+            })
         }
 
         #[pyo3(signature = (path, expiration=600))]
@@ -938,12 +938,12 @@ pub mod google_storage {
                     .await
             });
 
-            Ok(result.map_err(|e| -> pyo3::PyErr {
+            result.map_err(|e| -> pyo3::PyErr {
                 pyo3::exceptions::PyRuntimeError::new_err(format!(
                     "Unable to generate presigned url: {}",
                     e
                 ))
-            })?)
+            })
         }
     }
 
