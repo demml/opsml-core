@@ -1,4 +1,4 @@
-from ._opsml_storage_gcs import GCSFSStorageClient
+from ._opsml_storage import GCSFSStorageClient
 
 
 __all__ = ["GCSFSStorageClient"]

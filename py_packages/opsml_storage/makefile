@@ -1,6 +1,6 @@
-PROJECT=opml-storage-gcs
+PROJECT=opml-storage
 PYTHON_VERSION=3.11.2
-SOURCE_OBJECTS=python/opsml_storage
+SOURCE_OBJECTS=./python/opsml_storage
 
 format.isort:
 	uv run isort ${SOURCE_OBJECTS}
@@ -29,7 +29,7 @@ setup.docs:
 	uv sync --all-extras --group dev --group docs
 
 test.unit:
-	uv run pytest \
+	uv run python -m pytest tests \
 		--cov \
 		--cov-fail-under=0 \
 		--cov-report xml:./coverage.xml \

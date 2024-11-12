@@ -13,35 +13,41 @@ description = "Core rust library for the opsml project"
 
 [dependencies]
 pyo3 = { workspace = true }
-serde = { version = "1.0", features = ["derive"] }
-native-tls = { version = "0.2", features = ["vendored"] }
-reqwest = { version = "0.11", features = ["blocking", "json", "stream", ], default-features = false }
-tokio = { version = "1.4", features = ["rt", "rt-multi-thread"] }
-thiserror = "2.0.0"
-serde_json = "1.0.132"
-futures = "0.3.31"
-tokio-util = { version = "0.7.12",  features = ["codec"]}
+serde = { version = "1.*", features = ["derive"] }
+native-tls = { version = "0.*", features = ["vendored"] }
+reqwest = { version = "0.*", features = ["blocking", "json", "stream", ], default-features = false }
+tokio = { version = "1.*", features = ["rt", "rt-multi-thread"] }
+thiserror = "2.*"
+serde_json = "1.*"
+futures = "0.*"
+tokio-util = { version = "0.*",  features = ["codec"]}
 
 # storage dependencies
-google-cloud-storage = { version = "0.22.1", features  = ["auth"], optional = true }
-google-cloud-auth = { version ="0.17.1", optional = true }
-google-cloud-token = { version = "0.1.2", optional = true }
-base64 = "0.22.1"
-bytes = "1.8.0"
-mockall = "0.13.0"
-async-trait = "0.1.83"
-walkdir = "2.5.0"
+google-cloud-storage = { version = "0.*", features  = ["auth"], optional = true }
+google-cloud-auth = { version ="0.*", optional = true }
+google-cloud-token = { version = "0.*", optional = true }
+base64 = "0.*"
+bytes = "1.*"
+mockall = "0.*"
+async-trait = "0.*"
+walkdir = "2.*"
+aws-sdk-s3 = { version = "1.*", optional = true }
+azure_core = { version = "0.21.0", optional = true }
+azure_storage = { version = "0.21.0", optional = true }
+azure_storage_blobs = { version = "0.21.0", optional = true }
 
 
 [features]
 default = []
 google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token"]
+aws_storage = ["aws-sdk-s3"]
+azure = ["azure_core", "azure_storage", "azure_storage_blobs"]
 
 [dev-dependencies]
-mockall = "0.13.0"
-mockito = "1.4.0"
-reqwest_mock = "0.7.0"
-tempfile = "3.13.0"
+mockall = "0.*"
+mockito = "1.*"
+reqwest_mock = "0.*"
+tempfile = "3.*"
 
 
 [profile.release]

@@ -10,11 +10,11 @@ crate-type = ["cdylib", "rlib"]
 
 
 [dependencies]
-bytes = "1.8.0"
-futures-core = "0.3.31"
-opsml-storage = { workspace = true, features = ["google_storage"] }
+bytes = "1.*"
+futures-core = "0.*"
+opsml-storage = { workspace = true, features = ["google_storage", "aws_storage", "azure"] }
 pyo3 = { version = "0.22", features = ["extension-module"] }
-tokio = "1.41.1"
+tokio = "1.*"
 
 [features]
 default = []
