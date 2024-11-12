@@ -53,6 +53,7 @@ class GCSFSStorageClient:
             recursive:
                 Whether to copy recursively.
         """
+
     def rm(self, path: Path, recursive: bool = False):
         """Remove the data from the source.
 
