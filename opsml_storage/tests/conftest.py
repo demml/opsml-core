@@ -5,7 +5,4 @@ from opsml_storage import GCSFSStorageClient
 
 @pytest.fixture
 def gcs_storage_client():
-    value = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-    assert value, "GOOGLE_APPLICATION_CREDENTIALS not set"
-    print(f"GOOGLE_APPLICATION_CREDENTIALS: {value}")
     return GCSFSStorageClient(bucket=os.environ["GCP_BUCKET_NAME"])
