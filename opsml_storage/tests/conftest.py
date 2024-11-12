@@ -1,7 +1,8 @@
 import pytest
 import os
+from opsml_storage import GCSFSStorageClient
 
 
 @pytest.fixture
-def gcs_bucket_name():
-    return os.getenv("GCP_BUCKET_NAME")
+def gcs_storage_client():
+    return GCSFSStorageClient(bucket=os.environ["GCS_BUCKET_NAME"])
