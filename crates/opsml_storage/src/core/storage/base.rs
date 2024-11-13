@@ -1,11 +1,26 @@
 // create pyo3 async iterator
+use crate::core::utils::error::StorageError;
 use futures::StreamExt;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::path::PathBuf;
 use tokio::runtime::Runtime;
-
-use crate::core::utils::error::StorageError;
 // take a stream of bytes
+
+pub trait FileSystem {
+    fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError>;
+    fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError>;
+    fn put(&self, lpath: PathBuf, rpath: PathBuf) -> Result<(), StorageError>;
+    fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> Result<(), StorageError>;
+    fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError>;
+    fn exists(&self, path: PathBuf) -> Result<bool, StorageError>;
+    fn generate_presigned_url(
+        &self,
+        path: PathBuf,
+        expiration: u64,
+    ) -> Result<String, StorageError>;
+}
+
 #[pyclass]
 pub struct ByteIterator {
     // stream of bytes

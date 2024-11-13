@@ -1,16 +1,21 @@
 use crate::core::utils::error::StorageError;
 use aws_config::BehaviorVersion;
 use aws_config::SdkConfig;
-use aws_sdk_s3::operation::create_multipart_upload;
-use aws_sdk_s3::operation::get_object;
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::primitives::Length;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
+use bytes::Bytes;
+use pyo3::prelude::*;
+use pyo3::pyclass;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
+
+const MAX_CHUNKS: u64 = 10000;
 
 #[derive(Clone)]
 pub struct AWSCreds {
@@ -53,7 +58,6 @@ impl AWSMulitPartUpload {
 
     pub async fn upload_part(
         &mut self,
-        upload_id: &str,
         part_number: i32,
         body: ByteStream,
     ) -> Result<bool, StorageError> {
@@ -62,7 +66,7 @@ impl AWSMulitPartUpload {
             .upload_part()
             .bucket(&self.bucket)
             .key(&self.path)
-            .upload_id(upload_id)
+            .upload_id(&self.upload_id)
             .body(body)
             .part_number(part_number)
             .send()
@@ -313,5 +317,92 @@ impl AWSStorageClient {
             .map_err(|e| StorageError::Error(format!("Failed to delete objects: {}", e)))?;
 
         Ok(true)
+    }
+
+    pub async fn upload_file_in_chunks(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        chunk_size: Option<u64>,
+    ) -> Result<(), StorageError> {
+        let chunk_size = chunk_size.unwrap_or(5 * 1024 * 1024); // 5MB
+
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        // get file size
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        let upload_id = self
+            .create_multipart_upload(rpath.to_str().unwrap())
+            .await?;
+
+        let mut uploader = AWSMulitPartUpload::new(
+            self.bucket.clone(),
+            rpath.to_str().unwrap().to_string(),
+            upload_id,
+        )
+        .await?;
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_count - 1 == chunk_index {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let stream = ByteStream::read_from()
+                .path(lpath)
+                .offset(chunk_index * chunk_size)
+                .length(Length::Exact(this_chunk))
+                .build()
+                .await
+                .unwrap();
+
+            let part_number = (chunk_index as i32) + 1;
+
+            uploader.upload_part(part_number, stream).await?;
+        }
+
+        uploader.complete().await?;
+
+        Ok(())
+    }
+}
+
+// For both python and rust, we need to define 2 structs: one for rust that supports async and one for python that does not
+
+pub struct S3FStorageClient {
+    client: AWSStorageClient,
+}
+
+impl S3FStorageClient {
+    pub async fn new(bucket: String) -> Self {
+        let client = AWSStorageClient::new(bucket).await.unwrap();
+        S3FStorageClient { client }
+    }
+
+    pub async fn find(&self, path: PathBuf) -> Vec<String> {
+        let stripped_path = path
+            .strip_prefix(&self.client.bucket)
+            .unwrap_or(&path)
+            .to_str()
+            .unwrap();
+
+        self.client.find(stripped_path).await.unwrap()
     }
 }
