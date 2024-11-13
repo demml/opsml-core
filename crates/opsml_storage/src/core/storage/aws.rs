@@ -117,8 +117,7 @@ pub mod aws_storage {
                     .set_parts(Some(self.upload_parts.clone()))
                     .build();
 
-            let complete = self
-                .runtime
+            self.runtime
                 .block_on(async {
                     let _complete_multipart_upload_res = self
                         .client
@@ -140,9 +139,7 @@ pub mod aws_storage {
                 })
                 .map_err(|e: StorageError| {
                     StorageError::Error(format!("Failed to complete multipart upload: {}", e))
-                })?;
-
-            Ok(complete)
+                })
         }
 
         pub fn get_next_chunk(
@@ -360,7 +357,7 @@ pub mod aws_storage {
 
             Ok(objects
                 .contents
-                .unwrap_or_else(|| Vec::new())
+                .unwrap_or_else(Vec::new)
                 .iter()
                 .filter_map(|o| o.key.clone())
                 .collect())
@@ -390,7 +387,7 @@ pub mod aws_storage {
 
             Ok(objects
                 .contents
-                .unwrap_or_else(|| Vec::new())
+                .unwrap_or_else(Vec::new)
                 .iter()
                 .map(|o| {
                     let object_type = match o.storage_class.clone() {
@@ -402,16 +399,16 @@ pub mod aws_storage {
 
                     let size = o.size.unwrap_or_default();
 
-                    let created = match o.last_modified.clone() {
+                    let created = match o.last_modified {
                         Some(last_modified) => last_modified.to_string(),
                         None => "".to_string(),
                     };
 
                     FileInfo {
                         name: file.file_name().unwrap().to_str().unwrap().to_string(),
-                        size: size,
-                        object_type: object_type,
-                        created: created,
+                        size,
+                        object_type,
+                        created,
                         suffix: file.extension().unwrap().to_str().unwrap().to_string(),
                     }
                 })
@@ -454,7 +451,7 @@ pub mod aws_storage {
                 let relative_path = file_path.relative_path(&src)?;
                 let remote_path = dest.join(relative_path);
 
-                self.copy_object(&file_path.to_str().unwrap(), &remote_path.to_str().unwrap())?;
+                self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())?;
             }
 
             Ok(true)
@@ -502,8 +499,7 @@ pub mod aws_storage {
 
             self.runtime
                 .block_on(async {
-                    Ok(self
-                        .client
+                    self.client
                         .delete_objects()
                         .bucket(&self.bucket)
                         .delete(
@@ -521,7 +517,7 @@ pub mod aws_storage {
                         .await
                         .map_err(|e| {
                             StorageError::Error(format!("Failed to delete objects: {}", e))
-                        })?)
+                        })
                 })
                 .map_err(|e: StorageError| {
                     StorageError::Error(format!("Failed to delete objects: {}", e))
@@ -602,12 +598,12 @@ pub mod aws_storage {
         }
 
         fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
-            self.client.find_info(&path.to_str().unwrap())
+            self.client.find_info(path.to_str().unwrap())
         }
 
         fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client.find(&stripped_path.to_str().unwrap())
+            self.client.find(stripped_path.to_str().unwrap())
         }
 
         fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
@@ -619,7 +615,7 @@ pub mod aws_storage {
                 let stripped_lpath_clone = stripped_lpath.clone();
 
                 // list all objects in the path
-                let objects = self.client.find(&stripped_rpath.to_str().unwrap())?;
+                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
 
                 // iterate over each object and get it
                 for obj in objects {
@@ -629,14 +625,14 @@ pub mod aws_storage {
                     let local_path = stripped_lpath_clone.join(relative_path);
 
                     self.client.get_object(
-                        &local_path.to_str().unwrap(),
-                        &stripped_path.to_str().unwrap(),
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
                     )?;
                 }
             } else {
                 self.client.get_object(
-                    &stripped_lpath.to_str().unwrap(),
-                    &stripped_rpath.to_str().unwrap(),
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
                 )?;
             }
 
@@ -682,13 +678,13 @@ pub mod aws_storage {
 
             if recursive {
                 self.client.copy_objects(
-                    &stripped_src.to_str().unwrap(),
-                    &stripped_dest.to_str().unwrap(),
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
                 )?;
             } else {
                 self.client.copy_object(
-                    &stripped_src.to_str().unwrap(),
-                    &stripped_dest.to_str().unwrap(),
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
                 )?;
             }
 
@@ -700,10 +696,9 @@ pub mod aws_storage {
 
             if recursive {
                 self.client
-                    .delete_objects(&stripped_path.to_str().unwrap())?;
+                    .delete_objects(stripped_path.to_str().unwrap())?;
             } else {
-                self.client
-                    .delete_object(&stripped_path.to_str().unwrap())?;
+                self.client.delete_object(stripped_path.to_str().unwrap())?;
             }
 
             Ok(())
@@ -711,7 +706,7 @@ pub mod aws_storage {
 
         fn exists(&self, path: &Path) -> Result<bool, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            let objects = self.client.find(&stripped_path.to_str().unwrap())?;
+            let objects = self.client.find(stripped_path.to_str().unwrap())?;
 
             Ok(!objects.is_empty())
         }
@@ -723,7 +718,7 @@ pub mod aws_storage {
         ) -> Result<String, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
             self.client
-                .generate_presigned_url(&stripped_path.to_str().unwrap(), expiration)
+                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
         }
     }
 
@@ -741,13 +736,13 @@ pub mod aws_storage {
         }
 
         fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-            self.client.find_info(&path.to_str().unwrap())
+            self.client.find_info(path.to_str().unwrap())
         }
 
         #[pyo3(signature = (path=PathBuf::new()))]
         fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client.find(&stripped_path.to_str().unwrap())
+            self.client.find(stripped_path.to_str().unwrap())
         }
 
         #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -760,7 +755,7 @@ pub mod aws_storage {
                 let stripped_lpath_clone = stripped_lpath.clone();
 
                 // list all objects in the path
-                let objects = self.client.find(&stripped_rpath.to_str().unwrap())?;
+                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
 
                 // iterate over each object and get it
                 for obj in objects {
@@ -770,14 +765,14 @@ pub mod aws_storage {
                     let local_path = stripped_lpath_clone.join(relative_path);
 
                     self.client.get_object(
-                        &local_path.to_str().unwrap(),
-                        &stripped_path.to_str().unwrap(),
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
                     )?;
                 }
             } else {
                 self.client.get_object(
-                    &stripped_lpath.to_str().unwrap(),
-                    &stripped_rpath.to_str().unwrap(),
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
                 )?;
             }
 
@@ -825,13 +820,13 @@ pub mod aws_storage {
 
             if recursive {
                 self.client.copy_objects(
-                    &stripped_src.to_str().unwrap(),
-                    &stripped_dest.to_str().unwrap(),
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
                 )?;
             } else {
                 self.client.copy_object(
-                    &stripped_src.to_str().unwrap(),
-                    &stripped_dest.to_str().unwrap(),
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
                 )?;
             }
 
@@ -844,10 +839,9 @@ pub mod aws_storage {
 
             if recursive {
                 self.client
-                    .delete_objects(&stripped_path.to_str().unwrap())?;
+                    .delete_objects(stripped_path.to_str().unwrap())?;
             } else {
-                self.client
-                    .delete_object(&stripped_path.to_str().unwrap())?;
+                self.client.delete_object(stripped_path.to_str().unwrap())?;
             }
 
             Ok(())
@@ -855,7 +849,7 @@ pub mod aws_storage {
 
         fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            let objects = self.client.find(&stripped_path.to_str().unwrap())?;
+            let objects = self.client.find(stripped_path.to_str().unwrap())?;
 
             Ok(!objects.is_empty())
         }
@@ -868,7 +862,7 @@ pub mod aws_storage {
         ) -> Result<String, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
             self.client
-                .generate_presigned_url(&stripped_path.to_str().unwrap(), expiration)
+                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
         }
     }
 
@@ -885,7 +879,7 @@ pub mod aws_storage {
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
-            let mut file = File::create(&name).expect("Could not create sample file.");
+            let mut file = File::create(name).expect("Could not create sample file.");
 
             while file.metadata().unwrap().len() <= chunk_size * 2 {
                 let rand_string: String = thread_rng()

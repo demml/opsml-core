@@ -8,12 +8,12 @@ use std::path::PathBuf;
 // create a method for Path that returns a relative path
 
 pub trait PathExt {
-    fn relative_path(&self, base: &PathBuf) -> Result<PathBuf, StorageError>;
+    fn relative_path(&self, base: &Path) -> Result<PathBuf, StorageError>;
     fn strip_path(&self, prefix: &str) -> PathBuf;
 }
 
 impl PathExt for Path {
-    fn relative_path(&self, base: &PathBuf) -> Result<PathBuf, StorageError> {
+    fn relative_path(&self, base: &Path) -> Result<PathBuf, StorageError> {
         self.strip_prefix(base)
             .map_err(|e| StorageError::Error(format!("Failed to get relative path: {}", e)))
             .map(|p| p.to_path_buf())
