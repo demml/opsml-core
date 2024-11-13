@@ -12,12 +12,20 @@ permissions:
 
 env:
   RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
+  CLOUD_BUCKET_NAME: "${{ secrets.CLOUD_BUCKET_NAME }}"
+  AWS_REGION: "${{ secrets.AWS_REGION }}"
 
 jobs:
   rust-lints-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Rust
         run: rustup override set stable && rustup update
@@ -34,7 +42,7 @@ jobs:
 
       - name: Tests
         working-directory: ./crates/opsml_storage
-        run: make test.gcs
+        run: make test.aws
         env:
           RUST_BACKTRACE: 1
 
@@ -50,14 +58,16 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     runs-on: ${{ matrix.os }}-latest
     needs: [rust-lints-test]
-    env:
-      GCP_BUCKET_NAME: ${{ secrets.GCP_BUCKET_NAME }}
-      GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
-      #GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      #WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
       #- uses: "google-github-actions/auth@v2"
       #with:
       #project_id: ${{ env.GCP_PROJECT_ID }}
@@ -96,42 +106,3 @@ jobs:
       - name: Run tests and report coverage
         working-directory: ./opsml_storage_s3
         run: make test.unit
-
-  test-build:
-    needs: [test-os]
-    name: build - ubuntu - ${{ matrix.manylinux }} - ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64, x86]
-        manylinux: [auto]
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: set up python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
-
-      - name: build wheels
-        uses: PyO3/maturin-action@v1
-
-        with:
-          target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --interpreter 3.11
-          rust-toolchain: stable
-          docker-options: -e CI
-          working-directory: ./opsml_storage_s3
-
-      - name: Check dist
-        working-directory: ./opsml_storage_s3
-        run: ls -lh dist/
-
-      - name: Check wheel
-        working-directory: ./opsml_storage_s3
-        run: twine check --strict dist/*

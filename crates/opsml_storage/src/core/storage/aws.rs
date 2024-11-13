@@ -881,7 +881,7 @@ pub mod aws_storage {
         const CHUNK_SIZE: u64 = 1024 * 256;
 
         pub fn get_bucket() -> String {
-            std::env::var("AWS_BUCKET").unwrap_or_else(|_| "opsml-integration".to_string())
+            std::env::var("CLOUD_BUCKET_NAME").unwrap_or_else(|_| "opsml-integration".to_string())
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
