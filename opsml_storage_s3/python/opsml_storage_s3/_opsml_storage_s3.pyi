@@ -1,13 +1,34 @@
 from pathlib import Path
 from typing import Iterable, List
 
-class GCSFSStorageClient:
+class FileInfo:
+    @property
+    def name(self) -> str:
+        """The name of the file."""
+
+    @property
+    def size(self) -> int:
+        """The size of the file."""
+
+    @property
+    def object_type(self) -> str:
+        """The type of the object."""
+
+    @property
+    def created(self) -> str:
+        """The creation time of the file."""
+
+    @property
+    def suffix(self) -> str:
+        """The suffix of the file."""
+
+class PyS3FSStorageClient:
     def __init__(self, bucket: str):
         """Initialize the storage client.
 
         Args:
             bucket_name:
-                The name of the gcs bucket.
+                The name of the s3 bucket.
         """
 
     def find(self, path: Path) -> List[str]:
@@ -16,23 +37,32 @@ class GCSFSStorageClient:
         Args:
             path:
                 The path to search for files.
-
-        Returns:
-            A list of file paths.
         """
 
-    def iterfile(self, path: Path) -> Iterable[bytes]:
-        """Returns an iterator over all the files in the path.
+    def find_info(self, path: Path) -> List[FileInfo]:
+        """Returns all the files in the path with additional information.
 
         Args:
             path:
                 The path to search for files.
 
         Returns:
-            An iterator over file paths.
+            A list of FileInfo objects.
         """
 
-    def put(self, lpath: Path, rpath: Path):
+    def get(self, lpath: Path, rpath: Path, recursive: bool = False) -> None:
+        """Get the data from the path.
+
+        Args:
+            lpath:
+                The path to the local file.
+            rpath:
+                The path to the remote file.
+            recursive:
+                Whether to get recursively.
+        """
+
+    def put(self, lpath: Path, rpath: Path, recursive: bool = False):
         """Put the data in the path.
 
         Args:
@@ -40,10 +70,12 @@ class GCSFSStorageClient:
                 The path to the local file.
             rpath:
                 The path to the remote file.
+            recursive:
+                Whether to put recursively. lpath and rpath must be directories
         """
 
     def copy(self, src: Path, dest: Path, recursive: bool = False):
-        """Copy the data from the source to the destination.
+        """Copy the data from the source to the destination. This is an "in-bucket" copy.
 
         Args:
             src:
@@ -70,18 +102,9 @@ class GCSFSStorageClient:
         Args:
             path:
                 path to check.
-        """
 
-    def get(self, lpath: Path, rpath: Path, recursive: bool = False) -> None:
-        """Get the data from the path.
-
-        Args:
-            lpath:
-                The path to the local file.
-            rpath:
-                The path to the remote file.
-            recursive:
-                Whether to get recursively.
+        Returns:
+            True if the path exists, False otherwise.
         """
 
     def generate_presigned_url(self, path: Path, expiration: int = 600) -> str:
@@ -92,4 +115,7 @@ class GCSFSStorageClient:
                 The path to the file.
             expiration:
                 The expiration time in seconds.
+
+        Returns:
+            The signed URL.
         """

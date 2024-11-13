@@ -1,5 +1,5 @@
 [project]
-name = "opsml_storage"
+name = "opsml_storage_s3"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
@@ -87,5 +87,5 @@ build-backend = "maturin"
 
 [tool.maturin]
 python-source = "python"
-module-name = "opsml_storage._opsml_storage"
+module-name = "opsml_storage_s3._opsml_storage_s3"
 cargo-extra-args = "--features extension-module"

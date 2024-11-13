@@ -51,9 +51,14 @@ pub trait FileSystem {
 #[derive(Debug)]
 #[pyclass]
 pub struct FileInfo {
+    #[pyo3(get)]
     pub name: String,
+    #[pyo3(get)]
     pub size: i64,
+    #[pyo3(get)]
     pub object_type: String,
+    #[pyo3(get)]
     pub created: String,
+    #[pyo3(get)]
     pub suffix: String,
 }

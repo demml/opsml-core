@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   "crates/opsml_storage",
-  "opsml_storage",
+  "opsml_storage_s3",
 ]
 default-members = [
   "crates/*",

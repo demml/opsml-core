@@ -283,7 +283,7 @@ wheels = [
 ]
 
 [[package]]
-name = "opsml-storage"
+name = "opsml-storage-s3"
 version = "0.1.0"
 source = { editable = "." }
 
