@@ -16,7 +16,7 @@ pyo3 = { workspace = true }
 serde = { version = "1.*", features = ["derive"] }
 native-tls = { version = "0.*", features = ["vendored"] }
 reqwest = { version = "0.*", features = ["blocking", "json", "stream", ], default-features = false }
-tokio = { version = "1.*", features = ["rt", "rt-multi-thread"] }
+tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "macros"] }
 thiserror = "2.*"
 serde_json = "1.*"
 futures = "0.*"

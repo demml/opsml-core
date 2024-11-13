@@ -991,7 +991,6 @@ pub mod aws_storage {
             // list files with info
             let files = client.find_info(rpath).unwrap();
             assert_eq!(files.len(), 2);
-            println!("{:?}", files);
 
             // download the files
             let new_path = uuid::Uuid::new_v4().to_string();
