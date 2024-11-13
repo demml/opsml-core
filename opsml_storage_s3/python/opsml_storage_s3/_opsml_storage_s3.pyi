@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List
+from typing import List, Optional
 
 class FileInfo:
     @property
@@ -31,7 +31,7 @@ class PyS3FSStorageClient:
                 The name of the s3 bucket.
         """
 
-    def find(self, path: Path) -> List[str]:
+    def find(self, path: Optional[Path] = None) -> List[str]:
         """Returns all the files in the path.
 
         Args:
@@ -39,7 +39,7 @@ class PyS3FSStorageClient:
                 The path to search for files.
         """
 
-    def find_info(self, path: Path) -> List[FileInfo]:
+    def find_info(self, path: Optional[Path] = None) -> List[FileInfo]:
         """Returns all the files in the path with additional information.
 
         Args:

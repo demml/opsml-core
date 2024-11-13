@@ -29,7 +29,7 @@ setup.docs:
 	uv sync --all-extras --group dev --group docs
 
 test.unit:
-	uv run python -m pytest tests \
+	uv run pytest \
 		--cov \
 		--cov-fail-under=0 \
 		--cov-report xml:./coverage.xml \
@@ -37,7 +37,7 @@ test.unit:
 
 setup.integration:
 	uv sync --all-extras --group dev
-	uv run maturin develop --features google_storage 
+	uv run maturin develop --release 
 
 test.integration:
 	uv run pytest -s tests/integration

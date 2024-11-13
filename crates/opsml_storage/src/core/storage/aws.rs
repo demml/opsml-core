@@ -316,7 +316,6 @@ pub mod aws_storage {
                 Ok(response.upload_id.unwrap())
             })
         }
-
         /// List all objects in a path
         ///
         /// # Arguments
@@ -327,18 +326,37 @@ pub mod aws_storage {
         ///
         /// A list of objects in the path
         pub fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
-            let objects = self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .list_objects_v2()
-                    .bucket(&self.bucket)
-                    .prefix(path)
-                    .send()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
+            // check if path = "/"
+            let objects = if path == "/" || path.is_empty() {
+                self.runtime.block_on(async {
+                    let response = self
+                        .client
+                        .list_objects_v2()
+                        .bucket(&self.bucket)
+                        .send()
+                        .await
+                        .map_err(|e| {
+                            StorageError::Error(format!("Failed to list objects: {}", e))
+                        })?;
 
-                Ok(response)
-            })?;
+                    Ok(response)
+                })?
+            } else {
+                self.runtime.block_on(async {
+                    let response = self
+                        .client
+                        .list_objects_v2()
+                        .bucket(&self.bucket)
+                        .prefix(path)
+                        .send()
+                        .await
+                        .map_err(|e| {
+                            StorageError::Error(format!("Failed to list objects: {}", e))
+                        })?;
+
+                    Ok(response)
+                })?
+            };
 
             Ok(objects
                 .contents
@@ -726,11 +744,13 @@ pub mod aws_storage {
             self.client.find_info(&path.to_str().unwrap())
         }
 
+        #[pyo3(signature = (path=PathBuf::new()))]
         fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
             self.client.find(&stripped_path.to_str().unwrap())
         }
 
+        #[pyo3(signature = (lpath, rpath, recursive = false))]
         fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
             // strip the paths
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
@@ -764,6 +784,7 @@ pub mod aws_storage {
             Ok(())
         }
 
+        #[pyo3(signature = (lpath, rpath, recursive = false))]
         fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
             let stripped_lpath = lpath.strip_path(&self.client.bucket);
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
@@ -797,6 +818,7 @@ pub mod aws_storage {
             }
         }
 
+        #[pyo3(signature = (src, dest, recursive = false))]
         fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> Result<(), StorageError> {
             let stripped_src = src.strip_path(&self.client.bucket);
             let stripped_dest = dest.strip_path(&self.client.bucket);
@@ -816,6 +838,7 @@ pub mod aws_storage {
             Ok(())
         }
 
+        #[pyo3(signature = (path, recursive = false))]
         fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
 
@@ -837,6 +860,7 @@ pub mod aws_storage {
             Ok(!objects.is_empty())
         }
 
+        #[pyo3(signature = (path, expiration = 600))]
         fn generate_presigned_url(
             &self,
             path: PathBuf,
