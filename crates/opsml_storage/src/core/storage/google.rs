@@ -1,6 +1,6 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
-    use crate::core::storage::base::ByteIterator;
+
     use crate::core::utils::error::StorageError;
     use base64::prelude::*;
     use futures::stream::Stream;
@@ -555,29 +555,6 @@ pub mod google_storage {
                 result
                     .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?,
             )
-        }
-
-        pub fn iterfile(&self, path: PathBuf) -> PyResult<ByteIterator> {
-            let rt = Runtime::new().unwrap();
-            let result = rt.block_on(async {
-                // remove bucket from path if exists
-                let stripped_path = path
-                    .strip_prefix(&self.client.bucket)
-                    .unwrap_or(&path)
-                    .to_str()
-                    .unwrap();
-
-                self.client.get_object_stream(stripped_path).await
-            });
-
-            let stream = result
-                .unwrap()
-                .map_err(|e| StorageError::Error(format!("Stream error: {}", e)));
-
-            Ok(ByteIterator {
-                stream: Box::new(stream),
-                runtime: rt,
-            })
         }
 
         /// Upload a file to the storage bucket
