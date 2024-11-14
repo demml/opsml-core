@@ -2302,6 +2302,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "opsml-storage-gcs"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.8.0",
+ "futures-core",
+ "opsml-storage",
+ "pyo3",
+ "tokio 1.41.1",
+]
+
+[[package]]
 name = "opsml-storage-s3"
 version = "0.1.0"
 dependencies = [
