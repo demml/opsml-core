@@ -4,6 +4,7 @@ members = [
   "crates/opsml_storage",
   "opsml_storage_s3",
   "opsml_storage_gcs",
+  "opsml_storage_local",
 ]
 default-members = [
   "crates/*",

@@ -1,3 +1,3 @@
-from ._opsml_storage_gcs import PyGCSFSStorageClient
+from ._opsml_storage_gcs import PyGCSFSStorageClient, PyLocalFSStorageClient
 
-__all__ = ["PyGCSFSStorageClient"]
+__all__ = ["PyGCSFSStorageClient", "PyLocalFSStorageClient"]
