@@ -138,7 +138,7 @@ jobs:
         working-directory: ./opsml_storage_s3
         run: |
           python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
-          python -c "import ${env.MODULE_NAME}"
+          python -c "import ${env.PACKAGE_NAME}"
 
   test-linux-build:
     runs-on: ubuntu-latest
@@ -186,4 +186,4 @@ jobs:
         working-directory: ./opsml_storage_s3
         run: |
           python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
-          python -c "import ${env.MODULE_NAME}"
+          python -c "import ${env.PACKAGE_NAME}"
