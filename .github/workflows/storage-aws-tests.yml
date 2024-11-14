@@ -1,4 +1,4 @@
-name: Lints-Tests
+name: Lints-Tests-AWS
 
 on:
   push:
