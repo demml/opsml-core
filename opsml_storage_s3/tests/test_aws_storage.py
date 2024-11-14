@@ -1,12 +1,15 @@
 from pathlib import Path
 from opsml_storage_s3 import PyS3FSStorageClient
+import uuid
 
 
 def test_aws_storage_client(
     tmp_path: Path, aws_storage_client: PyS3FSStorageClient
 ) -> None:
+    # generate random directory
+
     lpath = Path("tests/assets/cats.jpg")
-    rpath_dir = Path("test_dir")
+    rpath_dir = Path(uuid.uuid4().hex)
     rpath = rpath_dir / "cats.jpg"
 
     get_lpath = Path(tmp_path / "tests/assets/empty.cats.jpg")
