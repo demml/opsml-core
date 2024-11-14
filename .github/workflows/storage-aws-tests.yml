@@ -113,7 +113,7 @@ jobs:
         working-directory: ./opsml_storage_s3
         run: make test.unit
 
-  macos-aarch64:
+  test-macos-aarch64-build:
     runs-on: macos-14
     needs: [rust-lints-test]
     steps:
@@ -131,6 +131,8 @@ jobs:
         with:
           target: aarch64
           args: --release --locked --out dist
+          rust-toolchain: stable
+          working-directory: ./opsml_storage_s3
 
       - name: "Test wheel - aarch64"
         run: |
@@ -158,6 +160,8 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
+          rust-toolchain: stable
+          working-directory: ./opsml_storage_s3
           target: ${{ matrix.target }}
           manylinux: auto
           args: --release --locked --out dist
