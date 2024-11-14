@@ -2,6 +2,8 @@
 pub mod google_storage {
 
     use crate::core::utils::error::StorageError;
+    use aws_smithy_types::byte_stream::ByteStream;
+    use aws_smithy_types::byte_stream::Length;
     use base64::prelude::*;
     use futures::stream::Stream;
     use futures::StreamExt;
@@ -27,9 +29,11 @@ pub mod google_storage {
     use std::fs::File;
     use std::io::BufRead;
     use std::io::BufReader;
+    use std::io::Read;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
+    use tokio::runtime::Handle;
     use tokio::runtime::Runtime;
     use walkdir;
 
@@ -96,72 +100,86 @@ pub mod google_storage {
         }
     }
 
-    #[derive(Clone)]
-    pub struct GoogleResumableUploadClient {
+    pub struct GoogleMultipartUploadClient {
         pub client: ResumableUploadClient,
-        first_byte: u64,
-        last_byte: u64,
-        total_size: u64,
-        chunk_size: u64,
         file_completed: bool,
+        handle: tokio::runtime::Handle,
     }
 
-    impl GoogleResumableUploadClient {
-        pub async fn upload_multiple_chunks(
+    impl GoogleMultipartUploadClient {
+        pub fn get_next_chunk(
+            &self,
+            path: &Path,
+            chunk_size: u64,
+            chunk_index: u64,
+            this_chunk_size: u64,
+        ) -> Result<ByteStream, StorageError> {
+            let handle = self.handle.clone();
+            handle.block_on(async {
+                let stream = ByteStream::read_from()
+                    .path(path)
+                    .offset(chunk_index * chunk_size)
+                    .length(Length::Exact(this_chunk_size))
+                    .build()
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
+
+                Ok(stream)
+            })
+        }
+        pub fn upload_part(
             &mut self,
-            chunk: bytes::Bytes,
-        ) -> Result<Option<String>, StorageError> {
-            let size = ChunkSize::new(self.first_byte, 63304, Some(self.total_size));
+            chunk: ByteStream,
+            first_byte: u64,
+            last_byte: u64,
+            total_size: u64,
+        ) -> Result<UploadStatus, StorageError> {
+            let handle = self.handle.clone();
+            let size = ChunkSize::new(first_byte, last_byte, Some(total_size));
 
-            let result = self
-                .client
-                .upload_multiple_chunk(chunk, &size)
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!(
-                        "Unable to upload multiple chunks to resumable upload: {}",
-                        e
-                    ))
-                })?;
+            handle.block_on(async {
+                let data = chunk
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Unable to collect chunk data: {}", e))
+                    })?
+                    .into_bytes();
 
-            // extract the range from the result and update the first_byte and last_byte
-            // check if enum is Ok
-            match result {
-                UploadStatus::Ok(object) => {
-                    self.file_completed = true;
-                    return Ok(Some(object.name));
-                }
-                UploadStatus::ResumeIncomplete(range) => {
-                    self.first_byte = range.last_byte + 1;
+                println!("Uploading chunk: {:?}", size);
+                println!("Data size: {:?}", data.len());
 
-                    // if the last_byte + chunk_size is greater than the total size, set the last_byte to the total size
-                    if range.last_byte + self.chunk_size > self.total_size {
-                        self.last_byte = self.total_size;
-                    } else {
-                        self.last_byte = range.last_byte + self.chunk_size;
-                    }
-                }
-                UploadStatus::NotStarted => {
-                    self.first_byte = 0;
-                    self.last_byte = self.chunk_size;
-                }
-            }
+                let result = self
+                    .client
+                    .upload_multiple_chunk(data, &size)
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!(
+                            "Unable to upload multiple chunks to resumable upload: {}",
+                            e
+                        ))
+                    })?;
 
-            Ok(None)
+                Ok(result)
+            })
         }
     }
 
-    #[derive(Clone)]
     pub struct GoogleStorageClient {
         pub client: Client,
         pub bucket: String,
+        runtime: tokio::runtime::Runtime,
     }
 
     impl GoogleStorageClient {
         pub async fn new(bucket: String) -> Result<Self, StorageError> {
             let client = GoogleStorageClient::build_client().await?;
-
-            Ok(GoogleStorageClient { client, bucket })
+            let rt = Runtime::new().unwrap();
+            Ok(GoogleStorageClient {
+                client,
+                bucket,
+                runtime: rt,
+            })
         }
 
         pub async fn build_client() -> Result<Client, StorageError> {
@@ -206,31 +224,215 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A stream of bytes
-        pub async fn get_object_stream(
+        pub fn get_object_stream(
             &self,
             rpath: &str,
         ) -> Result<
             impl Stream<Item = Result<bytes::Bytes, google_cloud_storage::http::Error>>,
             StorageError,
         > {
-            // open a bucket and blob and return the stream
-            let result = self
-                .client
-                .download_streamed_object(
-                    &GetObjectRequest {
-                        bucket: self.bucket.clone(),
-                        object: rpath.to_string(),
-                        ..Default::default()
-                    },
-                    &Range::default(),
-                )
-                .await
-                .map_err(|e| StorageError::Error(format!("Unable to download object: {}", e)))?;
+            self.runtime.block_on(async {
+                // open a bucket and blob and return the stream
+                let result = self
+                    .client
+                    .download_streamed_object(
+                        &GetObjectRequest {
+                            bucket: self.bucket.clone(),
+                            object: rpath.to_string(),
+                            ..Default::default()
+                        },
+                        &Range::default(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Unable to download object: {}", e))
+                    })?;
+                Ok(result)
+            })
+        }
 
-            // chunk the stream and return a stream of bytes
+        /// Download a remote object as a stream to a local file
+        ///
+        /// # Arguments
+        ///
+        /// * `lpath` - The path to the local file
+        /// * `rpath` - The path to the remote file
+        ///
+        pub fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+            let mut stream = self.get_object_stream(rpath)?;
 
-            // return stream of bytes
-            Ok(result)
+            // create and open lpath file
+            let prefix = Path::new(lpath).parent().unwrap();
+
+            if !prefix.exists() {
+                // create the directory if it does not exist and skip errors
+                std::fs::create_dir_all(prefix).map_err(|e| {
+                    StorageError::Error(format!("Unable to create directory: {}", e))
+                })?;
+            }
+
+            // create and open lpath file
+            let mut file = File::create(lpath)
+                .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
+
+            self.runtime.block_on(async {
+                // iterate over the stream and write to the file
+                while let Some(v) = stream.next().await {
+                    let chunk =
+                        v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
+                    file.write_all(&chunk).map_err(|e| {
+                        StorageError::Error(format!("Unable to write to file: {}", e))
+                    })?;
+                }
+
+                Ok(())
+            })
+        }
+
+        /// Generate a presigned url for an object in the storage bucket
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        /// * `expiration` - The time in seconds for the presigned url to expire
+        ///
+        /// # Returns
+        ///
+        /// A Result with the presigned url if successful
+        ///
+        pub fn generate_presigned_url(
+            &self,
+            path: &str,
+            expiration: u64,
+        ) -> Result<String, StorageError> {
+            self.runtime.block_on(async {
+                let presigned_url = self
+                    .client
+                    .signed_url(
+                        &self.bucket.clone(),
+                        path,
+                        None,
+                        None,
+                        SignedURLOptions {
+                            method: SignedURLMethod::GET,
+                            start_time: None,
+                            expires: std::time::Duration::from_secs(expiration),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Unable to generate presigned url: {}", e))
+                    })?;
+
+                Ok(presigned_url)
+            })
+        }
+
+        /// Create a resumable upload session
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        ///
+        ///
+        pub fn create_multipart_upload(
+            &self,
+            path: &str,
+        ) -> Result<GoogleMultipartUploadClient, StorageError> {
+            let _filename = path.to_string();
+
+            let metadata = Object {
+                name: path.to_string(),
+                content_type: Some("application/octet-stream".to_string()),
+                ..Default::default()
+            };
+
+            self.runtime.block_on(async {
+                let result = self
+                    .client
+                    .prepare_resumable_upload(
+                        &UploadObjectRequest {
+                            bucket: self.bucket.clone(),
+                            ..Default::default()
+                        },
+                        &UploadType::Multipart(Box::new(metadata)),
+                    )
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Unable to create resumable session: {}", e))
+                    })?;
+
+                Ok(GoogleMultipartUploadClient {
+                    client: result,
+                    file_completed: false,
+                    handle: tokio::runtime::Handle::current(),
+                })
+            })
+        }
+
+        pub fn upload_file_in_chunks(
+            &self,
+            lpath: &Path,
+            rpath: &Path,
+            chunk_size: Option<u64>,
+        ) -> Result<(), StorageError> {
+            let file = File::open(lpath)
+                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+            let metadata = file
+                .metadata()
+                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+            let file_size = metadata.len();
+
+            // check chunk size. IF chunk size is None, set chunk size to 5MB. If chunk size is greater than file size, set chunk size to file size
+            let mut chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5);
+            if chunk_size > file_size {
+                chunk_size = file_size;
+            }
+
+            // calculate the number of parts
+            let mut chunk_count = (file_size / chunk_size) + 1;
+            let mut size_of_last_chunk = file_size % chunk_size;
+
+            // if the last chunk is empty, reduce the number of parts
+            if size_of_last_chunk == 0 {
+                size_of_last_chunk = chunk_size;
+                chunk_count -= 1;
+            }
+
+            let mut uploader = self.create_multipart_upload(rpath.to_str().unwrap())?;
+            let mut status = UploadStatus::NotStarted;
+
+            for chunk_index in 0..chunk_count {
+                let this_chunk = if chunk_count - 1 == chunk_index {
+                    size_of_last_chunk
+                } else {
+                    chunk_size
+                };
+
+                let first_byte = (chunk_index as u64) * this_chunk;
+                let last_byte = first_byte + this_chunk - 1;
+
+                let stream = uploader.get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)?;
+                status = uploader.upload_part(stream, first_byte, last_byte, file_size)?;
+            } // extract the range from the result and update the first_byte and last_byte
+
+            match status {
+                UploadStatus::Ok(_) => {
+                    // complete the upload
+                    return Ok(());
+                }
+                _ => {
+                    return Err(StorageError::Error(format!(
+                        "Failed to upload file in chunks: {:?}",
+                        status
+                    )));
+                }
+            }
+
+            // check if enum is Ok
         }
 
         /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
@@ -301,51 +503,6 @@ pub mod google_storage {
                 .iter()
                 .map(|o| o.name.clone())
                 .collect())
-        }
-
-        /// Create a resumable upload session
-        ///
-        /// # Arguments
-        ///
-        /// * `path` - The path to the object in the bucket
-        ///
-        ///
-        pub async fn create_resumable_upload_session(
-            &self,
-            path: &str,
-            chunk_size: u64,
-            total_size: u64,
-        ) -> Result<GoogleResumableUploadClient, StorageError> {
-            let _filename = path.to_string();
-
-            let metadata = Object {
-                name: path.to_string(),
-                content_type: Some("application/octet-stream".to_string()),
-                ..Default::default()
-            };
-
-            let result = self
-                .client
-                .prepare_resumable_upload(
-                    &UploadObjectRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    },
-                    &UploadType::Multipart(Box::new(metadata)),
-                )
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Unable to create resumable session: {}", e))
-                })?;
-
-            Ok(GoogleResumableUploadClient {
-                client: result,
-                first_byte: 0,
-                last_byte: chunk_size,
-                total_size,
-                chunk_size,
-                file_completed: false,
-            })
         }
 
         /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
@@ -451,70 +608,6 @@ pub mod google_storage {
                 .map_err(|e| StorageError::Error(format!("Unable to delete object: {}", e)))?;
 
             Ok(())
-        }
-
-        /// Download a remote object as a stream to a local file
-        ///
-        /// # Arguments
-        ///
-        /// * `lpath` - The path to the local file
-        /// * `rpath` - The path to the remote file
-        ///
-        pub async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
-            let mut stream = self
-                .get_object_stream(rpath)
-                .await?
-                .map_err(|e| StorageError::Error(format!("Unable to get object stream: {}", e)));
-
-            // create and open lpath file
-            let prefix = Path::new(lpath).parent().unwrap();
-
-            if !prefix.exists() {
-                // create the directory if it does not exist and skip errors
-                std::fs::create_dir_all(prefix).map_err(|e| {
-                    StorageError::Error(format!("Unable to create directory: {}", e))
-                })?;
-            }
-
-            // create and open lpath file
-            let mut file = File::create(lpath)
-                .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
-
-            // iterate over the stream and write to the file
-            while let Some(v) = stream.next().await {
-                let chunk = v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
-                file.write_all(&chunk)
-                    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
-            }
-
-            Ok(())
-        }
-
-        pub async fn generate_presigned_url(
-            &self,
-            path: &str,
-            expiration: u64,
-        ) -> Result<String, StorageError> {
-            let presigned_url = self
-                .client
-                .signed_url(
-                    &self.bucket.clone(),
-                    path,
-                    None,
-                    None,
-                    SignedURLOptions {
-                        method: SignedURLMethod::GET,
-                        start_time: None,
-                        expires: std::time::Duration::from_secs(expiration),
-                        ..Default::default()
-                    },
-                )
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Unable to generate presigned url: {}", e))
-                })?;
-
-            Ok(presigned_url)
         }
     }
 
