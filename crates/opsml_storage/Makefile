@@ -15,7 +15,6 @@ test.aws:
 test.gcs:
 	cargo test google --features "google_storage" -- --nocapture 
 
-
 .PHONY: test.local
 test.local:
 	cargo test local -- --nocapture 
