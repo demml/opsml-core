@@ -12,11 +12,11 @@ permissions:
 
 env:
   RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
-  CLOUD_BUCKET_NAME: "${{ secrets.CLOUD_BUCKET_NAME }}"
-  AWS_REGION: "${{ secrets.AWS_REGION }}"
+  CLOUD_BUCKET_NAME: "opsml-storage-integration"
   PYTHON_VERSION: "3.11"
-  PACKAGE_NAME: "opsml_storage_s3"
-  MODULE_NAME: "PyS3FSStorageClient"
+  PACKAGE_NAME: "opsml_storage_gcs"
+  MODULE_NAME: "PyGCSFSStorageClient"
+  GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
 
 jobs:
   rust-lints-test:
@@ -26,12 +26,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Rust
         run: rustup override set stable && rustup update
@@ -48,7 +42,7 @@ jobs:
 
       - name: Tests
         working-directory: ./crates/opsml_storage
-        run: make test.aws
+        run: make test.gcs
         env:
           RUST_BACKTRACE: 1
 
@@ -67,12 +61,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -126,7 +114,7 @@ jobs:
       - name: "Test wheel - aarch64"
         working-directory: ./${{ env.PACKAGE_NAME }}
         run: |
-          python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
+          python3 -m pip install opsml-storage-gcs --no-deps --no-index --force-reinstall --find-links dist
           python -c "import ${{ env.PACKAGE_NAME }}"
 
   test-linux-build:
@@ -174,5 +162,5 @@ jobs:
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         working-directory: ./${{ env.PACKAGE_NAME }}
         run: |
-          python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
+          python3 -m pip install opsml-storage-gcs --no-deps --no-index --force-reinstall --find-links dist
           python -c "import ${{ env.PACKAGE_NAME }}"

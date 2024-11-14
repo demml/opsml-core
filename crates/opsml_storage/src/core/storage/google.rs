@@ -666,12 +666,12 @@ pub mod google_storage {
     }
 
     #[pyclass]
-    pub struct PyS3GCSFSStorageClient {
+    pub struct PyGCSFSStorageClient {
         client: GoogleStorageClient,
     }
 
     #[pymethods]
-    impl PyS3GCSFSStorageClient {
+    impl PyGCSFSStorageClient {
         #[new]
         fn new(bucket: String) -> Self {
             let client = GoogleStorageClient::new(bucket);
