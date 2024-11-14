@@ -61,19 +61,19 @@ pub trait FileSystem<T: StorageClient> {
     fn new(bucket: String) -> Self;
 
     fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
-        let stripped_path = path.strip_path(&self.client().bucket());
+        let stripped_path = path.strip_path(self.client().bucket());
         self.client().find(stripped_path.to_str().unwrap())
     }
 
     fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
-        let stripped_path = path.strip_path(&self.client().bucket());
+        let stripped_path = path.strip_path(self.client().bucket());
         self.client().find_info(stripped_path.to_str().unwrap())
     }
 
     fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
         // strip the paths
-        let stripped_rpath = rpath.strip_path(&self.client().bucket());
-        let stripped_lpath = lpath.strip_path(&self.client().bucket());
+        let stripped_rpath = rpath.strip_path(self.client().bucket());
+        let stripped_lpath = lpath.strip_path(self.client().bucket());
 
         if recursive {
             let stripped_lpath_clone = stripped_lpath.clone();
@@ -84,7 +84,7 @@ pub trait FileSystem<T: StorageClient> {
             // iterate over each object and get it
             for obj in objects {
                 let file_path = Path::new(obj.as_str());
-                let stripped_path = file_path.strip_path(&self.client().bucket());
+                let stripped_path = file_path.strip_path(self.client().bucket());
                 let relative_path = file_path.relative_path(&stripped_rpath)?;
                 let local_path = stripped_lpath_clone.join(relative_path);
 
@@ -103,8 +103,8 @@ pub trait FileSystem<T: StorageClient> {
         Ok(())
     }
     fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(&self.client().bucket());
-        let stripped_rpath = rpath.strip_path(&self.client().bucket());
+        let stripped_lpath = lpath.strip_path(self.client().bucket());
+        let stripped_rpath = rpath.strip_path(self.client().bucket());
 
         if recursive {
             if !stripped_lpath.is_dir() {
@@ -118,7 +118,7 @@ pub trait FileSystem<T: StorageClient> {
             for file in files {
                 let stripped_lpath_clone = stripped_lpath.clone();
                 let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(&self.client().bucket());
+                let stripped_file_path = file.strip_path(self.client().bucket());
 
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
@@ -135,8 +135,8 @@ pub trait FileSystem<T: StorageClient> {
         }
     }
     fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_src = src.strip_path(&self.client().bucket());
-        let stripped_dest = dest.strip_path(&self.client().bucket());
+        let stripped_src = src.strip_path(self.client().bucket());
+        let stripped_dest = dest.strip_path(self.client().bucket());
 
         if recursive {
             self.client().copy_objects(
@@ -153,7 +153,7 @@ pub trait FileSystem<T: StorageClient> {
         Ok(())
     }
     fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_path = path.strip_path(&self.client().bucket());
+        let stripped_path = path.strip_path(self.client().bucket());
 
         if recursive {
             self.client()
@@ -166,14 +166,14 @@ pub trait FileSystem<T: StorageClient> {
         Ok(())
     }
     fn exists(&self, path: &Path) -> Result<bool, StorageError> {
-        let stripped_path = path.strip_path(&self.client().bucket());
+        let stripped_path = path.strip_path(self.client().bucket());
         let objects = self.client().find(stripped_path.to_str().unwrap())?;
 
         Ok(!objects.is_empty())
     }
 
     fn generate_presigned_url(&self, path: &Path, expiration: u64) -> Result<String, StorageError> {
-        let stripped_path = path.strip_path(&self.client().bucket());
+        let stripped_path = path.strip_path(self.client().bucket());
         self.client()
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
     }

@@ -144,9 +144,6 @@ pub mod google_storage {
                     })?
                     .into_bytes();
 
-                println!("Uploading chunk: {:?}", size);
-                println!("Data size: {:?}", data.len());
-
                 let result = self
                     .client
                     .upload_multiple_chunk(data, &size)
@@ -349,7 +346,7 @@ pub mod google_storage {
                     chunk_size
                 };
 
-                let first_byte = (chunk_index as u64) * this_chunk;
+                let first_byte = chunk_index * chunk_size;
                 let last_byte = first_byte + this_chunk - 1;
 
                 let stream = uploader.get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)?;
@@ -359,14 +356,12 @@ pub mod google_storage {
             match status {
                 UploadStatus::Ok(_) => {
                     // complete the upload
-                    return Ok(());
+                    Ok(())
                 }
-                _ => {
-                    return Err(StorageError::Error(format!(
-                        "Failed to upload file in chunks: {:?}",
-                        status
-                    )));
-                }
+                _ => Err(StorageError::Error(format!(
+                    "Failed to upload file in chunks: {:?}",
+                    status
+                ))),
             }
 
             // check if enum is Ok
@@ -431,8 +426,8 @@ pub mod google_storage {
                 .iter()
                 .map(|o| FileInfo {
                     name: o.name.clone(),
-                    size: o.size.clone(),
-                    object_type: o.content_type.clone().unwrap_or_else(|| "".to_string()),
+                    size: o.size,
+                    object_type: o.content_type.clone().unwrap_or_default(),
                     created: match o.time_created {
                         Some(last_modified) => last_modified.to_string(),
                         None => "".to_string(),
@@ -524,20 +519,13 @@ pub mod google_storage {
         /// * `path` - The path to the object in the bucket
         ///
         fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
-            let request = DeleteObjectRequest {
-                bucket: self.bucket.clone(),
-                object: path.to_string(),
-                ..Default::default()
-            };
+            let objects = self.find(path)?;
 
-            self.runtime.block_on(async {
-                self.client
-                    .delete_object(&request)
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Unable to delete object: {}", e)))?;
+            for obj in objects {
+                self.delete_object(obj.as_str())?;
+            }
 
-                Ok(true)
-            })
+            Ok(true)
         }
     }
 
@@ -833,7 +821,8 @@ pub mod google_storage {
         const CHUNK_SIZE: u64 = 1024 * 256;
 
         pub fn get_bucket() -> String {
-            std::env::var("CLOUD_BUCKET_NAME").unwrap_or_else(|_| "opsml-integration".to_string())
+            std::env::var("CLOUD_BUCKET_NAME")
+                .unwrap_or_else(|_| "opsml-storage-integration".to_string())
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
@@ -972,6 +961,7 @@ pub mod google_storage {
             // cleanup
             std::fs::remove_dir_all(&dirname).unwrap();
             std::fs::remove_dir_all(new_path).unwrap();
+
             client.rm(rpath, true).unwrap();
             client.rm(copy_path, true).unwrap();
 
@@ -1013,6 +1003,14 @@ pub mod google_storage {
 
             // put the file
             client.put(path, path, false).unwrap();
+
+            // get the file info
+            let info = client.find_info(path).unwrap();
+            assert_eq!(info.len(), 1);
+
+            // get item and assert it's at least the size of the file
+            let item = info.get(0).unwrap();
+            assert!(item.size >= 1024 * 1024 * 10);
 
             // cleanup
             client.rm(path, false).unwrap();

@@ -36,7 +36,7 @@ impl StorageClient for LocalStorageClient {
                 .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
         }
 
-        fs::copy(&src_path, &dest_path)
+        fs::copy(&src_path, dest_path)
             .map_err(|e| StorageError::Error(format!("Unable to copy file: {}", e)))?;
 
         Ok(())
