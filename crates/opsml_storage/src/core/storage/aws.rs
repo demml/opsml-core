@@ -1,5 +1,6 @@
 #[cfg(feature = "aws_storage")]
 pub mod aws_storage {
+    use crate::core::storage::base::StorageClient;
     use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt};
     use crate::core::utils::error::StorageError;
     use aws_config::BehaviorVersion;
@@ -169,8 +170,11 @@ pub mod aws_storage {
         runtime: tokio::runtime::Runtime,
     }
 
-    impl AWSStorageClient {
-        pub fn new(bucket: String) -> Result<Self, StorageError> {
+    impl StorageClient for AWSStorageClient {
+        fn bucket(&self) -> &str {
+            &self.bucket
+        }
+        fn new(bucket: String) -> Self {
             // create a resuable runtime for client
             let rt = Runtime::new().unwrap();
 
@@ -181,43 +185,24 @@ pub mod aws_storage {
                 })
                 .map_err(|e: StorageError| {
                     StorageError::Error(format!("Failed to create AWS creds: {}", e))
-                })?;
+                });
 
-            let client = Client::new(&creds.config);
-            Ok(Self {
-                client,
-                bucket,
-                runtime: rt,
-            })
+            match creds {
+                Ok(creds) => {
+                    let client = Client::new(&creds.config);
+                    Self {
+                        client,
+                        bucket,
+                        runtime: rt,
+                    }
+                }
+                Err(e) => {
+                    panic!("Failed to create AWS client: {}", e);
+                }
+            }
         }
 
-        /// Get an object stream from the storage bucket
-        ///
-        /// # Arguments
-        ///
-        /// * `rpath` - The path to the object in the bucket
-        ///
-        /// # Returns
-        ///
-        /// A Result with the object stream if successful
-        ///
-        pub fn get_object_stream(&self, rpath: &str) -> Result<GetObjectOutput, StorageError> {
-            self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .get_object()
-                    .bucket(&self.bucket)
-                    .key(rpath)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to get object stream: {}", e))
-                    })?;
-                Ok(response)
-            })
-        }
-
-        pub fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+        fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
             // check if lpath and rpath have suffixes
             let lpath = Path::new(lpath);
             let rpath = Path::new(rpath);
@@ -272,7 +257,7 @@ pub mod aws_storage {
         ///
         /// A Result with the presigned url if successful
         ///
-        pub fn generate_presigned_url(
+        fn generate_presigned_url(
             &self,
             path: &str,
             expiration: u64,
@@ -297,22 +282,6 @@ pub mod aws_storage {
             })
         }
 
-        pub fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-            self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .create_multipart_upload()
-                    .bucket(&self.bucket)
-                    .key(path)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to create multipart upload: {}", e))
-                    })?;
-
-                Ok(response.upload_id.unwrap())
-            })
-        }
         /// List all objects in a path
         ///
         /// # Arguments
@@ -322,7 +291,7 @@ pub mod aws_storage {
         /// # Returns
         ///
         /// A list of objects in the path
-        pub fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+        fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
             // check if path = "/"
             let objects = if path == "/" || path.is_empty() {
                 self.runtime.block_on(async {
@@ -371,7 +340,7 @@ pub mod aws_storage {
         ///
         /// # Returns
         ///
-        pub fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+        fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
             let objects = self.runtime.block_on(async {
                 let response = self
                     .client
@@ -425,7 +394,7 @@ pub mod aws_storage {
         /// # Returns
         ///
         /// A Result with the object name if successful
-        pub fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+        fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
             self.runtime.block_on(async {
                 self.client
                     .copy_object()
@@ -441,7 +410,7 @@ pub mod aws_storage {
         }
 
         /// Copy objects from the storage bucket
-        pub fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+        fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
             let objects = self.find(src)?;
             let dest = Path::new(dest);
             let src = PathBuf::from(src);
@@ -463,7 +432,7 @@ pub mod aws_storage {
         ///
         /// * `path` - The path to the object in the bucket
         ///
-        pub fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+        fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
             self.runtime.block_on(async {
                 self.client
                     .delete_object()
@@ -483,7 +452,7 @@ pub mod aws_storage {
         ///
         /// * `path` - Bucket and prefix path to the objects to delete
         ///
-        pub fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+        fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
             let objects = self.find(path)?;
 
             let mut delete_object_ids: Vec<aws_sdk_s3::types::ObjectIdentifier> = vec![];
@@ -526,7 +495,7 @@ pub mod aws_storage {
             Ok(true)
         }
 
-        pub fn upload_file_in_chunks(
+        fn upload_file_in_chunks(
             &self,
             lpath: &Path,
             rpath: &Path,
@@ -586,139 +555,63 @@ pub mod aws_storage {
         }
     }
 
+    impl AWSStorageClient {
+        pub fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+            self.runtime.block_on(async {
+                let response = self
+                    .client
+                    .create_multipart_upload()
+                    .bucket(&self.bucket)
+                    .key(path)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Failed to create multipart upload: {}", e))
+                    })?;
+
+                Ok(response.upload_id.unwrap())
+            })
+        }
+
+        /// Get an object stream from the storage bucket
+        ///
+        /// # Arguments
+        ///
+        /// * `rpath` - The path to the object in the bucket
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object stream if successful
+        ///
+        pub fn get_object_stream(&self, rpath: &str) -> Result<GetObjectOutput, StorageError> {
+            self.runtime.block_on(async {
+                let response = self
+                    .client
+                    .get_object()
+                    .bucket(&self.bucket)
+                    .key(rpath)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Failed to get object stream: {}", e))
+                    })?;
+                Ok(response)
+            })
+        }
+    }
+
     // For both python and rust, we need to define 2 structs: one for rust that supports async and one for python that does not
     pub struct S3FStorageClient {
         client: AWSStorageClient,
     }
 
-    impl FileSystem for S3FStorageClient {
+    impl FileSystem<AWSStorageClient> for S3FStorageClient {
+        fn client(&self) -> &AWSStorageClient {
+            &self.client
+        }
         fn new(bucket: String) -> Self {
-            let client = AWSStorageClient::new(bucket).unwrap();
+            let client = AWSStorageClient::new(bucket);
             Self { client }
-        }
-
-        fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
-            self.client.find_info(path.to_str().unwrap())
-        }
-
-        fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
-            let stripped_path = path.strip_path(&self.client.bucket);
-            self.client.find(stripped_path.to_str().unwrap())
-        }
-
-        fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
-            // strip the paths
-            let stripped_rpath = rpath.strip_path(&self.client.bucket);
-            let stripped_lpath = lpath.strip_path(&self.client.bucket);
-
-            if recursive {
-                let stripped_lpath_clone = stripped_lpath.clone();
-
-                // list all objects in the path
-                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
-
-                // iterate over each object and get it
-                for obj in objects {
-                    let file_path = Path::new(obj.as_str());
-                    let stripped_path = file_path.strip_path(&self.client.bucket);
-                    let relative_path = file_path.relative_path(&stripped_rpath)?;
-                    let local_path = stripped_lpath_clone.join(relative_path);
-
-                    self.client.get_object(
-                        local_path.to_str().unwrap(),
-                        stripped_path.to_str().unwrap(),
-                    )?;
-                }
-            } else {
-                self.client.get_object(
-                    stripped_lpath.to_str().unwrap(),
-                    stripped_rpath.to_str().unwrap(),
-                )?;
-            }
-
-            Ok(())
-        }
-
-        fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
-            let stripped_lpath = lpath.strip_path(&self.client.bucket);
-            let stripped_rpath = rpath.strip_path(&self.client.bucket);
-
-            if recursive {
-                if !stripped_lpath.is_dir() {
-                    return Err(StorageError::Error(
-                        "Local path must be a directory for recursive put".to_string(),
-                    ));
-                }
-
-                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
-
-                for file in files {
-                    let stripped_lpath_clone = stripped_lpath.clone();
-                    let stripped_rpath_clone = stripped_rpath.clone();
-                    let stripped_file_path = file.strip_path(&self.client.bucket);
-
-                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                    let remote_path = stripped_rpath_clone.join(relative_path);
-
-                    self.client
-                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
-                }
-
-                Ok(())
-            } else {
-                self.client
-                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
-                Ok(())
-            }
-        }
-
-        fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
-            let stripped_src = src.strip_path(&self.client.bucket);
-            let stripped_dest = dest.strip_path(&self.client.bucket);
-
-            if recursive {
-                self.client.copy_objects(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            } else {
-                self.client.copy_object(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            }
-
-            Ok(())
-        }
-
-        fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
-            let stripped_path = path.strip_path(&self.client.bucket);
-
-            if recursive {
-                self.client
-                    .delete_objects(stripped_path.to_str().unwrap())?;
-            } else {
-                self.client.delete_object(stripped_path.to_str().unwrap())?;
-            }
-
-            Ok(())
-        }
-
-        fn exists(&self, path: &Path) -> Result<bool, StorageError> {
-            let stripped_path = path.strip_path(&self.client.bucket);
-            let objects = self.client.find(stripped_path.to_str().unwrap())?;
-
-            Ok(!objects.is_empty())
-        }
-
-        fn generate_presigned_url(
-            &self,
-            path: &Path,
-            expiration: u64,
-        ) -> Result<String, StorageError> {
-            let stripped_path = path.strip_path(&self.client.bucket);
-            self.client
-                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
         }
     }
 
@@ -731,7 +624,7 @@ pub mod aws_storage {
     impl PyS3FSStorageClient {
         #[new]
         fn new(bucket: String) -> Self {
-            let client = AWSStorageClient::new(bucket).unwrap();
+            let client = AWSStorageClient::new(bucket);
             Self { client }
         }
 
@@ -952,14 +845,13 @@ pub mod aws_storage {
         #[test]
         fn test_aws_storage_client_new() {
             let bucket = get_bucket();
-            let client = AWSStorageClient::new(bucket);
-            assert!(client.is_ok());
+            let _client = AWSStorageClient::new(bucket);
         }
 
         #[test]
         fn test_aws_storage_client_get_object() {
             let bucket = get_bucket();
-            let client = AWSStorageClient::new(bucket).unwrap();
+            let client = AWSStorageClient::new(bucket);
 
             // should fail since there are no suffixes
             let result = client.get_object("local_path", "remote_path");
