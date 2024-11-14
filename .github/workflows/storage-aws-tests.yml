@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu, macos]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"] # always run tests for latest 3 python versions
     runs-on: ${{ matrix.os }}-latest
     needs: [rust-lints-test]
 
@@ -135,9 +135,9 @@ jobs:
           working-directory: ./opsml_storage_s3
 
       - name: "Test wheel - aarch64"
+        working-directory: ./opsml_storage_s3
         run: |
-          WHEEL_FILE=$(ls dist/${{ env.PACKAGE_NAME }}-*.whl)
-          pip install $WHEEL_FILE --force-reinstall
+          python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
           python -c "import ${env.MODULE_NAME}"
 
   test-linux-build:
@@ -183,7 +183,7 @@ jobs:
             fi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
+        working-directory: ./opsml_storage_s3
         run: |
-          WHEEL_FILE=$(ls dist/${{ env.PACKAGE_NAME }}-*.whl)
-          pip install $WHEEL_FILE --force-reinstall
+          python3 -m pip install opsml-storage-s3 --no-deps --no-index --force-reinstall --find-links dist
           python -c "import ${env.MODULE_NAME}"

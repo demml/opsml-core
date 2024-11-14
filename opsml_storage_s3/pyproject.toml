@@ -1,5 +1,5 @@
 [project]
-name = "opsml_storage_s3"
+name = "opsml-storage-s3"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
