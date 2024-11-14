@@ -29,9 +29,7 @@ impl StorageClient for LocalStorageClient {
                 .unwrap();
         }
 
-        Self {
-            bucket: PathBuf::from(bucket),
-        }
+        Self { bucket }
     }
 
     fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
@@ -416,10 +414,10 @@ impl PyLocalFSStorageClient {
 
         // if error, return false
         if objects.is_err() {
-            return Ok(false);
+            Ok(false)
         } else {
             let objects = objects?;
-            return Ok(!objects.is_empty());
+            Ok(!objects.is_empty())
         }
     }
 
