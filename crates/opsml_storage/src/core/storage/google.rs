@@ -1,6 +1,7 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
 
+    use crate::core::storage::base::FileInfo;
     use crate::core::utils::error::StorageError;
     use aws_smithy_types::byte_stream::ByteStream;
     use aws_smithy_types::byte_stream::Length;
@@ -485,23 +486,64 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A list of objects in the path
-        pub async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
-            let result = self
-                .client
-                .list_objects(&ListObjectsRequest {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(path.to_string()),
-                    ..Default::default()
-                })
-                .await
-                .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
+        pub fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+            self.runtime.block_on(async {
+                let result = self
+                    .client
+                    .list_objects(&ListObjectsRequest {
+                        bucket: self.bucket.clone(),
+                        prefix: Some(path.to_string()),
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
 
-            // return a list of object names if results.items is not None, Else return empty list
-            Ok(result
+                // return a list of object names if results.items is not None, Else return empty list
+                Ok(result
+                    .items
+                    .unwrap_or_else(Vec::new)
+                    .iter()
+                    .map(|o| o.name.clone())
+                    .collect())
+            })
+        }
+
+        /// Find object information. Runs the same operation as find but returns more information about each object
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to list objects from
+        ///
+        /// # Returns
+        ///
+        pub fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+            let objects = self.runtime.block_on(async {
+                let result = self
+                    .client
+                    .list_objects(&ListObjectsRequest {
+                        bucket: self.bucket.clone(),
+                        prefix: Some(path.to_string()),
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
+                Ok(result)
+            })?;
+
+            Ok(objects
                 .items
                 .unwrap_or_else(Vec::new)
                 .iter()
-                .map(|o| o.name.clone())
+                .map(|o| FileInfo {
+                    name: o.name.clone(),
+                    size: o.size.clone(),
+                    object_type: o.content_type.clone().unwrap_or_else(|| "".to_string()),
+                    created: match o.time_created {
+                        Some(last_modified) => last_modified.to_string(),
+                        None => "".to_string(),
+                    },
+                    suffix: o.name.clone().split('.').last().unwrap_or("").to_string(),
+                })
                 .collect())
         }
 
