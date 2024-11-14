@@ -18,6 +18,17 @@ impl StorageClient for LocalStorageClient {
     }
 
     fn new(bucket: String) -> Self {
+        let bucket = PathBuf::from(bucket);
+
+        // bucket should be a dir. Check if it exists. If not, create it
+        if !bucket.exists() {
+            fs::create_dir_all(&bucket)
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create bucket directory: {}", e))
+                })
+                .unwrap();
+        }
+
         Self {
             bucket: PathBuf::from(bucket),
         }
@@ -93,6 +104,15 @@ impl StorageClient for LocalStorageClient {
                 files.push(entry.path().to_str().unwrap().to_string());
             }
         }
+
+        // remove the bucket name and any following slashes
+        let bucket = self.bucket.to_str().unwrap();
+        let files = files
+            .iter()
+            .map(|f| f.strip_prefix(bucket).unwrap_or(f))
+            .map(|f| f.strip_prefix("/").unwrap_or(f))
+            .map(|f| f.to_string())
+            .collect();
 
         Ok(files)
     }
@@ -273,7 +293,19 @@ impl PyLocalFSStorageClient {
     #[pyo3(signature = (path=PathBuf::new()))]
     fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
-        self.client.find(stripped_path.to_str().unwrap())
+        let files = self.client.find(stripped_path.to_str().unwrap())?;
+
+        // attempt to remove the bucket name from the path
+        let stripped_files = files
+            .iter()
+            .map(|f| {
+                f.strip_prefix(self.client.bucket.to_str().unwrap())
+                    .unwrap_or(f)
+                    .to_string()
+            })
+            .collect();
+
+        Ok(stripped_files)
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -380,9 +412,15 @@ impl PyLocalFSStorageClient {
 
     fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
-        let objects = self.client.find(stripped_path.to_str().unwrap())?;
+        let objects = self.client.find(stripped_path.to_str().unwrap());
 
-        Ok(!objects.is_empty())
+        // if error, return false
+        if objects.is_err() {
+            return Ok(false);
+        } else {
+            let objects = objects?;
+            return Ok(!objects.is_empty());
+        }
     }
 
     #[pyo3(signature = (path, expiration = 600))]
@@ -394,6 +432,12 @@ impl PyLocalFSStorageClient {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
         self.client
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+    }
+
+    fn delete_bucket(&self) -> Result<(), StorageError> {
+        fs::remove_dir_all(&self.client.bucket)
+            .map_err(|e| StorageError::Error(format!("Unable to delete bucket: {}", e)))?;
+        Ok(())
     }
 }
 

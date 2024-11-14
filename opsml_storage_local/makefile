@@ -1,6 +1,6 @@
-PROJECT=opml-storage-gcs
+PROJECT=opml-storage-local
 PYTHON_VERSION=3.11.9
-SOURCE_OBJECTS=python/opsml_storage_gcs
+SOURCE_OBJECTS=python/opsml_storage_local
 
 format.isort:
 	uv run isort ${SOURCE_OBJECTS}

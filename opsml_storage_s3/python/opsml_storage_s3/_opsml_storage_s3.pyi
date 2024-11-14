@@ -217,3 +217,6 @@ class PyLocalFSStorageClient:
         Returns:
             The signed URL.
         """
+
+    def delete_bucket(self) -> None:
+        """Delete the bucket."""

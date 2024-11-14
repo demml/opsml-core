@@ -1,9 +1,10 @@
 from pathlib import Path
-from opsml_storage_gcs import PyGCSFSStorageClient
+from opsml_storage_local import PyLocalFSStorageClient
 import uuid
+import shutil
 
 
-def test_storage_client(tmp_path: Path, storage_client: PyGCSFSStorageClient) -> None:
+def test_storage_client(tmp_path: Path, storage_client: PyLocalFSStorageClient) -> None:
     # generate random directory
 
     lpath = Path("tests/assets/cats.jpg")
@@ -49,3 +50,4 @@ def test_storage_client(tmp_path: Path, storage_client: PyGCSFSStorageClient) ->
     finally:
         if storage_client.exists(rpath_dir):
             storage_client.rm(rpath_dir, True)
+        storage_client.delete_bucket()
