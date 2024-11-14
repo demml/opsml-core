@@ -903,7 +903,7 @@ pub mod google_storage {
         }
 
         #[test]
-        fn test_goo_storage_client_get_object() {
+        fn test_google_storage_client_get_object() {
             let bucket = get_bucket();
             let client = GoogleStorageClient::new(bucket);
 
@@ -992,7 +992,7 @@ pub mod google_storage {
         }
 
         #[test]
-        fn test_foofle_large_file_upload() {
+        fn test_google_large_file_upload() {
             let bucket = get_bucket();
             let client = GCSFSStorageClient::new(bucket);
 

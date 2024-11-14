@@ -14,9 +14,22 @@ pub trait PathExt {
 
 impl PathExt for Path {
     fn relative_path(&self, base: &Path) -> Result<PathBuf, StorageError> {
-        self.strip_prefix(base)
+        let result = self
+            .strip_prefix(base)
             .map_err(|e| StorageError::Error(format!("Failed to get relative path: {}", e)))
-            .map(|p| p.to_path_buf())
+            .map(|p| p.to_path_buf());
+
+        // if result is error, check if prefix occurs in the path (this happens with LocalStorageClient) and remove anything before the prefix and the prefix itself
+        if result.is_err() {
+            if let Some(pos) = self.iter().position(|part| part == base) {
+                let relative_path: PathBuf = self.iter().skip(pos + 1).collect();
+                return Ok(relative_path);
+            } else {
+                return Ok(PathBuf::from(self));
+            }
+        }
+
+        result
     }
 
     fn strip_path(&self, prefix: &str) -> PathBuf {
