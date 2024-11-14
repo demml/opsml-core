@@ -1009,7 +1009,7 @@ pub mod google_storage {
             assert_eq!(info.len(), 1);
 
             // get item and assert it's at least the size of the file
-            let item = info.get(0).unwrap();
+            let item = info.first().unwrap();
             assert!(item.size >= 1024 * 1024 * 10);
 
             // cleanup
