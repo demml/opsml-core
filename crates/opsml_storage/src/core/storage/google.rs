@@ -1,6 +1,7 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
 
+    use crate::core::storage::base::get_files;
     use crate::core::storage::base::FileInfo;
     use crate::core::storage::base::FileSystem;
     use crate::core::storage::base::PathExt;
@@ -30,15 +31,10 @@ pub mod google_storage {
     use serde_json::Value;
     use std::env;
     use std::fs::File;
-    use std::io::BufRead;
-    use std::io::BufReader;
-    use std::io::Read;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
-    use tokio::runtime::Handle;
     use tokio::runtime::Runtime;
-    use walkdir;
 
     #[derive(Clone)]
     pub struct GcpCreds {
@@ -105,7 +101,6 @@ pub mod google_storage {
 
     pub struct GoogleMultipartUploadClient {
         pub client: ResumableUploadClient,
-        file_completed: bool,
         handle: tokio::runtime::Handle,
     }
 
@@ -583,7 +578,6 @@ pub mod google_storage {
 
                 Ok(GoogleMultipartUploadClient {
                     client: result,
-                    file_completed: false,
                     handle: tokio::runtime::Handle::current(),
                 })
             })
@@ -683,86 +677,346 @@ pub mod google_storage {
         }
     }
 
+    #[pyclass]
+    pub struct PyS3GCSFSStorageClient {
+        client: GoogleStorageClient,
+    }
+
+    #[pymethods]
+    impl PyS3GCSFSStorageClient {
+        #[new]
+        fn new(bucket: String) -> Self {
+            let client = GoogleStorageClient::new(bucket);
+            Self { client }
+        }
+
+        fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
+            self.client.find_info(path.to_str().unwrap())
+        }
+
+        #[pyo3(signature = (path=PathBuf::new()))]
+        fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
+            let stripped_path = path.strip_path(&self.client.bucket);
+            self.client.find(stripped_path.to_str().unwrap())
+        }
+
+        #[pyo3(signature = (lpath, rpath, recursive = false))]
+        fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
+            // strip the paths
+            let stripped_rpath = rpath.strip_path(&self.client.bucket);
+            let stripped_lpath = lpath.strip_path(&self.client.bucket);
+
+            if recursive {
+                let stripped_lpath_clone = stripped_lpath.clone();
+
+                // list all objects in the path
+                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
+
+                // iterate over each object and get it
+                for obj in objects {
+                    let file_path = Path::new(obj.as_str());
+                    let stripped_path = file_path.strip_path(&self.client.bucket);
+                    let relative_path = file_path.relative_path(&stripped_rpath)?;
+                    let local_path = stripped_lpath_clone.join(relative_path);
+
+                    self.client.get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )?;
+                }
+            } else {
+                self.client.get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )?;
+            }
+
+            Ok(())
+        }
+
+        #[pyo3(signature = (lpath, rpath, recursive = false))]
+        fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
+            let stripped_lpath = lpath.strip_path(&self.client.bucket);
+            let stripped_rpath = rpath.strip_path(&self.client.bucket);
+
+            if recursive {
+                if !stripped_lpath.is_dir() {
+                    return Err(StorageError::Error(
+                        "Local path must be a directory for recursive put".to_string(),
+                    ));
+                }
+
+                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+                for file in files {
+                    let stripped_lpath_clone = stripped_lpath.clone();
+                    let stripped_rpath_clone = stripped_rpath.clone();
+                    let stripped_file_path = file.strip_path(&self.client.bucket);
+
+                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                    let remote_path = stripped_rpath_clone.join(relative_path);
+
+                    self.client
+                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
+                }
+
+                Ok(())
+            } else {
+                self.client
+                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
+                Ok(())
+            }
+        }
+
+        #[pyo3(signature = (src, dest, recursive = false))]
+        fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> Result<(), StorageError> {
+            let stripped_src = src.strip_path(&self.client.bucket);
+            let stripped_dest = dest.strip_path(&self.client.bucket);
+
+            if recursive {
+                self.client.copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )?;
+            } else {
+                self.client.copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )?;
+            }
+
+            Ok(())
+        }
+
+        #[pyo3(signature = (path, recursive = false))]
+        fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
+            let stripped_path = path.strip_path(&self.client.bucket);
+
+            if recursive {
+                self.client
+                    .delete_objects(stripped_path.to_str().unwrap())?;
+            } else {
+                self.client.delete_object(stripped_path.to_str().unwrap())?;
+            }
+
+            Ok(())
+        }
+
+        fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
+            let stripped_path = path.strip_path(&self.client.bucket);
+            let objects = self.client.find(stripped_path.to_str().unwrap())?;
+
+            Ok(!objects.is_empty())
+        }
+
+        #[pyo3(signature = (path, expiration = 600))]
+        fn generate_presigned_url(
+            &self,
+            path: PathBuf,
+            expiration: u64,
+        ) -> Result<String, StorageError> {
+            let stripped_path = path.strip_path(&self.client.bucket);
+            self.client
+                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
         use std::io::Write;
-        use tempfile::NamedTempFile;
         use tokio;
 
-        fn setup() {
-            unsafe {
-                env::remove_var("GOOGLE_ACCOUNT_JSON_BASE64");
-                env::remove_var("GOOGLE_APPLICATION_CREDENTIALS_JSON");
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+
+        const CHUNK_SIZE: u64 = 1024 * 256;
+
+        pub fn get_bucket() -> String {
+            std::env::var("CLOUD_BUCKET_NAME").unwrap_or_else(|_| "opsml-integration".to_string())
+        }
+
+        pub fn create_file(name: &str, chunk_size: &u64) {
+            let mut file = File::create(name).expect("Could not create sample file.");
+
+            while file.metadata().unwrap().len() <= chunk_size * 2 {
+                let rand_string: String = thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(256)
+                    .map(char::from)
+                    .collect();
+                let return_string: String = "\n".to_string();
+                file.write_all(rand_string.as_ref())
+                    .expect("Error writing to file.");
+                file.write_all(return_string.as_ref())
+                    .expect("Error writing to file.");
             }
         }
 
-        #[tokio::test]
-        async fn test_create_client_with_anonymous() {
-            setup();
-            let client = GoogleStorageClient::new("bucket".to_string());
-        }
+        pub fn create_nested_data(chunk_size: &u64) -> String {
+            let rand_name = uuid::Uuid::new_v4().to_string();
 
-        #[tokio::test]
-        async fn test_create_client_with_google_application_credentials_json() {
-            setup();
+            // create a temporary directory
+            let dir_name = format!("temp_test_dir_{}", &rand_name);
+            let dir = Path::new(&dir_name);
 
-            // Create a temporary file with fake credentials
-            let mut file = NamedTempFile::new().expect("Unable to create temp file");
-            let fake_credentials = r#"
-        {
-            "type": "service_account",
-            "project_id": "fake-project-id",
-            "private_key_id": "fake-private-key-id",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nFAKEPRIVATEKEY\n-----END PRIVATE KEY-----\n",
-            "client_email": "fake-email@fake-project-id.iam.gserviceaccount.com",
-            "client_id": "fake-client-id",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/fake-email%40fake-project-id.iam.gserviceaccount.com"
-        }
-        "#;
-            file.write_all(fake_credentials.as_bytes())
-                .expect("Unable to write to temp file");
+            if !dir.exists() {
+                std::fs::create_dir_all(dir).unwrap();
+            }
+            // random file name with uuid
+            let key = format!("{}/temp_test_file_{}.txt", &dir_name, &rand_name);
+            create_file(&key, chunk_size);
 
-            unsafe {
-                // Set the environment variable to the path of the temp file
-                env::set_var("GOOGLE_APPLICATION_CREDENTIALS_JSON", file.path());
+            // created nested directories
+            let dir = Path::new(&dir_name);
+            let nested_dir = dir.join("nested_dir");
+            let nested_dir_path = nested_dir.to_str().unwrap();
+
+            if !nested_dir.exists() {
+                std::fs::create_dir_all(nested_dir.clone()).unwrap();
             }
 
-            let client = GoogleStorageClient::new("bucket".to_string());
+            // random file name with uuid
+            let key = format!("{}/temp_test_file_{}.txt", &nested_dir_path, &rand_name);
+            create_file(&key, chunk_size);
 
-            // this will fail because the credentials are fake. We are just testing the client creation
+            dir_name
+        }
+
+        fn create_single_file(chunk_size: &u64) -> String {
+            let rand_name = uuid::Uuid::new_v4().to_string();
+
+            // create a temporary directory
+            let dir_name = format!("temp_test_dir_{}", &rand_name);
+            let dir = Path::new(&dir_name);
+
+            if !dir.exists() {
+                std::fs::create_dir_all(dir).unwrap();
+            }
+
+            // random file name with uuid
+            let key = format!("{}/temp_test_file_{}.txt", &dir_name, &rand_name);
+            create_file(&key, chunk_size);
+
+            key
         }
 
         #[tokio::test]
-        async fn test_create_client_with_google_account_json_base64() {
-            setup();
-
-            // Create a base64 encoded string of fake credentials
-            let fake_credentials = r#"
-        {
-            "type": "service_account",
-            "project_id": "fake-project-id",
-            "private_key_id": "fake-private-key-id",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nFAKEPRIVATEKEY\n-----END PRIVATE KEY-----\n",
-            "client_email": "fake-email@fake-project-id.iam.gserviceaccount.com",
-            "client_id": "fake-client-id",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/fake-email%40fake-project-id.iam.gserviceaccount.com"
+        async fn test_google_creds_new() {
+            let creds = GcpCreds::new().await;
+            assert!(creds.is_ok());
         }
-        "#;
-            let base64_credentials = BASE64_STANDARD.encode(fake_credentials);
 
-            unsafe {
-                // Set the environment variable to the base64 encoded string
-                env::set_var("GOOGLE_ACCOUNT_JSON_BASE64", base64_credentials);
-            }
+        #[test]
+        fn test_aws_google_client_new() {
+            let bucket = get_bucket();
+            let _client = GoogleStorageClient::new(bucket);
+        }
 
-            let client = GoogleStorageClient::new("bucket".to_string());
+        #[test]
+        fn test_goo_storage_client_get_object() {
+            let bucket = get_bucket();
+            let client = GoogleStorageClient::new(bucket);
+
+            // should fail since there are no suffixes
+            let result = client.get_object("local_path", "remote_path");
+            assert!(result.is_err()); // Assuming the object does not exist
+        }
+
+        #[test]
+        fn test_google_storage_client_put() {
+            let bucket = get_bucket();
+            let client = GCSFSStorageClient::new(bucket);
+
+            //
+            let dirname = create_nested_data(&CHUNK_SIZE);
+
+            let lpath = Path::new(&dirname);
+            let rpath = Path::new(&dirname);
+
+            // put the file
+            client.put(lpath, rpath, true).unwrap();
+
+            // check if the file exists
+            let exists = client.exists(rpath).unwrap();
+            assert!(exists);
+
+            // list all files
+            let files = client.find(rpath).unwrap();
+            assert_eq!(files.len(), 2);
+
+            // list files with info
+            let files = client.find_info(rpath).unwrap();
+            assert_eq!(files.len(), 2);
+
+            // download the files
+            let new_path = uuid::Uuid::new_v4().to_string();
+            let new_path = Path::new(&new_path);
+
+            client.get(new_path, rpath, true).unwrap();
+
+            // check if the files are the same
+            let files = get_files(rpath).unwrap();
+            let new_files = get_files(new_path).unwrap();
+
+            assert_eq!(files.len(), new_files.len());
+
+            // copy the files
+            // create a new path
+            let copy_path = uuid::Uuid::new_v4().to_string();
+            let copy_path = Path::new(&copy_path);
+            client.copy(rpath, copy_path, true).unwrap();
+            let files = client.find(copy_path).unwrap();
+            assert_eq!(files.len(), 2);
+
+            // cleanup
+            std::fs::remove_dir_all(&dirname).unwrap();
+            std::fs::remove_dir_all(new_path).unwrap();
+            client.rm(rpath, true).unwrap();
+            client.rm(copy_path, true).unwrap();
+
+            // check if the file exists
+            let exists = client.exists(rpath).unwrap();
+            assert!(!exists);
+        }
+
+        #[test]
+        fn test_google_storage_client_generate_presigned_url() {
+            let bucket = get_bucket();
+            let client = GCSFSStorageClient::new(bucket);
+
+            // create file
+            let key = create_single_file(&CHUNK_SIZE);
+            let path = Path::new(&key);
+
+            // put the file
+            client.put(path, path, false).unwrap();
+
+            // generate presigned url
+            let url = client.generate_presigned_url(path, 3600).unwrap();
+            assert!(!url.is_empty());
+
+            // cleanup
+            client.rm(path, false).unwrap();
+            std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        }
+
+        #[test]
+        fn test_foofle_large_file_upload() {
+            let bucket = get_bucket();
+            let client = GCSFSStorageClient::new(bucket);
+
+            // create file
+            let chunk_size = 1024 * 1024 * 5; // 5MB
+            let key = create_single_file(&chunk_size);
+            let path = Path::new(&key);
+
+            // put the file
+            client.put(path, path, false).unwrap();
+
+            // cleanup
+            client.rm(path, false).unwrap();
+            std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
     }
 }

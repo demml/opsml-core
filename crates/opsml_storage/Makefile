@@ -10,3 +10,7 @@ lints:
 .PHONY: test.aws
 test.aws:
 	cargo test aws --features "aws_storage" -- --nocapture 
+
+.PHONY: test.gcs
+test.gcs:
+	cargo test google --features "google_storage" -- --nocapture 
