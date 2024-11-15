@@ -1,0 +1,21 @@
+[package]
+name = "opsml-settings"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+
+authors = [
+  "Steven Forrester <sjforrester32@gmail.com>"
+]
+
+license = "MIT"
+description = "Opsml settings rust and python bindings"
+
+[dependencies]
+pyo3 = { workspace = true }
+rand = "0.8.5"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true

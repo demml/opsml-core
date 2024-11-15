@@ -1,20 +1,24 @@
-use opsml_storage::core::storage::base::FileInfo;
-use opsml_storage::core::storage::base::FileSystem;
-use opsml_storage::core::storage::local::LocalFSStorageClient;
-use opsml_storage::core::utils::error::StorageError;
+/// Implements a generic enum to handle different storage clients based on the storage URI
+/// This enum is meant to provide a common interface to use in the server
+use crate::core::storage::base::FileInfo;
+use crate::core::storage::base::FileSystem;
+use crate::core::storage::local::LocalFSStorageClient;
+use crate::core::utils::error::StorageError;
+use pyo3::prelude::*;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[cfg(feature = "google_storage")]
-use opsml_storage::core::storage::google::google_storage::GCSFSStorageClient;
+use crate::core::storage::google::google_storage::GCSFSStorageClient;
 
 #[cfg(feature = "aws_storage")]
-use opsml_storage::core::storage::aws::aws_storage::S3FStorageClient;
+use crate::core::storage::aws::aws_storage::S3FStorageClient;
 
 pub enum StorageClientEnum {
     #[cfg(feature = "google_storage")]
     Google(GCSFSStorageClient),
     #[cfg(feature = "aws_storage")]
-    Aws(S3FStorageClient),
+    AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
 }
 
@@ -24,7 +28,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.name(),
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.name(),
+            StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
         }
     }
@@ -47,7 +51,7 @@ impl StorageClientEnum {
                 // strip the s3:// prefix
                 let bucket = storage_uri.strip_prefix("s3://").unwrap().to_string();
                 let client = S3FStorageClient::new(bucket).await;
-                Ok(StorageClientEnum::Aws(client))
+                Ok(StorageClientEnum::AWS(client))
             }
             _ => {
                 let client = LocalFSStorageClient::new(storage_uri).await;
@@ -61,7 +65,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.find(path).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.find(path).await,
+            StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
         }
     }
@@ -71,7 +75,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.find_info(path).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.find_info(path).await,
+            StorageClientEnum::AWS(client) => client.find_info(path).await,
             StorageClientEnum::Local(client) => client.find_info(path).await,
         }
     }
@@ -86,7 +90,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.get(lpath, rpath, recursive).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.get(lpath, rpath, recursive).await,
+            StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
         }
     }
@@ -101,7 +105,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.put(lpath, rpath, recursive).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.put(lpath, rpath, recursive).await,
+            StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
         }
     }
@@ -111,7 +115,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.copy(src, dest, recursive).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.copy(src, dest, recursive).await,
+            StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
         }
     }
@@ -121,7 +125,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.rm(path, recursive).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.rm(path, recursive).await,
+            StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
         }
     }
@@ -131,7 +135,7 @@ impl StorageClientEnum {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.exists(path).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.exists(path).await,
+            StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
         }
     }
@@ -147,10 +151,104 @@ impl StorageClientEnum {
                 client.generate_presigned_url(path, expiration).await
             }
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::Aws(client) => client.generate_presigned_url(path, expiration).await,
+            StorageClientEnum::AWS(client) => client.generate_presigned_url(path, expiration).await,
             StorageClientEnum::Local(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
         }
     }
+}
+
+#[pyclass]
+pub struct PyStorageClient {
+    inner: StorageClientEnum,
+    runtime: tokio::runtime::Runtime,
+}
+
+#[pymethods]
+impl PyStorageClient {
+    #[new]
+    fn new(storage_uri: String) -> PyResult<Self> {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = rt
+            .block_on(StorageClientEnum::new(storage_uri))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(PyStorageClient {
+            inner: client,
+            runtime: rt,
+        })
+    }
+
+    fn name(&self) -> String {
+        self.inner.name().to_string()
+    }
+
+    #[pyo3(signature = (path=PathBuf::new()))]
+    fn find(&self, path: PathBuf) -> PyResult<Vec<String>> {
+        let result = self
+            .runtime
+            .block_on(self.inner.find(&path))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(result)
+    }
+
+    fn find_info(&self, path: PathBuf) -> PyResult<Vec<FileInfo>> {
+        let result = self
+            .runtime
+            .block_on(self.inner.find_info(&path))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(result)
+    }
+
+    #[pyo3(signature = (lpath, rpath, recursive = false))]
+    pub fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
+        self.runtime
+            .block_on(self.inner.get(&lpath, &rpath, recursive))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(())
+    }
+
+    #[pyo3(signature = (lpath, rpath, recursive = false))]
+    pub fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
+        self.runtime
+            .block_on(self.inner.put(&lpath, &rpath, recursive))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(())
+    }
+
+    pub fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> PyResult<()> {
+        self.runtime
+            .block_on(self.inner.copy(&src, &dest, recursive))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(())
+    }
+
+    pub fn rm(&self, path: PathBuf, recursive: bool) -> PyResult<()> {
+        self.runtime
+            .block_on(self.inner.rm(&path, recursive))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+
+        Ok(())
+    }
+
+    pub fn exists(&self, path: PathBuf) -> PyResult<bool> {
+        let result = self
+            .runtime
+            .block_on(self.inner.exists(&path))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(result)
+    }
+
+    pub fn generate_presigned_url(&self, path: PathBuf, expiration: u64) -> PyResult<String> {
+        let result = self
+            .runtime
+            .block_on(self.inner.generate_presigned_url(&path, expiration))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        Ok(result)
+    }
+}
+
+#[pyfunction]
+pub fn get_storage_client(storage_uri: String) -> PyResult<PyStorageClient> {
+    PyStorageClient::new(storage_uri)
 }

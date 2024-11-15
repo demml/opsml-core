@@ -1,7 +1,6 @@
 use crate::core::storage::client::StorageClientEnum;
+use opsml_settings::config::OpsmlConfig;
 use std::sync::Arc;
-
-use super::setup::OpsmlConfig;
 
 pub struct AppState {
     pub storage_client: Arc<StorageClientEnum>,

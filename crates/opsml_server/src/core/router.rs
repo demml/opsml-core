@@ -1,4 +1,4 @@
-use crate::core::debug::debug::debug_info;
+use crate::core::debug::route::debug_info;
 use crate::core::health::route::health_check;
 use crate::core::state::AppState;
 use axum::http::{

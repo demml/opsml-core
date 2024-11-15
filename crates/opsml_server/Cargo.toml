@@ -19,7 +19,7 @@ tower-http = { version = "0.5.0", features = ["cors"] }
 tracing = "0.1.40"
 tracing-subscriber = {version = "0.3.18", features = ["json", "time"]}
 axum = "0.7.7"
-rand = "0.8.5"
+opsml-settings = { workspace = true }
 
 # Conditional dependencies
 opsml-storage = { workspace = true, optional = true, features = [] }
