@@ -7,6 +7,7 @@ pub mod google_storage {
     use crate::core::storage::base::PathExt;
     use crate::core::storage::base::StorageClient;
     use crate::core::utils::error::StorageError;
+    use async_trait::async_trait;
     use aws_smithy_types::byte_stream::ByteStream;
     use aws_smithy_types::byte_stream::Length;
     use base64::prelude::*;
@@ -164,6 +165,7 @@ pub mod google_storage {
         pub bucket: String,
     }
 
+    #[async_trait]
     impl StorageClient for GoogleStorageClient {
         async fn bucket(&self) -> &str {
             &self.bucket
@@ -625,6 +627,7 @@ pub mod google_storage {
         client: GoogleStorageClient,
     }
 
+    #[async_trait]
     impl FileSystem<GoogleStorageClient> for GCSFSStorageClient {
         fn client(&self) -> &GoogleStorageClient {
             &self.client

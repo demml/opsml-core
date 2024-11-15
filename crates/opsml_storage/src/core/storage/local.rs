@@ -2,6 +2,7 @@ use crate::core::storage::base::get_files;
 use crate::core::storage::base::PathExt;
 use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
 use crate::core::utils::error::StorageError;
+use async_trait::async_trait;
 use pyo3::prelude::*;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
@@ -12,12 +13,13 @@ pub struct LocalStorageClient {
     pub bucket: PathBuf,
 }
 
+#[async_trait]
 impl StorageClient for LocalStorageClient {
-    fn bucket(&self) -> &str {
+    async fn bucket(&self) -> &str {
         self.bucket.to_str().unwrap()
     }
 
-    fn new(bucket: String) -> Self {
+    async fn new(bucket: String) -> Result<Self, StorageError> {
         let bucket = PathBuf::from(bucket);
 
         // bucket should be a dir. Check if it exists. If not, create it
@@ -29,10 +31,10 @@ impl StorageClient for LocalStorageClient {
                 .unwrap();
         }
 
-        Self { bucket }
+        Ok(Self { bucket })
     }
 
-    fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+    async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
         let src_path = self.bucket.join(rpath);
         let dest_path = Path::new(lpath);
 
@@ -54,7 +56,11 @@ impl StorageClient for LocalStorageClient {
         Ok(())
     }
 
-    fn generate_presigned_url(&self, path: &str, _expiration: u64) -> Result<String, StorageError> {
+    async fn generate_presigned_url(
+        &self,
+        path: &str,
+        _expiration: u64,
+    ) -> Result<String, StorageError> {
         let full_path = self.bucket.join(path);
         if full_path.exists() {
             Ok(full_path.to_str().unwrap().to_string())
@@ -66,7 +72,7 @@ impl StorageClient for LocalStorageClient {
         }
     }
 
-    fn upload_file_in_chunks(
+    async fn upload_file_in_chunks(
         &self,
         lpath: &Path,
         rpath: &Path,
@@ -85,7 +91,7 @@ impl StorageClient for LocalStorageClient {
         Ok(())
     }
 
-    fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+    async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
         let full_path = self.bucket.join(path);
         if !full_path.exists() {
             return Err(StorageError::Error(format!(
@@ -115,7 +121,7 @@ impl StorageClient for LocalStorageClient {
         Ok(files)
     }
 
-    fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+    async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
         let full_path = self.bucket.join(path);
         if !full_path.exists() {
             return Err(StorageError::Error(format!(
@@ -159,7 +165,7 @@ impl StorageClient for LocalStorageClient {
         Ok(files_info)
     }
 
-    fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+    async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
         let src_path = self.bucket.join(src);
         let dest_path = self.bucket.join(dest);
 
@@ -181,7 +187,7 @@ impl StorageClient for LocalStorageClient {
         Ok(true)
     }
 
-    fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+    async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
         let src_path = self.bucket.join(src);
         let dest_path = self.bucket.join(dest);
 
@@ -216,7 +222,7 @@ impl StorageClient for LocalStorageClient {
         Ok(true)
     }
 
-    fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+    async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
         let full_path = self.bucket.join(path);
 
         if !full_path.exists() {
@@ -232,7 +238,7 @@ impl StorageClient for LocalStorageClient {
         Ok(true)
     }
 
-    fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+    async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
         let full_path = self.bucket.join(path);
 
         if !full_path.exists() {
@@ -259,14 +265,15 @@ pub struct LocalFSStorageClient {
     client: LocalStorageClient,
 }
 
+#[async_trait]
 impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
     fn client(&self) -> &LocalStorageClient {
         &self.client
     }
 
-    fn new(root: String) -> Self {
+    async fn new(root: String) -> Self {
         Self {
-            client: LocalStorageClient::new(root),
+            client: LocalStorageClient::new(root).await.unwrap(),
         }
     }
 }
@@ -274,24 +281,36 @@ impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
 #[pyclass]
 pub struct PyLocalFSStorageClient {
     client: LocalStorageClient,
+    runtime: tokio::runtime::Runtime,
 }
 
 #[pymethods]
 impl PyLocalFSStorageClient {
     #[new]
     fn new(bucket: String) -> Self {
-        let client = LocalStorageClient::new(bucket);
-        Self { client }
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = rt
+            .block_on(async { LocalStorageClient::new(bucket).await })
+            .unwrap();
+        Self {
+            client,
+            runtime: rt,
+        }
     }
 
     fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-        self.client.find_info(path.to_str().unwrap())
+        let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
+
+        self.runtime
+            .block_on(async { self.client.find_info(stripped_path.to_str().unwrap()).await })
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
     fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
-        let files = self.client.find(stripped_path.to_str().unwrap())?;
+        let files = self
+            .runtime
+            .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })?;
 
         // attempt to remove the bucket name from the path
         let stripped_files = files
@@ -312,32 +331,38 @@ impl PyLocalFSStorageClient {
         let stripped_rpath = rpath.strip_path(self.client.bucket.to_str().unwrap());
         let stripped_lpath = lpath.strip_path(self.client.bucket.to_str().unwrap());
 
-        if recursive {
-            let stripped_lpath_clone = stripped_lpath.clone();
+        self.runtime.block_on(async {
+            if recursive {
+                let stripped_lpath_clone = stripped_lpath.clone();
 
-            // list all objects in the path
-            let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
+                // list all objects in the path
+                let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
 
-            // iterate over each object and get it
-            for obj in objects {
-                let file_path = Path::new(obj.as_str());
-                let stripped_path = file_path.strip_path(self.client.bucket.to_str().unwrap());
-                let relative_path = file_path.relative_path(&stripped_rpath)?;
-                let local_path = stripped_lpath_clone.join(relative_path);
+                // iterate over each object and get it
+                for obj in objects {
+                    let file_path = Path::new(obj.as_str());
+                    let stripped_path = file_path.strip_path(self.client.bucket.to_str().unwrap());
+                    let relative_path = file_path.relative_path(&stripped_rpath)?;
+                    let local_path = stripped_lpath_clone.join(relative_path);
 
-                self.client.get_object(
-                    local_path.to_str().unwrap(),
-                    stripped_path.to_str().unwrap(),
-                )?;
+                    self.client
+                        .get_object(
+                            local_path.to_str().unwrap(),
+                            stripped_path.to_str().unwrap(),
+                        )
+                        .await?;
+                }
+            } else {
+                self.client
+                    .get_object(
+                        stripped_lpath.to_str().unwrap(),
+                        stripped_rpath.to_str().unwrap(),
+                    )
+                    .await?;
             }
-        } else {
-            self.client.get_object(
-                stripped_lpath.to_str().unwrap(),
-                stripped_rpath.to_str().unwrap(),
-            )?;
-        }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -345,33 +370,37 @@ impl PyLocalFSStorageClient {
         let stripped_lpath = lpath.strip_path(self.client.bucket.to_str().unwrap());
         let stripped_rpath = rpath.strip_path(self.client.bucket.to_str().unwrap());
 
-        if recursive {
-            if !stripped_lpath.is_dir() {
-                return Err(StorageError::Error(
-                    "Local path must be a directory for recursive put".to_string(),
-                ));
-            }
+        self.runtime.block_on(async {
+            if recursive {
+                if !stripped_lpath.is_dir() {
+                    return Err(StorageError::Error(
+                        "Local path must be a directory for recursive put".to_string(),
+                    ));
+                }
 
-            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
 
-            for file in files {
-                let stripped_lpath_clone = stripped_lpath.clone();
-                let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client.bucket.to_str().unwrap());
+                for file in files {
+                    let stripped_lpath_clone = stripped_lpath.clone();
+                    let stripped_rpath_clone = stripped_rpath.clone();
+                    let stripped_file_path = file.strip_path(self.client.bucket.to_str().unwrap());
 
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
+                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                    let remote_path = stripped_rpath_clone.join(relative_path);
 
+                    self.client
+                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                        .await?;
+                }
+
+                Ok(())
+            } else {
                 self.client
-                    .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
+                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                    .await?;
+                Ok(())
             }
-
-            Ok(())
-        } else {
-            self.client
-                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
-            Ok(())
-        }
+        })
     }
 
     #[pyo3(signature = (src, dest, recursive = false))]
@@ -379,38 +408,51 @@ impl PyLocalFSStorageClient {
         let stripped_src = src.strip_path(self.client.bucket.to_str().unwrap());
         let stripped_dest = dest.strip_path(self.client.bucket.to_str().unwrap());
 
-        if recursive {
-            self.client.copy_objects(
-                stripped_src.to_str().unwrap(),
-                stripped_dest.to_str().unwrap(),
-            )?;
-        } else {
-            self.client.copy_object(
-                stripped_src.to_str().unwrap(),
-                stripped_dest.to_str().unwrap(),
-            )?;
-        }
+        self.runtime.block_on(async {
+            if recursive {
+                self.client
+                    .copy_objects(
+                        stripped_src.to_str().unwrap(),
+                        stripped_dest.to_str().unwrap(),
+                    )
+                    .await?;
+            } else {
+                self.client
+                    .copy_object(
+                        stripped_src.to_str().unwrap(),
+                        stripped_dest.to_str().unwrap(),
+                    )
+                    .await?;
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     #[pyo3(signature = (path, recursive = false))]
     fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
 
-        if recursive {
-            self.client
-                .delete_objects(stripped_path.to_str().unwrap())?;
-        } else {
-            self.client.delete_object(stripped_path.to_str().unwrap())?;
-        }
+        self.runtime.block_on(async {
+            if recursive {
+                self.client
+                    .delete_objects(stripped_path.to_str().unwrap())
+                    .await?;
+            } else {
+                self.client
+                    .delete_object(stripped_path.to_str().unwrap())
+                    .await?;
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
-        let objects = self.client.find(stripped_path.to_str().unwrap());
+        let objects = self
+            .runtime
+            .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await });
 
         // if error, return false
         if objects.is_err() {
@@ -428,8 +470,11 @@ impl PyLocalFSStorageClient {
         expiration: u64,
     ) -> Result<String, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
-        self.client
-            .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+        self.runtime.block_on(async {
+            self.client
+                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+                .await
+        })
     }
 
     fn delete_bucket(&self) -> Result<(), StorageError> {
@@ -529,22 +574,22 @@ mod tests {
         let _client = LocalStorageClient::new(root.clone());
     }
 
-    #[test]
-    fn test_local_storage_client_get_object() {
+    #[tokio::test]
+    async fn test_local_storage_client_get_object() {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().to_str().unwrap().to_string();
-        let client = LocalStorageClient::new(root.clone());
+        let client = LocalStorageClient::new(root.clone()).await.unwrap();
 
         // should fail since there are no suffixes
-        let result = client.get_object("local_path", "remote_path");
+        let result = client.get_object("local_path", "remote_path").await;
         assert!(result.is_err()); // Assuming the object does not exist
     }
 
-    #[test]
-    fn test_local_storage_client_put() {
+    #[tokio::test]
+    async fn test_local_storage_client_put() {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().to_str().unwrap().to_string();
-        let client = LocalFSStorageClient::new(root.clone());
+        let client = LocalFSStorageClient::new(root.clone()).await;
 
         //
         let dirname = create_nested_data(&CHUNK_SIZE);
@@ -553,25 +598,25 @@ mod tests {
         let rpath = Path::new(&dirname);
 
         // put the file
-        client.put(lpath, rpath, true).unwrap();
+        client.put(lpath, rpath, true).await.unwrap();
 
         // check if the file exists
-        let exists = client.exists(rpath).unwrap();
+        let exists = client.exists(rpath).await.unwrap();
         assert!(exists);
 
         // list all files
-        let files = client.find(rpath).unwrap();
+        let files = client.find(rpath).await.unwrap();
         assert_eq!(files.len(), 2);
 
         // list files with info
-        let files = client.find_info(rpath).unwrap();
+        let files = client.find_info(rpath).await.unwrap();
         assert_eq!(files.len(), 2);
 
         // download the files
         let new_path = uuid::Uuid::new_v4().to_string();
         let new_path = Path::new(&new_path);
 
-        client.get(new_path, rpath, true).unwrap();
+        client.get(new_path, rpath, true).await.unwrap();
 
         // check if the files are the same
         let files = get_files(rpath).unwrap();
@@ -583,47 +628,47 @@ mod tests {
         // create a new path
         let copy_path = uuid::Uuid::new_v4().to_string();
         let copy_path = Path::new(&copy_path);
-        client.copy(rpath, copy_path, true).unwrap();
-        let files = client.find(copy_path).unwrap();
+        client.copy(rpath, copy_path, true).await.unwrap();
+        let files = client.find(copy_path).await.unwrap();
         assert_eq!(files.len(), 2);
 
         // cleanup
         std::fs::remove_dir_all(&dirname).unwrap();
         std::fs::remove_dir_all(new_path).unwrap();
 
-        client.rm(rpath, true).unwrap();
-        client.rm(copy_path, true).unwrap();
+        client.rm(rpath, true).await.unwrap();
+        client.rm(copy_path, true).await.unwrap();
 
         // check if the file exists
-        let exists = client.exists(rpath).unwrap();
+        let exists = client.exists(rpath).await.unwrap();
         assert!(!exists);
     }
 
-    #[test]
-    fn test_local_storage_client_generate_presigned_url() {
+    #[tokio::test]
+    async fn test_local_storage_client_generate_presigned_url() {
         let bucket = get_bucket();
-        let client = LocalFSStorageClient::new(bucket);
+        let client = LocalFSStorageClient::new(bucket).await;
 
         // create file
         let key = create_single_file(&CHUNK_SIZE);
         let path = Path::new(&key);
 
         // put the file
-        client.put(path, path, false).unwrap();
+        client.put(path, path, false).await.unwrap();
 
         // generate presigned url
-        let url = client.generate_presigned_url(path, 3600).unwrap();
+        let url = client.generate_presigned_url(path, 3600).await.unwrap();
         assert!(!url.is_empty());
 
         // cleanup
-        client.rm(path, false).unwrap();
+        client.rm(path, false).await.unwrap();
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
-    #[test]
-    fn test_local_large_file_upload() {
+    #[tokio::test]
+    async fn test_local_large_file_upload() {
         let bucket = get_bucket();
-        let client = LocalFSStorageClient::new(bucket);
+        let client = LocalFSStorageClient::new(bucket).await;
 
         // create file
         let chunk_size = 1024 * 1024 * 5; // 5MB
@@ -631,10 +676,10 @@ mod tests {
         let path = Path::new(&key);
 
         // put the file
-        client.put(path, path, false).unwrap();
+        client.put(path, path, false).await.unwrap();
 
         // get the file info
-        let info = client.find_info(path).unwrap();
+        let info = client.find_info(path).await.unwrap();
         assert_eq!(info.len(), 1);
 
         // get item and assert it's at least the size of the file
@@ -642,7 +687,7 @@ mod tests {
         assert!(item.size >= 1024 * 1024 * 10);
 
         // cleanup
-        client.rm(path, false).unwrap();
+        client.rm(path, false).await.unwrap();
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }

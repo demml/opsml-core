@@ -19,7 +19,18 @@ tower-http = { version = "0.5.0", features = ["cors"] }
 tracing = "0.1.40"
 tracing-subscriber = {version = "0.3.18", features = ["json", "time"]}
 axum = "0.7.7"
-opsml-storage = { workspace = true, features = ["google_storage"] }
+rand = "0.8.5"
+
+# Conditional dependencies
+opsml-storage = { workspace = true, optional = true, features = [] }
+async-trait = "0.1.83"
+anyhow = "1.0.93"
+time = "0.3.36"
+
+[features]
+default = ["opsml-storage"]
+google_storage = ["opsml-storage/google_storage"]
+aws_storage = ["opsml-storage/aws_storage"]
 
 
 [dev-dependencies]

@@ -3,6 +3,7 @@ pub mod aws_storage {
     use crate::core::storage::base::StorageClient;
     use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt};
     use crate::core::utils::error::StorageError;
+    use async_trait::async_trait;
     use aws_config::BehaviorVersion;
     use aws_config::SdkConfig;
     use aws_sdk_s3::operation::get_object::GetObjectOutput;
@@ -139,6 +140,7 @@ pub mod aws_storage {
         pub bucket: String,
     }
 
+    #[async_trait]
     impl StorageClient for AWSStorageClient {
         async fn bucket(&self) -> &str {
             &self.bucket
@@ -237,25 +239,20 @@ pub mod aws_storage {
         async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
             // check if path = "/"
             let objects = if path == "/" || path.is_empty() {
-                let response = self
-                    .client
+                self.client
                     .list_objects_v2()
                     .bucket(&self.bucket)
                     .send()
                     .await
-                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
-                response
+                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?
             } else {
-                let response = self
-                    .client
+                self.client
                     .list_objects_v2()
                     .bucket(&self.bucket)
                     .prefix(path)
                     .send()
                     .await
-                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
-
-                response
+                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?
             };
 
             Ok(objects
@@ -529,6 +526,7 @@ pub mod aws_storage {
         client: AWSStorageClient,
     }
 
+    #[async_trait]
     impl FileSystem<AWSStorageClient> for S3FStorageClient {
         fn client(&self) -> &AWSStorageClient {
             &self.client

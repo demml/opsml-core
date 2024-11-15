@@ -1,5 +1,6 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
+use async_trait::async_trait;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -50,6 +51,7 @@ pub fn get_files(path: &Path) -> Result<Vec<PathBuf>, StorageError> {
 }
 
 // Define the StorageClient trait with common methods
+#[async_trait]
 pub trait StorageClient: Sized {
     async fn bucket(&self) -> &str;
     async fn new(bucket: String) -> Result<Self, StorageError>;
@@ -73,6 +75,7 @@ pub trait StorageClient: Sized {
     ) -> Result<String, StorageError>;
 }
 
+#[async_trait]
 pub trait FileSystem<T: StorageClient> {
     fn client(&self) -> &T;
     async fn new(bucket: String) -> Self;
