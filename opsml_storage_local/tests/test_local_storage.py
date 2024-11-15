@@ -1,7 +1,7 @@
 from pathlib import Path
 from opsml_storage_local import PyLocalFSStorageClient
 import uuid
-import shutil
+from typing import List
 
 
 def test_storage_client(tmp_path: Path, storage_client: PyLocalFSStorageClient) -> None:
@@ -34,10 +34,16 @@ def test_storage_client(tmp_path: Path, storage_client: PyLocalFSStorageClient) 
         assert len(storage_client.find(rpath_nested.parent)) >= 1
 
         # find
-        assert storage_client.find(rpath_dir) == [
-            rpath.as_posix(),
-            rpath_nested.as_posix(),
-        ]
+
+        # rpaths
+        _paths: List[str] = storage_client.find(rpath_dir)
+        _paths.sort()
+
+        # lpaths
+        _lpaths = [rpath.as_posix(), rpath_nested.as_posix()]
+        _lpaths.sort()
+
+        assert _paths == _lpaths
 
         ## get
         get_lpath = tmp_path / "cats.jpg"
