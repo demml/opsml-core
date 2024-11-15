@@ -1,5 +1,6 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
+use futures::Future;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -50,74 +51,84 @@ pub fn get_files(path: &Path) -> Result<Vec<PathBuf>, StorageError> {
 }
 
 // Define the StorageClient trait with common methods
-pub trait StorageClient {
-    fn bucket(&self) -> &str;
-    fn new(bucket: String) -> Self;
-    fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
-    fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
-    fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
-    fn upload_file_in_chunks(
+pub trait StorageClient: Sized {
+    async fn bucket(&self) -> &str;
+    async fn new(bucket: String) -> Result<Self, StorageError>;
+    async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
+    async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
+    async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
+    async fn upload_file_in_chunks(
         &self,
         local_path: &Path,
         remote_path: &Path,
         chunk_size: Option<u64>,
     ) -> Result<(), StorageError>;
-    fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
-    fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
-    fn delete_objects(&self, path: &str) -> Result<bool, StorageError>;
-    fn delete_object(&self, path: &str) -> Result<bool, StorageError>;
-    fn generate_presigned_url(&self, path: &str, expiration: u64) -> Result<String, StorageError>;
+    async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
+    async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
+    async fn delete_objects(&self, path: &str) -> Result<bool, StorageError>;
+    async fn delete_object(&self, path: &str) -> Result<bool, StorageError>;
+    async fn generate_presigned_url(
+        &self,
+        path: &str,
+        expiration: u64,
+    ) -> Result<String, StorageError>;
 }
 
 pub trait FileSystem<T: StorageClient> {
     fn client(&self) -> &T;
-    fn new(bucket: String) -> Self;
+    async fn new(bucket: String) -> Self;
 
-    fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket());
-        self.client().find(stripped_path.to_str().unwrap())
+    async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
+        self.client().find(stripped_path.to_str().unwrap()).await
     }
 
-    fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket());
-        self.client().find_info(stripped_path.to_str().unwrap())
+    async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
+        self.client()
+            .find_info(stripped_path.to_str().unwrap())
+            .await
     }
 
-    fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+    async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
         // strip the paths
-        let stripped_rpath = rpath.strip_path(self.client().bucket());
-        let stripped_lpath = lpath.strip_path(self.client().bucket());
+        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
 
         if recursive {
             let stripped_lpath_clone = stripped_lpath.clone();
 
             // list all objects in the path
-            let objects = self.client().find(stripped_rpath.to_str().unwrap())?;
+            let objects = self.client().find(stripped_rpath.to_str().unwrap()).await?;
 
             // iterate over each object and get it
             for obj in objects {
                 let file_path = Path::new(obj.as_str());
-                let stripped_path = file_path.strip_path(self.client().bucket());
+                let stripped_path = file_path.strip_path(self.client().bucket().await);
                 let relative_path = file_path.relative_path(&stripped_rpath)?;
                 let local_path = stripped_lpath_clone.join(relative_path);
 
-                self.client().get_object(
-                    local_path.to_str().unwrap(),
-                    stripped_path.to_str().unwrap(),
-                )?;
+                self.client()
+                    .get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )
+                    .await?;
             }
         } else {
-            self.client().get_object(
-                stripped_lpath.to_str().unwrap(),
-                stripped_rpath.to_str().unwrap(),
-            )?;
+            self.client()
+                .get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )
+                .await?;
         }
 
         Ok(())
     }
-    fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket());
-        let stripped_rpath = rpath.strip_path(self.client().bucket());
+    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
 
         if recursive {
             if !stripped_lpath.is_dir() {
@@ -131,64 +142,77 @@ pub trait FileSystem<T: StorageClient> {
             for file in files {
                 let stripped_lpath_clone = stripped_lpath.clone();
                 let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket());
+                let stripped_file_path = file.strip_path(self.client().bucket().await);
 
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
                 self.client()
-                    .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
+                    .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                    .await?;
             }
 
             Ok(())
         } else {
             self.client()
-                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
+                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                .await?;
             Ok(())
         }
     }
-    fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_src = src.strip_path(self.client().bucket());
-        let stripped_dest = dest.strip_path(self.client().bucket());
+    async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_src = src.strip_path(self.client().bucket().await);
+        let stripped_dest = dest.strip_path(self.client().bucket().await);
 
         if recursive {
-            self.client().copy_objects(
-                stripped_src.to_str().unwrap(),
-                stripped_dest.to_str().unwrap(),
-            )?;
+            self.client()
+                .copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
         } else {
-            self.client().copy_object(
-                stripped_src.to_str().unwrap(),
-                stripped_dest.to_str().unwrap(),
-            )?;
+            self.client()
+                .copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
         }
 
         Ok(())
     }
-    fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket());
+    async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
 
         if recursive {
             self.client()
-                .delete_objects(stripped_path.to_str().unwrap())?;
+                .delete_objects(stripped_path.to_str().unwrap())
+                .await?;
         } else {
             self.client()
-                .delete_object(stripped_path.to_str().unwrap())?;
+                .delete_object(stripped_path.to_str().unwrap())
+                .await?;
         }
 
         Ok(())
     }
-    fn exists(&self, path: &Path) -> Result<bool, StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket());
-        let objects = self.client().find(stripped_path.to_str().unwrap())?;
+    async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
+        let objects = self.client().find(stripped_path.to_str().unwrap()).await?;
 
         Ok(!objects.is_empty())
     }
 
-    fn generate_presigned_url(&self, path: &Path, expiration: u64) -> Result<String, StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket());
+    async fn generate_presigned_url(
+        &self,
+        path: &Path,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
         self.client()
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            .await
     }
 }
 

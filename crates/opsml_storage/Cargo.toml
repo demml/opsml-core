@@ -12,7 +12,7 @@ license = "MIT"
 description = "Core rust library for the opsml project"
 
 [dependencies]
-pyo3 = { workspace = true }
+pyo3 = { version = "0.22", features = ["experimental-async"] }
 serde = { version = "1.*", features = ["derive"] }
 reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }
 tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "macros"] }

@@ -34,7 +34,6 @@ pub mod google_storage {
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
-    use tokio::runtime::Runtime;
 
     #[derive(Clone)]
     pub struct GcpCreds {
@@ -163,56 +162,47 @@ pub mod google_storage {
     pub struct GoogleStorageClient {
         pub client: Client,
         pub bucket: String,
-        runtime: tokio::runtime::Runtime,
     }
 
     impl StorageClient for GoogleStorageClient {
-        fn bucket(&self) -> &str {
+        async fn bucket(&self) -> &str {
             &self.bucket
         }
-        fn new(bucket: String) -> Self {
-            let rt = Runtime::new().unwrap();
+        async fn new(bucket: String) -> Result<Self, StorageError> {
+            let creds = GcpCreds::new().await?;
+            // If no credentials, attempt to create a default client pulling from the environment
+            let client: Result<Client, StorageError> = if creds.creds.is_none() {
+                let config = ClientConfig::default().with_auth().await;
 
-            let client: Result<Client, StorageError> = rt.block_on(async {
-                let creds = GcpCreds::new().await?;
-                // If no credentials, attempt to create a default client pulling from the environment
-                if creds.creds.is_none() {
-                    let config = ClientConfig::default().with_auth().await;
+                // if error, use ClientConfig::default().anonymous();
+                let config = match config {
+                    Ok(config) => config,
+                    Err(_) => ClientConfig::default().anonymous(),
+                };
 
-                    // if error, use ClientConfig::default().anonymous();
-                    let config = match config {
-                        Ok(config) => config,
-                        Err(_) => ClientConfig::default().anonymous(),
-                    };
+                Ok(Client::new(config))
 
-                    Ok(Client::new(config))
+            // if creds are set (base64 for JSON file)
+            } else {
+                // try with credentials
+                let config = ClientConfig::default()
+                    .with_credentials(creds.creds.unwrap())
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!(
+                            "Unable to create client with credentials: {}",
+                            e
+                        ))
+                    })?;
 
-                // if creds are set (base64 for JSON file)
-                } else {
-                    // try with credentials
-                    let config = ClientConfig::default()
-                        .with_credentials(creds.creds.unwrap())
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!(
-                                "Unable to create client with credentials: {}",
-                                e
-                            ))
-                        })?;
+                let client = Client::new(config);
+                Ok(client)
+            };
 
-                    let client = Client::new(config);
-                    Ok(client)
-                }
-            });
-
-            match client {
-                Ok(client) => GoogleStorageClient {
-                    client,
-                    bucket,
-                    runtime: rt,
-                },
-                Err(e) => panic!("Unable to create GoogleStorageClient: {}", e),
-            }
+            Ok(GoogleStorageClient {
+                client: client?,
+                bucket,
+            })
         }
 
         /// Download a remote object as a stream to a local file
@@ -222,8 +212,8 @@ pub mod google_storage {
         /// * `lpath` - The path to the local file
         /// * `rpath` - The path to the remote file
         ///
-        fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
-            let mut stream = self.get_object_stream(rpath)?;
+        async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+            let mut stream = self.get_object_stream(rpath).await?;
 
             // create and open lpath file
             let prefix = Path::new(lpath).parent().unwrap();
@@ -239,18 +229,13 @@ pub mod google_storage {
             let mut file = File::create(lpath)
                 .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
 
-            self.runtime.block_on(async {
-                // iterate over the stream and write to the file
-                while let Some(v) = stream.next().await {
-                    let chunk =
-                        v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
-                    file.write_all(&chunk).map_err(|e| {
-                        StorageError::Error(format!("Unable to write to file: {}", e))
-                    })?;
-                }
+            while let Some(v) = stream.next().await {
+                let chunk = v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
+                file.write_all(&chunk)
+                    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+            }
 
-                Ok(())
-            })
+            Ok(())
         }
 
         /// Generate a presigned url for an object in the storage bucket
@@ -264,33 +249,31 @@ pub mod google_storage {
         ///
         /// A Result with the presigned url if successful
         ///
-        fn generate_presigned_url(
+        async fn generate_presigned_url(
             &self,
             path: &str,
             expiration: u64,
         ) -> Result<String, StorageError> {
-            self.runtime.block_on(async {
-                let presigned_url = self
-                    .client
-                    .signed_url(
-                        &self.bucket.clone(),
-                        path,
-                        None,
-                        None,
-                        SignedURLOptions {
-                            method: SignedURLMethod::GET,
-                            start_time: None,
-                            expires: std::time::Duration::from_secs(expiration),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Unable to generate presigned url: {}", e))
-                    })?;
+            let presigned_url = self
+                .client
+                .signed_url(
+                    &self.bucket.clone(),
+                    path,
+                    None,
+                    None,
+                    SignedURLOptions {
+                        method: SignedURLMethod::GET,
+                        start_time: None,
+                        expires: std::time::Duration::from_secs(expiration),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to generate presigned url: {}", e))
+                })?;
 
-                Ok(presigned_url)
-            })
+            Ok(presigned_url)
         }
 
         /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
@@ -305,7 +288,7 @@ pub mod google_storage {
         ///
         /// A Result with the object name if successful
         ///
-        fn upload_file_in_chunks(
+        async fn upload_file_in_chunks(
             &self,
             lpath: &Path,
             rpath: &Path,
@@ -336,7 +319,9 @@ pub mod google_storage {
                 chunk_count -= 1;
             }
 
-            let mut uploader = self.create_multipart_upload(rpath.to_str().unwrap())?;
+            let mut uploader = self
+                .create_multipart_upload(rpath.to_str().unwrap())
+                .await?;
             let mut status = UploadStatus::NotStarted;
 
             for chunk_index in 0..chunk_count {
@@ -376,26 +361,24 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A list of objects in the path
-        fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
-            self.runtime.block_on(async {
-                let result = self
-                    .client
-                    .list_objects(&ListObjectsRequest {
-                        bucket: self.bucket.clone(),
-                        prefix: Some(path.to_string()),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
+        async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+            let result = self
+                .client
+                .list_objects(&ListObjectsRequest {
+                    bucket: self.bucket.clone(),
+                    prefix: Some(path.to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
 
-                // return a list of object names if results.items is not None, Else return empty list
-                Ok(result
-                    .items
-                    .unwrap_or_else(Vec::new)
-                    .iter()
-                    .map(|o| o.name.clone())
-                    .collect())
-            })
+            // return a list of object names if results.items is not None, Else return empty list
+            Ok(result
+                .items
+                .unwrap_or_else(Vec::new)
+                .iter()
+                .map(|o| o.name.clone())
+                .collect())
         }
 
         /// Find object information. Runs the same operation as find but returns more information about each object
@@ -406,21 +389,18 @@ pub mod google_storage {
         ///
         /// # Returns
         ///
-        fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
-            let objects = self.runtime.block_on(async {
-                let result = self
-                    .client
-                    .list_objects(&ListObjectsRequest {
-                        bucket: self.bucket.clone(),
-                        prefix: Some(path.to_string()),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
-                Ok(result)
-            })?;
+        async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+            let result = self
+                .client
+                .list_objects(&ListObjectsRequest {
+                    bucket: self.bucket.clone(),
+                    prefix: Some(path.to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to list objects: {}", e)))?;
 
-            Ok(objects
+            Ok(result
                 .items
                 .unwrap_or_else(Vec::new)
                 .iter()
@@ -447,23 +427,21 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A Result with the object name if successful
-        fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
-            self.runtime.block_on(async {
-                self.client
-                    .copy_object(
-                        &google_cloud_storage::http::objects::copy::CopyObjectRequest {
-                            source_bucket: self.bucket.clone(),
-                            source_object: src.to_string(),
-                            destination_bucket: self.bucket.clone(),
-                            destination_object: dest.to_string(),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Unable to copy object: {}", e)))?;
+        async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+            self.client
+                .copy_object(
+                    &google_cloud_storage::http::objects::copy::CopyObjectRequest {
+                        source_bucket: self.bucket.clone(),
+                        source_object: src.to_string(),
+                        destination_bucket: self.bucket.clone(),
+                        destination_object: dest.to_string(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to copy object: {}", e)))?;
 
-                Ok(true)
-            })
+            Ok(true)
         }
 
         /// Copy objects from one bucket to another without deleting the source objects
@@ -473,8 +451,8 @@ pub mod google_storage {
         /// * `src` - The path to the source object
         /// * `dest` - The path to the destination object
         ///
-        fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
-            let objects = self.find(src)?;
+        async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+            let objects = self.find(src).await?;
             let dest = Path::new(dest);
             let src = PathBuf::from(src);
 
@@ -483,7 +461,8 @@ pub mod google_storage {
                 let relative_path = file_path.relative_path(&src)?;
                 let remote_path = dest.join(relative_path);
 
-                self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())?;
+                self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())
+                    .await?;
             }
 
             Ok(true)
@@ -495,21 +474,19 @@ pub mod google_storage {
         ///
         /// * `path` - The path to the object in the bucket
         ///
-        fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+        async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
             let request = DeleteObjectRequest {
                 bucket: self.bucket.clone(),
                 object: path.to_string(),
                 ..Default::default()
             };
 
-            self.runtime.block_on(async {
-                self.client
-                    .delete_object(&request)
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Unable to delete object: {}", e)))?;
+            self.client
+                .delete_object(&request)
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to delete object: {}", e)))?;
 
-                Ok(true)
-            })
+            Ok(true)
         }
 
         /// Delete an object from the storage bucket
@@ -518,11 +495,11 @@ pub mod google_storage {
         ///
         /// * `path` - The path to the object in the bucket
         ///
-        fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
-            let objects = self.find(path)?;
+        async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+            let objects = self.find(path).await?;
 
             for obj in objects {
-                self.delete_object(obj.as_str())?;
+                self.delete_object(obj.as_str()).await?;
             }
 
             Ok(true)
@@ -537,7 +514,7 @@ pub mod google_storage {
         /// * `path` - The path to the object in the bucket
         ///
         ///
-        pub fn create_multipart_upload(
+        pub async fn create_multipart_upload(
             &self,
             path: &str,
         ) -> Result<GoogleMultipartUploadClient, StorageError> {
@@ -549,25 +526,23 @@ pub mod google_storage {
                 ..Default::default()
             };
 
-            self.runtime.block_on(async {
-                let result = self
-                    .client
-                    .prepare_resumable_upload(
-                        &UploadObjectRequest {
-                            bucket: self.bucket.clone(),
-                            ..Default::default()
-                        },
-                        &UploadType::Multipart(Box::new(metadata)),
-                    )
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Unable to create resumable session: {}", e))
-                    })?;
+            let result = self
+                .client
+                .prepare_resumable_upload(
+                    &UploadObjectRequest {
+                        bucket: self.bucket.clone(),
+                        ..Default::default()
+                    },
+                    &UploadType::Multipart(Box::new(metadata)),
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create resumable session: {}", e))
+                })?;
 
-                Ok(GoogleMultipartUploadClient {
-                    client: result,
-                    handle: tokio::runtime::Handle::current(),
-                })
+            Ok(GoogleMultipartUploadClient {
+                client: result,
+                handle: tokio::runtime::Handle::current(),
             })
         }
 
@@ -622,31 +597,27 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A stream of bytes
-        pub fn get_object_stream(
+        pub async fn get_object_stream(
             &self,
             rpath: &str,
         ) -> Result<
             impl Stream<Item = Result<bytes::Bytes, google_cloud_storage::http::Error>>,
             StorageError,
         > {
-            self.runtime.block_on(async {
-                // open a bucket and blob and return the stream
-                let result = self
-                    .client
-                    .download_streamed_object(
-                        &GetObjectRequest {
-                            bucket: self.bucket.clone(),
-                            object: rpath.to_string(),
-                            ..Default::default()
-                        },
-                        &Range::default(),
-                    )
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Unable to download object: {}", e))
-                    })?;
-                Ok(result)
-            })
+            // open a bucket and blob and return the stream
+            let result = self
+                .client
+                .download_streamed_object(
+                    &GetObjectRequest {
+                        bucket: self.bucket.clone(),
+                        object: rpath.to_string(),
+                        ..Default::default()
+                    },
+                    &Range::default(),
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to download object: {}", e)))?;
+            Ok(result)
         }
     }
 
@@ -658,9 +629,9 @@ pub mod google_storage {
         fn client(&self) -> &GoogleStorageClient {
             &self.client
         }
-        fn new(bucket: String) -> Self {
+        async fn new(bucket: String) -> Self {
             GCSFSStorageClient {
-                client: GoogleStorageClient::new(bucket),
+                client: GoogleStorageClient::new(bucket).await.unwrap(),
             }
         }
     }
@@ -668,24 +639,36 @@ pub mod google_storage {
     #[pyclass]
     pub struct PyGCSFSStorageClient {
         client: GoogleStorageClient,
+        runtime: tokio::runtime::Runtime,
     }
 
     #[pymethods]
     impl PyGCSFSStorageClient {
         #[new]
         fn new(bucket: String) -> Self {
-            let client = GoogleStorageClient::new(bucket);
-            Self { client }
+            let rt = tokio::runtime::Runtime::new().unwrap();
+
+            let client = rt.block_on(async { GoogleStorageClient::new(bucket).await.unwrap() });
+
+            Self {
+                client,
+                runtime: rt,
+            }
         }
 
         fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-            self.client.find_info(path.to_str().unwrap())
+            let stripped_path = path.strip_path(&self.client.bucket);
+
+            self.runtime
+                .block_on(async { self.client.find_info(stripped_path.to_str().unwrap()).await })
         }
 
         #[pyo3(signature = (path=PathBuf::new()))]
         fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client.find(stripped_path.to_str().unwrap())
+
+            self.runtime
+                .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })
         }
 
         #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -694,32 +677,39 @@ pub mod google_storage {
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
             let stripped_lpath = lpath.strip_path(&self.client.bucket);
 
-            if recursive {
-                let stripped_lpath_clone = stripped_lpath.clone();
+            self.runtime.block_on(async {
+                if recursive {
+                    let stripped_lpath_clone = stripped_lpath.clone();
 
-                // list all objects in the path
-                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
+                    // list all objects in the path
 
-                // iterate over each object and get it
-                for obj in objects {
-                    let file_path = Path::new(obj.as_str());
-                    let stripped_path = file_path.strip_path(&self.client.bucket);
-                    let relative_path = file_path.relative_path(&stripped_rpath)?;
-                    let local_path = stripped_lpath_clone.join(relative_path);
+                    let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
 
-                    self.client.get_object(
-                        local_path.to_str().unwrap(),
-                        stripped_path.to_str().unwrap(),
-                    )?;
+                    // iterate over each object and get it
+                    for obj in objects {
+                        let file_path = Path::new(obj.as_str());
+                        let stripped_path = file_path.strip_path(&self.client.bucket);
+                        let relative_path = file_path.relative_path(&stripped_rpath)?;
+                        let local_path = stripped_lpath_clone.join(relative_path);
+
+                        self.client
+                            .get_object(
+                                local_path.to_str().unwrap(),
+                                stripped_path.to_str().unwrap(),
+                            )
+                            .await?;
+                    }
+                } else {
+                    self.client
+                        .get_object(
+                            stripped_lpath.to_str().unwrap(),
+                            stripped_rpath.to_str().unwrap(),
+                        )
+                        .await?;
                 }
-            } else {
-                self.client.get_object(
-                    stripped_lpath.to_str().unwrap(),
-                    stripped_rpath.to_str().unwrap(),
-                )?;
-            }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -727,33 +717,37 @@ pub mod google_storage {
             let stripped_lpath = lpath.strip_path(&self.client.bucket);
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
 
-            if recursive {
-                if !stripped_lpath.is_dir() {
-                    return Err(StorageError::Error(
-                        "Local path must be a directory for recursive put".to_string(),
-                    ));
-                }
+            self.runtime.block_on(async {
+                if recursive {
+                    if !stripped_lpath.is_dir() {
+                        return Err(StorageError::Error(
+                            "Local path must be a directory for recursive put".to_string(),
+                        ));
+                    }
 
-                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+                    let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
 
-                for file in files {
-                    let stripped_lpath_clone = stripped_lpath.clone();
-                    let stripped_rpath_clone = stripped_rpath.clone();
-                    let stripped_file_path = file.strip_path(&self.client.bucket);
+                    for file in files {
+                        let stripped_lpath_clone = stripped_lpath.clone();
+                        let stripped_rpath_clone = stripped_rpath.clone();
+                        let stripped_file_path = file.strip_path(&self.client.bucket);
 
-                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                    let remote_path = stripped_rpath_clone.join(relative_path);
+                        let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                        let remote_path = stripped_rpath_clone.join(relative_path);
 
+                        self.client
+                            .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                            .await?;
+                    }
+
+                    Ok(())
+                } else {
                     self.client
-                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
+                        .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                        .await?;
+                    Ok(())
                 }
-
-                Ok(())
-            } else {
-                self.client
-                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
-                Ok(())
-            }
+            })
         }
 
         #[pyo3(signature = (src, dest, recursive = false))]
@@ -761,38 +755,52 @@ pub mod google_storage {
             let stripped_src = src.strip_path(&self.client.bucket);
             let stripped_dest = dest.strip_path(&self.client.bucket);
 
-            if recursive {
-                self.client.copy_objects(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            } else {
-                self.client.copy_object(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            }
+            self.runtime.block_on(async {
+                if recursive {
+                    self.client
+                        .copy_objects(
+                            stripped_src.to_str().unwrap(),
+                            stripped_dest.to_str().unwrap(),
+                        )
+                        .await?;
+                } else {
+                    self.client
+                        .copy_object(
+                            stripped_src.to_str().unwrap(),
+                            stripped_dest.to_str().unwrap(),
+                        )
+                        .await?;
+                }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         #[pyo3(signature = (path, recursive = false))]
         fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
 
-            if recursive {
-                self.client
-                    .delete_objects(stripped_path.to_str().unwrap())?;
-            } else {
-                self.client.delete_object(stripped_path.to_str().unwrap())?;
-            }
+            self.runtime.block_on(async {
+                if recursive {
+                    self.client
+                        .delete_objects(stripped_path.to_str().unwrap())
+                        .await?;
+                } else {
+                    self.client
+                        .delete_object(stripped_path.to_str().unwrap())
+                        .await?;
+                }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            let objects = self.client.find(stripped_path.to_str().unwrap())?;
+
+            let objects = self
+                .runtime
+                .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })?;
 
             Ok(!objects.is_empty())
         }
@@ -804,8 +812,12 @@ pub mod google_storage {
             expiration: u64,
         ) -> Result<String, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client
-                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+
+            self.runtime.block_on(async {
+                self.client
+                    .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+                    .await
+            })
         }
     }
 
@@ -902,20 +914,20 @@ pub mod google_storage {
             let _client = GoogleStorageClient::new(bucket);
         }
 
-        #[test]
-        fn test_google_storage_client_get_object() {
+        #[tokio::test]
+        async fn test_google_storage_client_get_object() {
             let bucket = get_bucket();
-            let client = GoogleStorageClient::new(bucket);
+            let client = GoogleStorageClient::new(bucket).await.unwrap();
 
             // should fail since there are no suffixes
-            let result = client.get_object("local_path", "remote_path");
+            let result = client.get_object("local_path", "remote_path").await;
             assert!(result.is_err()); // Assuming the object does not exist
         }
 
-        #[test]
-        fn test_google_storage_client_put() {
+        #[tokio::test]
+        async fn test_google_storage_client_put() {
             let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket);
+            let client = GCSFSStorageClient::new(bucket).await;
 
             //
             let dirname = create_nested_data(&CHUNK_SIZE);
@@ -924,25 +936,25 @@ pub mod google_storage {
             let rpath = Path::new(&dirname);
 
             // put the file
-            client.put(lpath, rpath, true).unwrap();
+            client.put(lpath, rpath, true).await.unwrap();
 
             // check if the file exists
-            let exists = client.exists(rpath).unwrap();
+            let exists = client.exists(rpath).await.unwrap();
             assert!(exists);
 
             // list all files
-            let files = client.find(rpath).unwrap();
+            let files = client.find(rpath).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // list files with info
-            let files = client.find_info(rpath).unwrap();
+            let files = client.find_info(rpath).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // download the files
             let new_path = uuid::Uuid::new_v4().to_string();
             let new_path = Path::new(&new_path);
 
-            client.get(new_path, rpath, true).unwrap();
+            client.get(new_path, rpath, true).await.unwrap();
 
             // check if the files are the same
             let files = get_files(rpath).unwrap();
@@ -954,47 +966,47 @@ pub mod google_storage {
             // create a new path
             let copy_path = uuid::Uuid::new_v4().to_string();
             let copy_path = Path::new(&copy_path);
-            client.copy(rpath, copy_path, true).unwrap();
-            let files = client.find(copy_path).unwrap();
+            client.copy(rpath, copy_path, true).await.unwrap();
+            let files = client.find(copy_path).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // cleanup
             std::fs::remove_dir_all(&dirname).unwrap();
             std::fs::remove_dir_all(new_path).unwrap();
 
-            client.rm(rpath, true).unwrap();
-            client.rm(copy_path, true).unwrap();
+            client.rm(rpath, true).await.unwrap();
+            client.rm(copy_path, true).await.unwrap();
 
             // check if the file exists
-            let exists = client.exists(rpath).unwrap();
+            let exists = client.exists(rpath).await.unwrap();
             assert!(!exists);
         }
 
-        #[test]
-        fn test_google_storage_client_generate_presigned_url() {
+        #[tokio::test]
+        async fn test_google_storage_client_generate_presigned_url() {
             let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket);
+            let client = GCSFSStorageClient::new(bucket).await;
 
             // create file
             let key = create_single_file(&CHUNK_SIZE);
             let path = Path::new(&key);
 
             // put the file
-            client.put(path, path, false).unwrap();
+            client.put(path, path, false).await.unwrap();
 
             // generate presigned url
-            let url = client.generate_presigned_url(path, 3600).unwrap();
+            let url = client.generate_presigned_url(path, 3600).await.unwrap();
             assert!(!url.is_empty());
 
             // cleanup
-            client.rm(path, false).unwrap();
+            client.rm(path, false).await.unwrap();
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
 
-        #[test]
-        fn test_google_large_file_upload() {
+        #[tokio::test]
+        async fn test_google_large_file_upload() {
             let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket);
+            let client = GCSFSStorageClient::new(bucket).await;
 
             // create file
             let chunk_size = 1024 * 1024 * 5; // 5MB
@@ -1002,10 +1014,10 @@ pub mod google_storage {
             let path = Path::new(&key);
 
             // put the file
-            client.put(path, path, false).unwrap();
+            client.put(path, path, false).await.unwrap();
 
             // get the file info
-            let info = client.find_info(path).unwrap();
+            let info = client.find_info(path).await.unwrap();
             assert_eq!(info.len(), 1);
 
             // get item and assert it's at least the size of the file
@@ -1013,7 +1025,7 @@ pub mod google_storage {
             assert!(item.size >= 1024 * 1024 * 10);
 
             // cleanup
-            client.rm(path, false).unwrap();
+            client.rm(path, false).await.unwrap();
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
     }

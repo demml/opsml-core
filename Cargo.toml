@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/opsml_storage",
+  "crates/opsml_server",
   "opsml_storage_s3",
   "opsml_storage_gcs",
   "opsml_storage_local",
@@ -19,8 +20,8 @@ repository = "https://github.com/demml/opsml-core"
 
 
 [workspace.dependencies]
-pyo3 = { version = "0.22", features = ["experimental-async"] }
 opsml-storage = { path = "crates/opsml_storage" }
+opsml-server = { path = "crates/opsml_server" }
 
 [profile.release]
 lto = "fat"
