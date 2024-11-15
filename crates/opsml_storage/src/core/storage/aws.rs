@@ -17,7 +17,6 @@ pub mod aws_storage {
     use std::path::Path;
     use std::path::PathBuf;
     use std::str;
-    use tokio::runtime::Runtime;
 
     const MAX_CHUNKS: u64 = 10000;
 
@@ -45,23 +44,17 @@ pub mod aws_storage {
         pub path: String,
         pub upload_id: String,
         upload_parts: Vec<aws_sdk_s3::types::CompletedPart>,
-        runtime: tokio::runtime::Runtime,
     }
 
     impl AWSMulitPartUpload {
-        pub fn new(bucket: String, path: String, upload_id: String) -> Result<Self, StorageError> {
+        pub async fn new(
+            bucket: String,
+            path: String,
+            upload_id: String,
+        ) -> Result<Self, StorageError> {
             // create a resuable runtime for the multipart upload
-            let rt = Runtime::new().unwrap();
 
-            let creds = rt
-                .block_on(async {
-                    let creds = AWSCreds::new().await?;
-                    Ok(creds)
-                })
-                .map_err(|e: StorageError| {
-                    StorageError::Error(format!("Failed to create AWS creds: {}", e))
-                })?;
-
+            let creds = AWSCreds::new().await?;
             let client = Client::new(&creds.config);
 
             Ok(Self {
@@ -70,37 +63,25 @@ pub mod aws_storage {
                 path,
                 upload_id,
                 upload_parts: Vec::new(),
-                runtime: rt,
             })
         }
 
-        pub fn upload_part(
+        pub async fn upload_part(
             &mut self,
             part_number: i32,
             body: ByteStream,
         ) -> Result<bool, StorageError> {
             let response = self
-                .runtime
-                .block_on(async {
-                    let response = self
-                        .client
-                        .upload_part()
-                        .bucket(&self.bucket)
-                        .key(&self.path)
-                        .upload_id(&self.upload_id)
-                        .body(body)
-                        .part_number(part_number)
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!("Failed to upload part: {}", e))
-                        })?;
-
-                    Ok(response)
-                })
-                .map_err(|e: StorageError| {
-                    StorageError::Error(format!("Failed to upload part: {}", e))
-                })?;
+                .client
+                .upload_part()
+                .bucket(&self.bucket)
+                .key(&self.path)
+                .upload_id(&self.upload_id)
+                .body(body)
+                .part_number(part_number)
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to upload part: {}", e)))?;
 
             self.upload_parts.push(
                 CompletedPart::builder()
@@ -112,97 +93,66 @@ pub mod aws_storage {
             Ok(true)
         }
 
-        pub fn complete(&self) -> Result<(), StorageError> {
+        pub async fn complete(&self) -> Result<(), StorageError> {
             let completed_multipart_upload: CompletedMultipartUpload =
                 CompletedMultipartUpload::builder()
                     .set_parts(Some(self.upload_parts.clone()))
                     .build();
 
-            self.runtime
-                .block_on(async {
-                    let _complete_multipart_upload_res = self
-                        .client
-                        .complete_multipart_upload()
-                        .bucket(&self.bucket)
-                        .key(&self.path)
-                        .multipart_upload(completed_multipart_upload)
-                        .upload_id(&self.upload_id)
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!(
-                                "Failed to complete multipart upload: {}",
-                                e
-                            ))
-                        })?;
-
-                    Ok(())
-                })
-                .map_err(|e: StorageError| {
+            let _complete_multipart_upload_res = self
+                .client
+                .complete_multipart_upload()
+                .bucket(&self.bucket)
+                .key(&self.path)
+                .multipart_upload(completed_multipart_upload)
+                .upload_id(&self.upload_id)
+                .send()
+                .await
+                .map_err(|e| {
                     StorageError::Error(format!("Failed to complete multipart upload: {}", e))
-                })
+                })?;
+
+            Ok(())
         }
 
-        pub fn get_next_chunk(
+        pub async fn get_next_chunk(
             &self,
             path: &Path,
             chunk_size: u64,
             chunk_index: u64,
             this_chunk_size: u64,
         ) -> Result<ByteStream, StorageError> {
-            self.runtime.block_on(async {
-                let stream = ByteStream::read_from()
-                    .path(path)
-                    .offset(chunk_index * chunk_size)
-                    .length(Length::Exact(this_chunk_size))
-                    .build()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
+            let stream = ByteStream::read_from()
+                .path(path)
+                .offset(chunk_index * chunk_size)
+                .length(Length::Exact(this_chunk_size))
+                .build()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
 
-                Ok(stream)
-            })
+            Ok(stream)
         }
     }
 
     pub struct AWSStorageClient {
         pub client: Client,
         pub bucket: String,
-        runtime: tokio::runtime::Runtime,
     }
 
     impl StorageClient for AWSStorageClient {
-        fn bucket(&self) -> &str {
+        async fn bucket(&self) -> &str {
             &self.bucket
         }
-        fn new(bucket: String) -> Self {
+        async fn new(bucket: String) -> Result<Self, StorageError> {
             // create a resuable runtime for client
-            let rt = Runtime::new().unwrap();
 
-            let creds = rt
-                .block_on(async {
-                    let creds = AWSCreds::new().await?;
-                    Ok(creds)
-                })
-                .map_err(|e: StorageError| {
-                    StorageError::Error(format!("Failed to create AWS creds: {}", e))
-                });
+            let creds = AWSCreds::new().await?;
+            let client = Client::new(&creds.config);
 
-            match creds {
-                Ok(creds) => {
-                    let client = Client::new(&creds.config);
-                    Self {
-                        client,
-                        bucket,
-                        runtime: rt,
-                    }
-                }
-                Err(e) => {
-                    panic!("Failed to create AWS client: {}", e);
-                }
-            }
+            Ok(Self { client, bucket })
         }
 
-        fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
+        async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
             // check if lpath and rpath have suffixes
             let lpath = Path::new(lpath);
             let rpath = Path::new(rpath);
@@ -229,21 +179,16 @@ pub mod aws_storage {
                 .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
 
             // get stream
-            let mut response = self.get_object_stream(rpath.to_str().unwrap())?;
+            let mut response = self.get_object_stream(rpath.to_str().unwrap()).await?;
 
-            // write stream to file
-            self.runtime.block_on(async {
-                // iterate over the stream and write to the file
-                while let Some(v) = response.body.next().await {
-                    let chunk =
-                        v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
-                    file.write_all(&chunk).map_err(|e| {
-                        StorageError::Error(format!("Unable to write to file: {}", e))
-                    })?;
-                }
+            // iterate over the stream and write to the file
+            while let Some(v) = response.body.next().await {
+                let chunk = v.map_err(|e| StorageError::Error(format!("Stream error: {}", e)))?;
+                file.write_all(&chunk)
+                    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+            }
 
-                Ok(())
-            })
+            Ok(())
         }
 
         /// Generate a presigned url for an object in the storage bucket
@@ -257,29 +202,27 @@ pub mod aws_storage {
         ///
         /// A Result with the presigned url if successful
         ///
-        fn generate_presigned_url(
+        async fn generate_presigned_url(
             &self,
             path: &str,
             expiration: u64,
         ) -> Result<String, StorageError> {
             let expires_in = std::time::Duration::from_secs(expiration);
 
-            self.runtime.block_on(async {
-                let uri = self
-                    .client
-                    .get_object()
-                    .bucket(&self.bucket)
-                    .key(path)
-                    .presigned(PresigningConfig::expires_in(expires_in).map_err(|e| {
-                        StorageError::Error(format!("Failed to set presigned config: {}", e))
-                    })?)
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to generate presigned url: {}", e))
-                    })?;
+            let uri = self
+                .client
+                .get_object()
+                .bucket(&self.bucket)
+                .key(path)
+                .presigned(PresigningConfig::expires_in(expires_in).map_err(|e| {
+                    StorageError::Error(format!("Failed to set presigned config: {}", e))
+                })?)
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Failed to generate presigned url: {}", e))
+                })?;
 
-                Ok(uri.uri().to_string())
-            })
+            Ok(uri.uri().to_string())
         }
 
         /// List all objects in a path
@@ -291,37 +234,28 @@ pub mod aws_storage {
         /// # Returns
         ///
         /// A list of objects in the path
-        fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+        async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
             // check if path = "/"
             let objects = if path == "/" || path.is_empty() {
-                self.runtime.block_on(async {
-                    let response = self
-                        .client
-                        .list_objects_v2()
-                        .bucket(&self.bucket)
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!("Failed to list objects: {}", e))
-                        })?;
-
-                    Ok(response)
-                })?
+                let response = self
+                    .client
+                    .list_objects_v2()
+                    .bucket(&self.bucket)
+                    .send()
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
+                response
             } else {
-                self.runtime.block_on(async {
-                    let response = self
-                        .client
-                        .list_objects_v2()
-                        .bucket(&self.bucket)
-                        .prefix(path)
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!("Failed to list objects: {}", e))
-                        })?;
+                let response = self
+                    .client
+                    .list_objects_v2()
+                    .bucket(&self.bucket)
+                    .prefix(path)
+                    .send()
+                    .await
+                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
 
-                    Ok(response)
-                })?
+                response
             };
 
             Ok(objects
@@ -340,21 +274,17 @@ pub mod aws_storage {
         ///
         /// # Returns
         ///
-        fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
-            let objects = self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .list_objects_v2()
-                    .bucket(&self.bucket)
-                    .prefix(path)
-                    .send()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
+        async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+            let response = self
+                .client
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(path)
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to list objects: {}", e)))?;
 
-                Ok(response)
-            })?;
-
-            Ok(objects
+            Ok(response
                 .contents
                 .unwrap_or_else(Vec::new)
                 .iter()
@@ -394,24 +324,22 @@ pub mod aws_storage {
         /// # Returns
         ///
         /// A Result with the object name if successful
-        fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
-            self.runtime.block_on(async {
-                self.client
-                    .copy_object()
-                    .copy_source(format!("{}/{}", self.bucket, src))
-                    .bucket(&self.bucket)
-                    .key(dest)
-                    .send()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to copy object: {}", e)))?;
+        async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+            self.client
+                .copy_object()
+                .copy_source(format!("{}/{}", self.bucket, src))
+                .bucket(&self.bucket)
+                .key(dest)
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to copy object: {}", e)))?;
 
-                Ok(true)
-            })
+            Ok(true)
         }
 
         /// Copy objects from the storage bucket
-        fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
-            let objects = self.find(src)?;
+        async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+            let objects = self.find(src).await?;
             let dest = Path::new(dest);
             let src = PathBuf::from(src);
 
@@ -420,7 +348,8 @@ pub mod aws_storage {
                 let relative_path = file_path.relative_path(&src)?;
                 let remote_path = dest.join(relative_path);
 
-                self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())?;
+                self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())
+                    .await?;
             }
 
             Ok(true)
@@ -432,18 +361,16 @@ pub mod aws_storage {
         ///
         /// * `path` - The path to the object in the bucket
         ///
-        fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
-            self.runtime.block_on(async {
-                self.client
-                    .delete_object()
-                    .bucket(&self.bucket)
-                    .key(path)
-                    .send()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to delete object: {}", e)))?;
+        async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+            self.client
+                .delete_object()
+                .bucket(&self.bucket)
+                .key(path)
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to delete object: {}", e)))?;
 
-                Ok(true)
-            })
+            Ok(true)
         }
 
         /// Delete objects from the storage bucket
@@ -452,8 +379,8 @@ pub mod aws_storage {
         ///
         /// * `path` - Bucket and prefix path to the objects to delete
         ///
-        fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
-            let objects = self.find(path)?;
+        async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+            let objects = self.find(path).await?;
 
             let mut delete_object_ids: Vec<aws_sdk_s3::types::ObjectIdentifier> = vec![];
             for obj in objects {
@@ -466,28 +393,23 @@ pub mod aws_storage {
                 delete_object_ids.push(obj_id);
             }
 
-            self.runtime
-                .block_on(async {
-                    self.client
-                        .delete_objects()
-                        .bucket(&self.bucket)
-                        .delete(
-                            aws_sdk_s3::types::Delete::builder()
-                                .set_objects(Some(delete_object_ids))
-                                .build()
-                                .map_err(|err| {
-                                    StorageError::Error(format!(
-                                        "Failed to build delete object request: {}",
-                                        err
-                                    ))
-                                })?,
-                        )
-                        .send()
-                        .await
-                        .map_err(|e| {
-                            StorageError::Error(format!("Failed to delete objects: {}", e))
-                        })
-                })
+            self.client
+                .delete_objects()
+                .bucket(&self.bucket)
+                .delete(
+                    aws_sdk_s3::types::Delete::builder()
+                        .set_objects(Some(delete_object_ids))
+                        .build()
+                        .map_err(|err| {
+                            StorageError::Error(format!(
+                                "Failed to build delete object request: {}",
+                                err
+                            ))
+                        })?,
+                )
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to delete objects: {}", e)))
                 .map_err(|e: StorageError| {
                     StorageError::Error(format!("Failed to delete objects: {}", e))
                 })?;
@@ -495,7 +417,7 @@ pub mod aws_storage {
             Ok(true)
         }
 
-        fn upload_file_in_chunks(
+        async fn upload_file_in_chunks(
             &self,
             lpath: &Path,
             rpath: &Path,
@@ -529,13 +451,16 @@ pub mod aws_storage {
                 chunk_count -= 1;
             }
 
-            let upload_id = self.create_multipart_upload(rpath.to_str().unwrap())?;
+            let upload_id = self
+                .create_multipart_upload(rpath.to_str().unwrap())
+                .await?;
 
             let mut uploader = AWSMulitPartUpload::new(
                 self.bucket.clone(),
                 rpath.to_str().unwrap().to_string(),
                 upload_id,
-            )?;
+            )
+            .await?;
 
             for chunk_index in 0..chunk_count {
                 let this_chunk = if chunk_count - 1 == chunk_index {
@@ -544,33 +469,33 @@ pub mod aws_storage {
                     chunk_size
                 };
 
-                let stream = uploader.get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)?;
+                let stream = uploader
+                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
+                    .await?;
                 let part_number = (chunk_index as i32) + 1;
-                uploader.upload_part(part_number, stream)?;
+                uploader.upload_part(part_number, stream).await?;
             }
 
-            uploader.complete()?;
+            uploader.complete().await?;
 
             Ok(())
         }
     }
 
     impl AWSStorageClient {
-        pub fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-            self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .create_multipart_upload()
-                    .bucket(&self.bucket)
-                    .key(path)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to create multipart upload: {}", e))
-                    })?;
+        pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+            let response = self
+                .client
+                .create_multipart_upload()
+                .bucket(&self.bucket)
+                .key(path)
+                .send()
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Failed to create multipart upload: {}", e))
+                })?;
 
-                Ok(response.upload_id.unwrap())
-            })
+            Ok(response.upload_id.unwrap())
         }
 
         /// Get an object stream from the storage bucket
@@ -583,20 +508,19 @@ pub mod aws_storage {
         ///
         /// A Result with the object stream if successful
         ///
-        pub fn get_object_stream(&self, rpath: &str) -> Result<GetObjectOutput, StorageError> {
-            self.runtime.block_on(async {
-                let response = self
-                    .client
-                    .get_object()
-                    .bucket(&self.bucket)
-                    .key(rpath)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to get object stream: {}", e))
-                    })?;
-                Ok(response)
-            })
+        pub async fn get_object_stream(
+            &self,
+            rpath: &str,
+        ) -> Result<GetObjectOutput, StorageError> {
+            let response = self
+                .client
+                .get_object()
+                .bucket(&self.bucket)
+                .key(rpath)
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to get object stream: {}", e)))?;
+            Ok(response)
         }
     }
 
@@ -609,8 +533,8 @@ pub mod aws_storage {
         fn client(&self) -> &AWSStorageClient {
             &self.client
         }
-        fn new(bucket: String) -> Self {
-            let client = AWSStorageClient::new(bucket);
+        async fn new(bucket: String) -> Self {
+            let client = AWSStorageClient::new(bucket).await.unwrap();
             Self { client }
         }
     }
@@ -618,24 +542,35 @@ pub mod aws_storage {
     #[pyclass]
     pub struct PyS3FSStorageClient {
         client: AWSStorageClient,
+        runtime: tokio::runtime::Runtime,
     }
 
     #[pymethods]
     impl PyS3FSStorageClient {
         #[new]
         fn new(bucket: String) -> Self {
-            let client = AWSStorageClient::new(bucket);
-            Self { client }
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let client = rt
+                .block_on(async { AWSStorageClient::new(bucket).await })
+                .unwrap();
+
+            Self {
+                client,
+                runtime: rt,
+            }
         }
 
         fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-            self.client.find_info(path.to_str().unwrap())
+            let stripped_path = path.strip_path(&self.client.bucket);
+            self.runtime
+                .block_on(async { self.client.find_info(stripped_path.to_str().unwrap()).await })
         }
 
         #[pyo3(signature = (path=PathBuf::new()))]
         fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client.find(stripped_path.to_str().unwrap())
+            self.runtime
+                .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })
         }
 
         #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -644,32 +579,38 @@ pub mod aws_storage {
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
             let stripped_lpath = lpath.strip_path(&self.client.bucket);
 
-            if recursive {
-                let stripped_lpath_clone = stripped_lpath.clone();
+            self.runtime.block_on(async {
+                if recursive {
+                    let stripped_lpath_clone = stripped_lpath.clone();
 
-                // list all objects in the path
-                let objects = self.client.find(stripped_rpath.to_str().unwrap())?;
+                    // list all objects in the path
+                    let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
 
-                // iterate over each object and get it
-                for obj in objects {
-                    let file_path = Path::new(obj.as_str());
-                    let stripped_path = file_path.strip_path(&self.client.bucket);
-                    let relative_path = file_path.relative_path(&stripped_rpath)?;
-                    let local_path = stripped_lpath_clone.join(relative_path);
+                    // iterate over each object and get it
+                    for obj in objects {
+                        let file_path = Path::new(obj.as_str());
+                        let stripped_path = file_path.strip_path(&self.client.bucket);
+                        let relative_path = file_path.relative_path(&stripped_rpath)?;
+                        let local_path = stripped_lpath_clone.join(relative_path);
 
-                    self.client.get_object(
-                        local_path.to_str().unwrap(),
-                        stripped_path.to_str().unwrap(),
-                    )?;
+                        self.client
+                            .get_object(
+                                local_path.to_str().unwrap(),
+                                stripped_path.to_str().unwrap(),
+                            )
+                            .await?;
+                    }
+                } else {
+                    self.client
+                        .get_object(
+                            stripped_lpath.to_str().unwrap(),
+                            stripped_rpath.to_str().unwrap(),
+                        )
+                        .await?;
                 }
-            } else {
-                self.client.get_object(
-                    stripped_lpath.to_str().unwrap(),
-                    stripped_rpath.to_str().unwrap(),
-                )?;
-            }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         #[pyo3(signature = (lpath, rpath, recursive = false))]
@@ -677,33 +618,37 @@ pub mod aws_storage {
             let stripped_lpath = lpath.strip_path(&self.client.bucket);
             let stripped_rpath = rpath.strip_path(&self.client.bucket);
 
-            if recursive {
-                if !stripped_lpath.is_dir() {
-                    return Err(StorageError::Error(
-                        "Local path must be a directory for recursive put".to_string(),
-                    ));
-                }
+            self.runtime.block_on(async {
+                if recursive {
+                    if !stripped_lpath.is_dir() {
+                        return Err(StorageError::Error(
+                            "Local path must be a directory for recursive put".to_string(),
+                        ));
+                    }
 
-                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+                    let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
 
-                for file in files {
-                    let stripped_lpath_clone = stripped_lpath.clone();
-                    let stripped_rpath_clone = stripped_rpath.clone();
-                    let stripped_file_path = file.strip_path(&self.client.bucket);
+                    for file in files {
+                        let stripped_lpath_clone = stripped_lpath.clone();
+                        let stripped_rpath_clone = stripped_rpath.clone();
+                        let stripped_file_path = file.strip_path(&self.client.bucket);
 
-                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                    let remote_path = stripped_rpath_clone.join(relative_path);
+                        let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                        let remote_path = stripped_rpath_clone.join(relative_path);
 
+                        self.client
+                            .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                            .await?;
+                    }
+
+                    Ok(())
+                } else {
                     self.client
-                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)?;
+                        .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                        .await?;
+                    Ok(())
                 }
-
-                Ok(())
-            } else {
-                self.client
-                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)?;
-                Ok(())
-            }
+            })
         }
 
         #[pyo3(signature = (src, dest, recursive = false))]
@@ -711,38 +656,51 @@ pub mod aws_storage {
             let stripped_src = src.strip_path(&self.client.bucket);
             let stripped_dest = dest.strip_path(&self.client.bucket);
 
-            if recursive {
-                self.client.copy_objects(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            } else {
-                self.client.copy_object(
-                    stripped_src.to_str().unwrap(),
-                    stripped_dest.to_str().unwrap(),
-                )?;
-            }
+            self.runtime.block_on(async {
+                if recursive {
+                    self.client
+                        .copy_objects(
+                            stripped_src.to_str().unwrap(),
+                            stripped_dest.to_str().unwrap(),
+                        )
+                        .await?;
+                } else {
+                    self.client
+                        .copy_object(
+                            stripped_src.to_str().unwrap(),
+                            stripped_dest.to_str().unwrap(),
+                        )
+                        .await?;
+                }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         #[pyo3(signature = (path, recursive = false))]
         fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
 
-            if recursive {
-                self.client
-                    .delete_objects(stripped_path.to_str().unwrap())?;
-            } else {
-                self.client.delete_object(stripped_path.to_str().unwrap())?;
-            }
+            self.runtime.block_on(async {
+                if recursive {
+                    self.client
+                        .delete_objects(stripped_path.to_str().unwrap())
+                        .await?;
+                } else {
+                    self.client
+                        .delete_object(stripped_path.to_str().unwrap())
+                        .await?;
+                }
 
-            Ok(())
+                Ok(())
+            })
         }
 
         fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            let objects = self.client.find(stripped_path.to_str().unwrap())?;
+            let objects = self
+                .runtime
+                .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })?;
 
             Ok(!objects.is_empty())
         }
@@ -754,8 +712,11 @@ pub mod aws_storage {
             expiration: u64,
         ) -> Result<String, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
-            self.client
-                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            self.runtime.block_on(async {
+                self.client
+                    .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+                    .await
+            })
         }
     }
 
@@ -848,20 +809,20 @@ pub mod aws_storage {
             let _client = AWSStorageClient::new(bucket);
         }
 
-        #[test]
-        fn test_aws_storage_client_get_object() {
+        #[tokio::test]
+        async fn test_aws_storage_client_get_object() {
             let bucket = get_bucket();
-            let client = AWSStorageClient::new(bucket);
+            let client = AWSStorageClient::new(bucket).await.unwrap();
 
             // should fail since there are no suffixes
-            let result = client.get_object("local_path", "remote_path");
+            let result = client.get_object("local_path", "remote_path").await;
             assert!(result.is_err()); // Assuming the object does not exist
         }
 
-        #[test]
-        fn test_s3f_storage_client_put() {
+        #[tokio::test]
+        async fn test_s3f_storage_client_put() {
             let bucket = get_bucket();
-            let client = S3FStorageClient::new(bucket);
+            let client = S3FStorageClient::new(bucket).await;
 
             //
             let dirname = create_nested_data(&CHUNK_SIZE);
@@ -870,25 +831,25 @@ pub mod aws_storage {
             let rpath = Path::new(&dirname);
 
             // put the file
-            client.put(lpath, rpath, true).unwrap();
+            client.put(lpath, rpath, true).await.unwrap();
 
             // check if the file exists
-            let exists = client.exists(rpath).unwrap();
+            let exists = client.exists(rpath).await.unwrap();
             assert!(exists);
 
             // list all files
-            let files = client.find(rpath).unwrap();
+            let files = client.find(rpath).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // list files with info
-            let files = client.find_info(rpath).unwrap();
+            let files = client.find_info(rpath).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // download the files
             let new_path = uuid::Uuid::new_v4().to_string();
             let new_path = Path::new(&new_path);
 
-            client.get(new_path, rpath, true).unwrap();
+            client.get(new_path, rpath, true).await.unwrap();
 
             // check if the files are the same
             let files = get_files(rpath).unwrap();
@@ -900,46 +861,46 @@ pub mod aws_storage {
             // create a new path
             let copy_path = uuid::Uuid::new_v4().to_string();
             let copy_path = Path::new(&copy_path);
-            client.copy(rpath, copy_path, true).unwrap();
-            let files = client.find(copy_path).unwrap();
+            client.copy(rpath, copy_path, true).await.unwrap();
+            let files = client.find(copy_path).await.unwrap();
             assert_eq!(files.len(), 2);
 
             // cleanup
             std::fs::remove_dir_all(&dirname).unwrap();
             std::fs::remove_dir_all(new_path).unwrap();
-            client.rm(rpath, true).unwrap();
-            client.rm(copy_path, true).unwrap();
+            client.rm(rpath, true).await.unwrap();
+            client.rm(copy_path, true).await.unwrap();
 
             // check if the file exists
-            let exists = client.exists(rpath).unwrap();
+            let exists = client.exists(rpath).await.unwrap();
             assert!(!exists);
         }
 
-        #[test]
-        fn test_aws_storage_client_generate_presigned_url() {
+        #[tokio::test]
+        async fn test_aws_storage_client_generate_presigned_url() {
             let bucket = get_bucket();
-            let client = S3FStorageClient::new(bucket);
+            let client = S3FStorageClient::new(bucket).await;
 
             // create file
             let key = create_single_file(&CHUNK_SIZE);
             let path = Path::new(&key);
 
             // put the file
-            client.put(path, path, false).unwrap();
+            client.put(path, path, false).await.unwrap();
 
             // generate presigned url
-            let url = client.generate_presigned_url(path, 3600).unwrap();
+            let url = client.generate_presigned_url(path, 3600).await.unwrap();
             assert!(!url.is_empty());
 
             // cleanup
-            client.rm(path, false).unwrap();
+            client.rm(path, false).await.unwrap();
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
 
-        #[test]
-        fn test_aws_large_file_upload() {
+        #[tokio::test]
+        async fn test_aws_large_file_upload() {
             let bucket = get_bucket();
-            let client = S3FStorageClient::new(bucket);
+            let client = S3FStorageClient::new(bucket).await;
 
             // create file
             let chunk_size = 1024 * 1024 * 5; // 5MB
@@ -947,10 +908,10 @@ pub mod aws_storage {
             let path = Path::new(&key);
 
             // put the file
-            client.put(path, path, false).unwrap();
+            client.put(path, path, false).await.unwrap();
 
             // cleanup
-            client.rm(path, false).unwrap();
+            client.rm(path, false).await.unwrap();
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
     }

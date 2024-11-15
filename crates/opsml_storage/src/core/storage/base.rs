@@ -1,6 +1,5 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
-use futures::Future;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
