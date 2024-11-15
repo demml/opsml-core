@@ -528,6 +528,9 @@ pub mod aws_storage {
 
     #[async_trait]
     impl FileSystem<AWSStorageClient> for S3FStorageClient {
+        fn name(&self) -> &str {
+            "S3FStorageClient"
+        }
         fn client(&self) -> &AWSStorageClient {
             &self.client
         }

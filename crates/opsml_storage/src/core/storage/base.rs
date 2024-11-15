@@ -77,6 +77,7 @@ pub trait StorageClient: Sized {
 
 #[async_trait]
 pub trait FileSystem<T: StorageClient> {
+    fn name(&self) -> &str;
     fn client(&self) -> &T;
     async fn new(bucket: String) -> Self;
 

@@ -629,6 +629,9 @@ pub mod google_storage {
 
     #[async_trait]
     impl FileSystem<GoogleStorageClient> for GCSFSStorageClient {
+        fn name(&self) -> &str {
+            "GCSFSStorageClient"
+        }
         fn client(&self) -> &GoogleStorageClient {
             &self.client
         }

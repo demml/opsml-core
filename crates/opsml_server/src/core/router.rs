@@ -1,3 +1,4 @@
+use crate::core::debug::debug::debug_info;
 use crate::core::health::route::health_check;
 use crate::core::state::AppState;
 use axum::http::{
@@ -24,6 +25,7 @@ pub async fn create_router(app_state: Arc<AppState>) -> Router {
 
     Router::new()
         .route(&format!("{}/healthcheck", ROUTE_PREFIX), get(health_check))
+        .route(&format!("{}/debug", ROUTE_PREFIX), get(debug_info))
         .with_state(app_state)
         .layer(cors)
 }

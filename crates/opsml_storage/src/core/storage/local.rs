@@ -267,6 +267,10 @@ pub struct LocalFSStorageClient {
 
 #[async_trait]
 impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
+    fn name(&self) -> &str {
+        "LocalFSStorageClient"
+    }
+
     fn client(&self) -> &LocalStorageClient {
         &self.client
     }

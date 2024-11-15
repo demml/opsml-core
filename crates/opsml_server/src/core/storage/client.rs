@@ -19,6 +19,15 @@ pub enum StorageClientEnum {
 }
 
 impl StorageClientEnum {
+    pub fn name(&self) -> &str {
+        match self {
+            #[cfg(feature = "google_storage")]
+            StorageClientEnum::Google(client) => client.name(),
+            #[cfg(feature = "aws_storage")]
+            StorageClientEnum::AWS(client) => client.name(),
+            StorageClientEnum::Local(client) => client.name(),
+        }
+    }
     // Implement the required methods for the StorageClient trait
     // For example:
     pub async fn new(storage_uri: String) -> Result<Self, StorageError> {

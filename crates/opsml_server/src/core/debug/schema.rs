@@ -4,13 +4,13 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub struct Debug {
+pub struct DebugInfo {
     pub storage_client: String,
     pub opsml_storage_uri: String,
     pub opsml_tracking_uri: String,
 }
 
-impl Debug {
+impl DebugInfo {
     pub fn new(
         storage_client: String,
         opsml_storage_uri: String,
@@ -25,7 +25,7 @@ impl Debug {
 }
 
 // Implement IntoResponse for Alive
-impl IntoResponse for Debug {
+impl IntoResponse for DebugInfo {
     fn into_response(self) -> axum::response::Response {
         Json(self).into_response()
     }
