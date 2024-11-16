@@ -2390,6 +2390,7 @@ dependencies = [
  "pyo3",
  "rand 0.8.5",
  "reqwest 0.12.9",
+ "reqwest-middleware",
  "reqwest_mock",
  "serde",
  "serde_json",

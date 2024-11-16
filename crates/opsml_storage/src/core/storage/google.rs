@@ -29,6 +29,8 @@ pub mod google_storage {
     use google_cloud_storage::sign::SignedURLMethod;
     use google_cloud_storage::sign::SignedURLOptions;
     use pyo3::prelude::*;
+    use reqwest::ClientBuilder;
+    use reqwest_middleware::ClientWithMiddleware;
     use serde_json::Value;
     use std::env;
     use std::fs::File;
@@ -101,68 +103,60 @@ pub mod google_storage {
 
     pub struct GoogleMultipartUploadClient {
         pub client: ResumableUploadClient,
-        handle: tokio::runtime::Handle,
     }
 
     impl GoogleMultipartUploadClient {
-        pub fn get_next_chunk(
+        pub async fn get_next_chunk(
             &self,
             path: &Path,
             chunk_size: u64,
             chunk_index: u64,
             this_chunk_size: u64,
         ) -> Result<ByteStream, StorageError> {
-            let handle = self.handle.clone();
-            handle.block_on(async {
-                let stream = ByteStream::read_from()
-                    .path(path)
-                    .offset(chunk_index * chunk_size)
-                    .length(Length::Exact(this_chunk_size))
-                    .build()
-                    .await
-                    .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
+            let stream = ByteStream::read_from()
+                .path(path)
+                .offset(chunk_index * chunk_size)
+                .length(Length::Exact(this_chunk_size))
+                .build()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
 
-                Ok(stream)
-            })
+            Ok(stream)
         }
-        pub fn upload_part(
+        pub async fn upload_part(
             &mut self,
             chunk: ByteStream,
             first_byte: u64,
             last_byte: u64,
             total_size: u64,
         ) -> Result<UploadStatus, StorageError> {
-            let handle = self.handle.clone();
             let size = ChunkSize::new(first_byte, last_byte, Some(total_size));
 
-            handle.block_on(async {
-                let data = chunk
-                    .collect()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Unable to collect chunk data: {}", e))
-                    })?
-                    .into_bytes();
+            let data = chunk
+                .collect()
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to collect chunk data: {}", e)))?
+                .into_bytes();
 
-                let result = self
-                    .client
-                    .upload_multiple_chunk(data, &size)
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!(
-                            "Unable to upload multiple chunks to resumable upload: {}",
-                            e
-                        ))
-                    })?;
+            let result = self
+                .client
+                .upload_multiple_chunk(data, &size)
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!(
+                        "Unable to upload multiple chunks to resumable upload: {}",
+                        e
+                    ))
+                })?;
 
-                Ok(result)
-            })
+            Ok(result)
         }
     }
 
     pub struct GoogleStorageClient {
         pub client: Client,
         pub bucket: String,
+        pub http: ClientWithMiddleware,
     }
 
     #[async_trait]
@@ -173,7 +167,7 @@ pub mod google_storage {
         async fn new(bucket: String) -> Result<Self, StorageError> {
             let creds = GcpCreds::new().await?;
             // If no credentials, attempt to create a default client pulling from the environment
-            let client: Result<Client, StorageError> = if creds.creds.is_none() {
+            let config = if creds.creds.is_none() {
                 let config = ClientConfig::default().with_auth().await;
 
                 // if error, use ClientConfig::default().anonymous();
@@ -182,7 +176,7 @@ pub mod google_storage {
                     Err(_) => ClientConfig::default().anonymous(),
                 };
 
-                Ok(Client::new(config))
+                Ok(config)
 
             // if creds are set (base64 for JSON file)
             } else {
@@ -197,13 +191,21 @@ pub mod google_storage {
                         ))
                     })?;
 
-                let client = Client::new(config);
-                Ok(client)
+                Ok(config)
             };
 
+            let config = config?;
+
+            let http = config.http.clone().unwrap_or_else(|| {
+                reqwest_middleware::ClientBuilder::new(reqwest::Client::default()).build()
+            });
+
+            let client = Client::new(config);
+
             Ok(GoogleStorageClient {
-                client: client?,
+                client: client,
                 bucket,
+                http: http,
             })
         }
 
@@ -321,9 +323,12 @@ pub mod google_storage {
                 chunk_count -= 1;
             }
 
-            let mut uploader = self
-                .create_multipart_upload(rpath.to_str().unwrap())
-                .await?;
+            let session_url = self.create_multipart_upload(rpath).await?;
+
+            let mut uploader = GoogleMultipartUploadClient {
+                client: ResumableUploadClient::new(session_url, self.http.clone()),
+            };
+
             let mut status = UploadStatus::NotStarted;
 
             for chunk_index in 0..chunk_count {
@@ -336,8 +341,12 @@ pub mod google_storage {
                 let first_byte = chunk_index * chunk_size;
                 let last_byte = first_byte + this_chunk - 1;
 
-                let stream = uploader.get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)?;
-                status = uploader.upload_part(stream, first_byte, last_byte, file_size)?;
+                let stream = uploader
+                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
+                    .await?;
+                status = uploader
+                    .upload_part(stream, first_byte, last_byte, file_size)
+                    .await?;
             } // extract the range from the result and update the first_byte and last_byte
 
             match status {
@@ -506,24 +515,12 @@ pub mod google_storage {
 
             Ok(true)
         }
-    }
 
-    impl GoogleStorageClient {
-        /// Create a resumable upload session
-        ///
-        /// # Arguments
-        ///
-        /// * `path` - The path to the object in the bucket
-        ///
-        ///
-        pub async fn create_multipart_upload(
-            &self,
-            path: &str,
-        ) -> Result<GoogleMultipartUploadClient, StorageError> {
-            let _filename = path.to_string();
+        async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+            let _filename = path.to_str().unwrap().to_string();
 
             let metadata = Object {
-                name: path.to_string(),
+                name: _filename.clone(),
                 content_type: Some("application/octet-stream".to_string()),
                 ..Default::default()
             };
@@ -542,12 +539,11 @@ pub mod google_storage {
                     StorageError::Error(format!("Unable to create resumable session: {}", e))
                 })?;
 
-            Ok(GoogleMultipartUploadClient {
-                client: result,
-                handle: tokio::runtime::Handle::current(),
-            })
+            Ok(result.url().to_string())
         }
+    }
 
+    impl GoogleStorageClient {
         /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
         ///
         /// # Arguments

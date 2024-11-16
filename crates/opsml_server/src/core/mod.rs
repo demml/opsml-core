@@ -1,4 +1,5 @@
 pub mod debug;
+pub mod files;
 pub mod health;
 pub mod logging;
 pub mod router;

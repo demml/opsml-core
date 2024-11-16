@@ -1,11 +1,14 @@
 use crate::core::utils::error::ApiError;
 
 use futures::stream::TryStreamExt;
+use futures::TryFutureExt;
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
     Body, Client,
 };
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -19,6 +22,18 @@ pub enum RequestType {
     Get,
     Post,
     Put,
+}
+
+pub enum Routes {
+    Multipart,
+}
+
+impl Routes {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Routes::Multipart => "opsml/files/multipart",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,17 +130,31 @@ impl ApiClient {
         self,
         route: &str,
         request_type: RequestType,
-        params: Option<Value>,
+        body_params: Option<Value>,
+        query_params: HashMap<String, String>,
+        headers: Option<HeaderMap>,
     ) -> Result<Value, ApiError> {
+        let mut headers = headers.unwrap_or(HeaderMap::new());
+
+        // add bearer token if it exists
+        if self.requires_auth {
+            headers.insert(
+                "Authorization",
+                HeaderValue::from_str(&format!(
+                    "Bearer {}",
+                    self.auth_token.unwrap_or("".to_string())
+                ))
+                .map_err(|e| ApiError::Error(format!("Failed to create auth header: {}", e)))?,
+            );
+        }
+
         let response = match request_type {
             RequestType::Get => self
                 .client
                 .get(format!("{}/{}", self.base_url, route))
                 // add bearer token if it exists
-                .header(
-                    "Authorization",
-                    format!("Bearer {}", self.auth_token.unwrap_or("".to_string())),
-                )
+                .headers(headers)
+                .query(&query_params)
                 .send()
                 .await
                 .map_err(|e| {
@@ -134,11 +163,8 @@ impl ApiClient {
             RequestType::Post => self
                 .client
                 .post(format!("{}/{}", self.base_url, route))
-                .header(
-                    "Authorization",
-                    format!("Bearer {}", self.auth_token.unwrap_or("".to_string())),
-                )
-                .json(&params)
+                .headers(headers)
+                .json(&body_params)
                 .send()
                 .await
                 .map_err(|e| {
@@ -147,11 +173,8 @@ impl ApiClient {
             RequestType::Put => self
                 .client
                 .put(format!("{}/{}", self.base_url, route))
-                .header(
-                    "Authorization",
-                    format!("Bearer {}", self.auth_token.unwrap_or("".to_string())),
-                )
-                .json(&params)
+                .headers(headers)
+                .json(&body_params)
                 .send()
                 .await
                 .map_err(|e| {
@@ -171,19 +194,29 @@ impl ApiClient {
         &mut self,
         route: &str,
         request_type: RequestType,
-        params: Option<Value>,
+        body_params: Option<Value>,
+        query_params: Option<HashMap<String, String>>,
+        headers: Option<HeaderMap>,
     ) -> Result<Value, ApiError> {
         // this will attempt to send a request. If the request fails, it will refresh the token and try again. If it fails all 3 times it will return an error
         let mut attempts = 0;
         let max_attempts = 3;
         let mut response: Result<Value, ApiError>;
 
+        let query_params = query_params.unwrap_or(HashMap::new());
+
         loop {
             attempts += 1;
 
             let client = self.clone();
             response = client
-                .request(route, request_type.clone(), params.clone())
+                .request(
+                    route,
+                    request_type.clone(),
+                    body_params.clone(),
+                    query_params.clone(),
+                    headers.clone(),
+                )
                 .await;
 
             if response.is_ok() || attempts >= max_attempts {
@@ -201,6 +234,74 @@ impl ApiClient {
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(response)
+    }
+
+    /// creates a multipart upload request. Returns the upload uri
+    ///
+    /// # Arguments
+    ///
+    /// * `rpath` - the path to the file to upload
+    ///
+    /// # Returns
+    ///
+    /// * `Result<String, ApiError>` - the upload uri
+    async fn create_multipart_upload(&mut self, rpath: &Path) -> Result<String, ApiError> {
+        let mut query_params = HashMap::new();
+        query_params.insert("path".to_string(), rpath.to_str().unwrap().to_string());
+
+        let result = self
+            .request_with_retry(
+                Routes::Multipart.as_str(),
+                RequestType::Get,
+                None,
+                Some(query_params),
+                None,
+            )
+            .await?;
+
+        let upload_uri = result["upload_uri"]
+            .as_str()
+            .ok_or_else(|| ApiError::Error("Failed to get upload uri".to_string()))?;
+
+        Ok(upload_uri.to_string())
+    }
+
+    async fn upload_file_in_chunks(
+        &mut self,
+        lpath: &Path,
+        rpath: &Path,
+        chunk_size: Option<u64>,
+    ) -> Result<(), ApiError> {
+        let file = File::open(lpath)
+            .map_err(|e| ApiError::Error(format!("Failed to open file: {}", e)))
+            .await?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))
+            .await?;
+
+        let file_size = metadata.len();
+
+        // check chunk size. IF chunk size is None, set chunk size to 5MB. If chunk size is greater than file size, set chunk size to file size
+        let mut chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5);
+        if chunk_size > file_size {
+            chunk_size = file_size;
+        }
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        let resumable_client = self.create_multipart_upload(rpath).await?;
+
+        Ok(())
     }
 
     pub async fn upload_file(&self, route: &str, file_path: PathBuf) -> Result<Value, ApiError> {
@@ -449,7 +550,7 @@ mod tests {
                 .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None)
+            .request_with_retry("test", RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -489,7 +590,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None)
+            .request_with_retry("test", RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -529,7 +630,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None)
+            .request_with_retry("test", RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -568,7 +669,7 @@ mod tests {
         .unwrap();
 
         let result = api_client
-            .request_with_retry("test", RequestType::Get, None)
+            .request_with_retry("test", RequestType::Get, None, None, None)
             .await;
 
         assert!(result.is_err());
@@ -623,7 +724,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None)
+            .request_with_retry("test", RequestType::Get, None, None, None)
             .await
             .unwrap();
 

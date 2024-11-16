@@ -448,9 +448,7 @@ pub mod aws_storage {
                 chunk_count -= 1;
             }
 
-            let upload_id = self
-                .create_multipart_upload(rpath.to_str().unwrap())
-                .await?;
+            let upload_id = self.create_multipart_upload(rpath).await?;
 
             let mut uploader = AWSMulitPartUpload::new(
                 self.bucket.clone(),
@@ -477,15 +475,13 @@ pub mod aws_storage {
 
             Ok(())
         }
-    }
 
-    impl AWSStorageClient {
-        pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+        async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
             let response = self
                 .client
                 .create_multipart_upload()
                 .bucket(&self.bucket)
-                .key(path)
+                .key(path.to_str().unwrap())
                 .send()
                 .await
                 .map_err(|e| {
@@ -494,7 +490,9 @@ pub mod aws_storage {
 
             Ok(response.upload_id.unwrap())
         }
+    }
 
+    impl AWSStorageClient {
         /// Get an object stream from the storage bucket
         ///
         /// # Arguments

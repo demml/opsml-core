@@ -58,6 +58,7 @@ pub trait StorageClient: Sized {
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
+    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError>;
     async fn upload_file_in_chunks(
         &self,
         local_path: &Path,

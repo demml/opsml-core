@@ -30,3 +30,7 @@ opsml-settings = { path = "crates/opsml_settings" }
 lto = "fat"
 codegen-units = 1
 strip = true
+
+[profile.release-no-lto]
+inherits = "release"
+lto = false

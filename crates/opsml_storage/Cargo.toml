@@ -25,6 +25,7 @@ tokio-util = { version = "0.*",  features = ["codec"]}
 google-cloud-storage = { version = "0.*", features  = ["auth"], optional = true }
 google-cloud-auth = { version ="0.*", optional = true }
 google-cloud-token = { version = "0.*", optional = true }
+reqwest-middleware = { version = "0.*", optional = true }
 base64 = "0.*"
 bytes = "1.*"
 mockall = "0.*"
@@ -40,7 +41,7 @@ aws-smithy-types = { version = "1.2.9", features = ["rt-tokio", "http-body-0-4-x
 
 [features]
 default = []
-google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token"]
+google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token" ,"reqwest-middleware"]
 aws_storage = ["aws-sdk-s3", "aws-config"]
 azure = ["azure_core", "azure_storage", "azure_storage_blobs"]
 full = ["google_storage", "aws_storage", "azure"]
@@ -53,8 +54,5 @@ reqwest_mock = "0.*"
 tempfile = "3.*"
 uuid = { version = "1.11.0", features = ["v4"] }
 
-
 [profile.release]
-lto = "fat"
-codegen-units = 1
-strip = true
+workspace = true
