@@ -157,6 +157,16 @@ impl StorageClientEnum {
             }
         }
     }
+
+    pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            StorageClientEnum::Google(client) => client.create_multipart_upload(path).await,
+            #[cfg(feature = "aws_storage")]
+            StorageClientEnum::AWS(client) => client.create_multipart_upload(path).await,
+            StorageClientEnum::Local(client) => client.create_multipart_upload(path).await,
+        }
+    }
 }
 
 #[pyclass]

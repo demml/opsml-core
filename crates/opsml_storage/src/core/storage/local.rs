@@ -4,6 +4,7 @@ use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use pyo3::prelude::*;
+use std::fs::File;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -258,6 +259,18 @@ impl StorageClient for LocalStorageClient {
         }
 
         Ok(true)
+    }
+
+    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+        let full_path = self.bucket.join(path);
+
+        // check if parents path exists. If not, create it
+        if let Some(parent) = full_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
+        }
+
+        Ok(full_path.to_str().unwrap().to_string())
     }
 }
 

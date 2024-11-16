@@ -18,3 +18,9 @@ impl IntoResponse for ResumableId {
         Json(self).into_response()
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct UploadPartArgs {
+    pub first_chunk: u64,
+    pub last_chunk: u64,
+}

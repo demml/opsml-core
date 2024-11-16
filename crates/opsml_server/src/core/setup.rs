@@ -1,7 +1,7 @@
 use crate::core::logging::route::setup_logging;
-use crate::core::storage::client::StorageClientEnum;
 use anyhow::Context;
 use opsml_settings::config::OpsmlConfig;
+use opsml_storage::core::storage::enums::StorageClientEnum;
 
 pub async fn get_storage_system(storage_uri: &str) -> Result<StorageClientEnum, anyhow::Error> {
     StorageClientEnum::new(storage_uri.to_string())
