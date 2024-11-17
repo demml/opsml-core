@@ -1,7 +1,9 @@
 use crate::core::utils::error::ApiError;
 
+use aws_smithy_types::byte_stream::ByteStream;
 use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
+use reqwest::multipart::{Form, Part};
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
     Body, Client,
@@ -136,18 +138,7 @@ impl ApiClient {
     ) -> Result<Value, ApiError> {
         let mut headers = headers.unwrap_or(HeaderMap::new());
 
-        // add bearer token if it exists
-        if self.requires_auth {
-            headers.insert(
-                "Authorization",
-                HeaderValue::from_str(&format!(
-                    "Bearer {}",
-                    self.auth_token.unwrap_or("".to_string())
-                ))
-                .map_err(|e| ApiError::Error(format!("Failed to create auth header: {}", e)))?,
-            );
-        }
-
+        let token = self.auth_token.unwrap_or("".to_string());
         let response = match request_type {
             RequestType::Get => self
                 .client
@@ -155,6 +146,7 @@ impl ApiClient {
                 // add bearer token if it exists
                 .headers(headers)
                 .query(&query_params)
+                .bearer_auth(token)
                 .send()
                 .await
                 .map_err(|e| {
@@ -251,7 +243,7 @@ impl ApiClient {
 
         let result = self
             .request_with_retry(
-                Routes::Multipart.as_str(),
+                &format!("{}/{}", self.base_url, Routes::Multipart.as_str()),
                 RequestType::Get,
                 None,
                 Some(query_params),
@@ -264,6 +256,73 @@ impl ApiClient {
             .ok_or_else(|| ApiError::Error("Failed to get upload uri".to_string()))?;
 
         Ok(upload_uri.to_string())
+    }
+
+    pub async fn upload_part(
+        &mut self,
+        chunk: ByteStream,
+        chunk_index: u64,
+        chunk_size: u64,
+        first_chunk: u64,
+        last_chunk: u64,
+        upload_uri: &str,
+    ) -> Result<(), ApiError> {
+        let data = chunk
+            .collect()
+            .await
+            .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
+            .into_bytes();
+
+        let part = Part::stream_with_length(data, chunk_index)
+            .file_name(format!("chunk_{}", chunk_index))
+            .mime_str("application/octet-stream")
+            .map_err(|e| ApiError::Error(format!("Failed to create mime type: {}", e)))?;
+
+        let form = Form::new().part("file", part);
+
+        let token = self.auth_token.clone().unwrap_or_default();
+        let mut headers = HeaderMap::new();
+
+        // add chunk size, chunk index, and upload uri to headers
+        headers.insert(
+            "Chunk-Size",
+            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create content length header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Chunk-Range",
+            HeaderValue::from_str(&format!("{}/{}", first_chunk, last_chunk, chunk_size)).map_err(
+                |e| ApiError::Error(format!("Failed to create content range header: {}", e)),
+            )?,
+        );
+
+        headers.insert(
+            "Part-Index",
+            HeaderValue::from_str(&format!("{}", chunk_index)).map_err(|e| {
+                ApiError::Error(format!("Failed to create content range header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Upload-Uri",
+            HeaderValue::from_str(upload_uri).map_err(|e| {
+                ApiError::Error(format!("Failed to create upload uri header: {}", e))
+            })?,
+        );
+
+        let response = self
+            .client
+            .put(format!("{}/{}", self.base_url, Routes::Multipart.as_str()))
+            .headers(headers)
+            .bearer_auth(token)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
+
+        Ok(())
     }
 
     async fn upload_file_in_chunks(

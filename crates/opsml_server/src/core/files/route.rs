@@ -8,7 +8,7 @@ use tracing::error;
 
 use axum::{
     extract::{Multipart, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 
@@ -44,8 +44,10 @@ pub async fn create_resumable_upload(
 /// Used in conjunction with create_resumable_upload and multipart uploads on the client side
 pub async fn upload_part(
     State(data): State<Arc<AppState>>,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    let args = UploadPartArgs::new(headers);
     while let Some(mut field) = multipart.next_field().await.unwrap() {
         let name = field.name().unwrap().to_string();
         let data = field.bytes().await.unwrap();
