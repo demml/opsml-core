@@ -1,8 +1,11 @@
 use crate::core::utils::error::ApiError;
 
 use aws_smithy_types::byte_stream::ByteStream;
+use aws_smithy_types::byte_stream::Length;
+use futures::future::join_all;
 use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
+use google_cloud_storage::http::objects::upload;
 use reqwest::multipart::{Form, Part};
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
@@ -13,6 +16,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use tokio::fs::File;
+use tokio::task::JoinHandle;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 const TIMEOUT_SECS: u64 = 30;
@@ -35,6 +39,98 @@ impl Routes {
         match self {
             Routes::Multipart => "opsml/files/multipart",
         }
+    }
+}
+
+pub struct MultiPartUploader {}
+
+impl MultiPartUploader {
+    pub async fn get_next_chunk(
+        path: &Path,
+        chunk_size: u64,
+        chunk_index: u64,
+        this_chunk_size: u64,
+    ) -> Result<ByteStream, ApiError> {
+        let stream = ByteStream::read_from()
+            .path(path)
+            .offset(chunk_index * chunk_size)
+            .length(Length::Exact(this_chunk_size))
+            .build()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to get next chunk: {}", e)))?;
+
+        Ok(stream)
+    }
+
+    pub async fn upload_part(
+        client: ApiClient,
+        chunk: ByteStream,
+        chunk_index: u64,
+        chunk_size: u64,
+        first_chunk: u64,
+        last_chunk: u64,
+        upload_uri: &str,
+    ) -> Result<(), ApiError> {
+        let data = chunk
+            .collect()
+            .await
+            .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
+            .into_bytes();
+
+        let part = Part::stream_with_length(data, chunk_index)
+            .file_name(format!("chunk_{}", chunk_index))
+            .mime_str("application/octet-stream")
+            .map_err(|e| ApiError::Error(format!("Failed to create mime type: {}", e)))?;
+
+        let form = Form::new().part("file", part);
+
+        let token = client.auth_token.clone().unwrap_or_default();
+        let mut headers = HeaderMap::new();
+
+        // add chunk size, chunk index, and upload uri to headers
+        headers.insert(
+            "Chunk-Size",
+            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create content length header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Chunk-Range",
+            HeaderValue::from_str(&format!("{}/{}", first_chunk, last_chunk)).map_err(|e| {
+                ApiError::Error(format!("Failed to create content range header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Part-Index",
+            HeaderValue::from_str(&format!("{}", chunk_index)).map_err(|e| {
+                ApiError::Error(format!("Failed to create content range header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Upload-Uri",
+            HeaderValue::from_str(upload_uri).map_err(|e| {
+                ApiError::Error(format!("Failed to create upload uri header: {}", e))
+            })?,
+        );
+
+        let response = client
+            .client
+            .post(format!(
+                "{}/{}",
+                client.base_url,
+                Routes::Multipart.as_str()
+            ))
+            .headers(headers)
+            .bearer_auth(token)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -258,108 +354,75 @@ impl ApiClient {
         Ok(upload_uri.to_string())
     }
 
-    pub async fn upload_part(
-        &mut self,
-        chunk: ByteStream,
-        chunk_index: u64,
-        chunk_size: u64,
-        first_chunk: u64,
-        last_chunk: u64,
-        upload_uri: &str,
-    ) -> Result<(), ApiError> {
-        let data = chunk
-            .collect()
-            .await
-            .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
-            .into_bytes();
-
-        let part = Part::stream_with_length(data, chunk_index)
-            .file_name(format!("chunk_{}", chunk_index))
-            .mime_str("application/octet-stream")
-            .map_err(|e| ApiError::Error(format!("Failed to create mime type: {}", e)))?;
-
-        let form = Form::new().part("file", part);
-
-        let token = self.auth_token.clone().unwrap_or_default();
-        let mut headers = HeaderMap::new();
-
-        // add chunk size, chunk index, and upload uri to headers
-        headers.insert(
-            "Chunk-Size",
-            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Chunk-Range",
-            HeaderValue::from_str(&format!("{}/{}", first_chunk, last_chunk, chunk_size)).map_err(
-                |e| ApiError::Error(format!("Failed to create content range header: {}", e)),
-            )?,
-        );
-
-        headers.insert(
-            "Part-Index",
-            HeaderValue::from_str(&format!("{}", chunk_index)).map_err(|e| {
-                ApiError::Error(format!("Failed to create content range header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Upload-Uri",
-            HeaderValue::from_str(upload_uri).map_err(|e| {
-                ApiError::Error(format!("Failed to create upload uri header: {}", e))
-            })?,
-        );
-
-        let response = self
-            .client
-            .put(format!("{}/{}", self.base_url, Routes::Multipart.as_str()))
-            .headers(headers)
-            .bearer_auth(token)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        Ok(())
-    }
-
     async fn upload_file_in_chunks(
         &mut self,
         lpath: &Path,
         rpath: &Path,
         chunk_size: Option<u64>,
     ) -> Result<(), ApiError> {
+        let cloned_lpath = lpath.to_path_buf();
+
         let file = File::open(lpath)
-            .map_err(|e| ApiError::Error(format!("Failed to open file: {}", e)))
-            .await?;
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to open file: {}", e)))?;
 
         let metadata = file
             .metadata()
-            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))
-            .await?;
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         let file_size = metadata.len();
 
-        // check chunk size. IF chunk size is None, set chunk size to 5MB. If chunk size is greater than file size, set chunk size to file size
-        let mut chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5);
-        if chunk_size > file_size {
-            chunk_size = file_size;
+        // Set chunk size to 5MB if None, or to file size if greater than file size
+        let chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5).min(file_size);
+
+        // Calculate the number of parts
+        let chunk_count = (file_size + chunk_size - 1) / chunk_size;
+        let size_of_last_chunk = file_size % chunk_size;
+
+        let session_uri = self.create_multipart_upload(rpath).await?;
+        let mut futures = Vec::new();
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_index == chunk_count - 1 && size_of_last_chunk != 0 {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let first_byte = chunk_index * chunk_size;
+            let last_byte = first_byte + this_chunk - 1;
+            let client = self.clone();
+            let upload_uri = session_uri.clone();
+            let cloned_lpath = cloned_lpath.clone();
+
+            let future = tokio::spawn(async move {
+                let stream = MultiPartUploader::get_next_chunk(
+                    Path::new(&cloned_lpath),
+                    chunk_size,
+                    chunk_index,
+                    this_chunk,
+                )
+                .await
+                .map_err(|e| ApiError::Error(format!("Failed to get next chunk: {}", e)))?;
+
+                MultiPartUploader::upload_part(
+                    client,
+                    stream,
+                    chunk_index,
+                    chunk_size,
+                    first_byte,
+                    last_byte,
+                    &upload_uri,
+                )
+                .await?;
+                Ok::<(), ApiError>(())
+            });
+
+            futures.push(future);
         }
 
-        // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
-
-        // if the last chunk is empty, reduce the number of parts
-        if size_of_last_chunk == 0 {
-            size_of_last_chunk = chunk_size;
-            chunk_count -= 1;
-        }
-
-        let resumable_client = self.create_multipart_upload(rpath).await?;
-
+        join_all(futures).await;
         Ok(())
     }
 
@@ -493,20 +556,13 @@ impl ApiClient {
                 ApiError::Error(format!("Failed to create read path header: {}", e))
             })?,
         );
-        headers.insert(
-            "Authorization",
-            HeaderValue::from_str(&format!(
-                "Bearer {}",
-                self.auth_token.clone().unwrap_or_default()
-            ))
-            .map_err(|e| ApiError::Error(format!("Failed to create auth header: {}", e)))?,
-        );
 
         // Make streaming GET request
         let response = self
             .client
             .get(format!("{}/{}", self.base_url, route))
             .headers(headers)
+            .bearer_auth(self.auth_token.clone().unwrap_or_default())
             .send()
             .await
             .map_err(|e| ApiError::Error(format!("Failed to send request: {}", e)))?;
@@ -526,6 +582,7 @@ impl ApiClient {
 
         // Stream chunks to file
         let mut stream = response.bytes_stream();
+
         while let Some(chunk) = stream
             .try_next()
             .await
