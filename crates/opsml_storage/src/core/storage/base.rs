@@ -1,12 +1,44 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use opsml_settings::config::OpsmlConfig;
 use pyo3::prelude::*;
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 // take a stream of bytes
 
 // create a method for Path that returns a relative path
+
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct StorageSettings {
+    #[pyo3(get)]
+    pub storage_uri: String,
+
+    #[pyo3(get)]
+    pub kwargs: HashMap<String, String>,
+}
+
+#[pymethods]
+impl StorageSettings {
+    #[new]
+    pub fn new(storage_uri: String, kwargs: HashMap<String, String>) -> Self {
+        StorageSettings {
+            storage_uri,
+            kwargs,
+        }
+    }
+}
+
+impl Default for StorageSettings {
+    fn default() -> Self {
+        StorageSettings {
+            storage_uri: "".to_string(),
+            kwargs: HashMap::new(),
+        }
+    }
+}
 
 pub trait PathExt {
     fn relative_path(&self, base: &Path) -> Result<PathBuf, StorageError>;
@@ -54,7 +86,7 @@ pub fn get_files(path: &Path) -> Result<Vec<PathBuf>, StorageError> {
 #[async_trait]
 pub trait StorageClient: Sized {
     async fn bucket(&self) -> &str;
-    async fn new(bucket: String) -> Result<Self, StorageError>;
+    async fn new(settings: StorageSettings) -> Result<Self, StorageError>;
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
@@ -80,7 +112,7 @@ pub trait StorageClient: Sized {
 pub trait FileSystem<T: StorageClient> {
     fn name(&self) -> &str;
     fn client(&self) -> &T;
-    async fn new(bucket: String) -> Self;
+    async fn new(settings: StorageSettings) -> Self;
 
     async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
         let stripped_path = path.strip_path(self.client().bucket().await);

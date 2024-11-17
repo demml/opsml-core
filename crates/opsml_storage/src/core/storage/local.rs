@@ -3,8 +3,8 @@ use crate::core::storage::base::PathExt;
 use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use opsml_settings::config::OpsmlConfig;
 use pyo3::prelude::*;
-use std::fs::File;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -20,8 +20,8 @@ impl StorageClient for LocalStorageClient {
         self.bucket.to_str().unwrap()
     }
 
-    async fn new(bucket: String) -> Result<Self, StorageError> {
-        let bucket = PathBuf::from(bucket);
+    async fn new(config: OpsmlConfig) -> Result<Self, StorageError> {
+        let bucket = PathBuf::from(config.storage_root());
 
         // bucket should be a dir. Check if it exists. If not, create it
         if !bucket.exists() {

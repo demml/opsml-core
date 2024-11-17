@@ -1,5 +1,8 @@
-use crate::core::utils::error::ApiError;
+use crate::core::storage::local::LocalStorageClient;
+use crate::core::utils::error::{ApiError, StorageError};
 
+use crate::core::storage::base::StorageClient;
+use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
 use futures::future::join_all;
@@ -632,6 +635,34 @@ impl ApiClient {
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(response)
+    }
+}
+
+pub struct HttpStorageClient {
+    client: ApiClient,
+    storage_client: LocalStorageClient,
+    pub bucket: PathBuf,
+}
+
+#[async_trait]
+impl StorageClient for HttpStorageClient {
+    async fn bucket(&self) -> &str {
+        self.bucket.to_str().unwrap()
+    }
+
+    async fn new(bucket: String) -> Result<Self, StorageError> {
+        let bucket = PathBuf::from(bucket);
+
+        // bucket should be a dir. Check if it exists. If not, create it
+        if !bucket.exists() {
+            fs::create_dir_all(&bucket)
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create bucket directory: {}", e))
+                })
+                .unwrap();
+        }
+
+        Ok(Self { bucket })
     }
 }
 

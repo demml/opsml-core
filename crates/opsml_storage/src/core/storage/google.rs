@@ -1,11 +1,9 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
 
-    use crate::core::storage::base::get_files;
-    use crate::core::storage::base::FileInfo;
-    use crate::core::storage::base::FileSystem;
-    use crate::core::storage::base::PathExt;
-    use crate::core::storage::base::StorageClient;
+    use crate::core::storage::base::{
+        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
+    };
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_smithy_types::byte_stream::ByteStream;
@@ -29,7 +27,7 @@ pub mod google_storage {
     use google_cloud_storage::sign::SignedURLMethod;
     use google_cloud_storage::sign::SignedURLOptions;
     use pyo3::prelude::*;
-    use reqwest::ClientBuilder;
+
     use reqwest_middleware::ClientWithMiddleware;
     use serde_json::Value;
     use std::env;
@@ -164,7 +162,7 @@ pub mod google_storage {
         async fn bucket(&self) -> &str {
             &self.bucket
         }
-        async fn new(bucket: String) -> Result<Self, StorageError> {
+        async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
             let creds = GcpCreds::new().await?;
             // If no credentials, attempt to create a default client pulling from the environment
             let config = if creds.creds.is_none() {
@@ -204,7 +202,7 @@ pub mod google_storage {
 
             Ok(GoogleStorageClient {
                 client: client,
-                bucket,
+                bucket: settings.storage_uri,
                 http: http,
             })
         }
@@ -631,9 +629,9 @@ pub mod google_storage {
         fn client(&self) -> &GoogleStorageClient {
             &self.client
         }
-        async fn new(bucket: String) -> Self {
+        async fn new(settings: StorageSettings) -> Self {
             GCSFSStorageClient {
-                client: GoogleStorageClient::new(bucket).await.unwrap(),
+                client: GoogleStorageClient::new(settings).await.unwrap(),
             }
         }
     }
@@ -647,10 +645,10 @@ pub mod google_storage {
     #[pymethods]
     impl PyGCSFSStorageClient {
         #[new]
-        fn new(bucket: String) -> Self {
+        fn new(settings: StorageSettings) -> Self {
             let rt = tokio::runtime::Runtime::new().unwrap();
 
-            let client = rt.block_on(async { GoogleStorageClient::new(bucket).await.unwrap() });
+            let client = rt.block_on(async { GoogleStorageClient::new(settings).await.unwrap() });
 
             Self {
                 client,
@@ -834,9 +832,14 @@ pub mod google_storage {
 
         const CHUNK_SIZE: u64 = 1024 * 256;
 
-        pub fn get_bucket() -> String {
-            std::env::var("CLOUD_BUCKET_NAME")
-                .unwrap_or_else(|_| "opsml-storage-integration".to_string())
+        pub fn get_settings() -> StorageSettings {
+            let bucket = std::env::var("CLOUD_BUCKET_NAME")
+                .unwrap_or_else(|_| "opsml-storage-integration".to_string());
+
+            StorageSettings {
+                storage_uri: bucket,
+                ..Default::default()
+            }
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
@@ -912,14 +915,14 @@ pub mod google_storage {
 
         #[test]
         fn test_aws_google_client_new() {
-            let bucket = get_bucket();
-            let _client = GoogleStorageClient::new(bucket);
+            let settings = get_settings();
+            let _client = GoogleStorageClient::new(settings);
         }
 
         #[tokio::test]
         async fn test_google_storage_client_get_object() {
-            let bucket = get_bucket();
-            let client = GoogleStorageClient::new(bucket).await.unwrap();
+            let settings = get_settings();
+            let client = GoogleStorageClient::new(settings).await.unwrap();
 
             // should fail since there are no suffixes
             let result = client.get_object("local_path", "remote_path").await;
@@ -928,8 +931,8 @@ pub mod google_storage {
 
         #[tokio::test]
         async fn test_google_storage_client_put() {
-            let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket).await;
+            let settings = get_settings();
+            let client = GCSFSStorageClient::new(settings).await;
 
             //
             let dirname = create_nested_data(&CHUNK_SIZE);
@@ -986,8 +989,8 @@ pub mod google_storage {
 
         #[tokio::test]
         async fn test_google_storage_client_generate_presigned_url() {
-            let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket).await;
+            let settings = get_settings();
+            let client = GCSFSStorageClient::new(settings).await;
 
             // create file
             let key = create_single_file(&CHUNK_SIZE);
@@ -1007,8 +1010,8 @@ pub mod google_storage {
 
         #[tokio::test]
         async fn test_google_large_file_upload() {
-            let bucket = get_bucket();
-            let client = GCSFSStorageClient::new(bucket).await;
+            let settings = get_settings();
+            let client = GCSFSStorageClient::new(settings).await;
 
             // create file
             let chunk_size = 1024 * 1024 * 5; // 5MB
