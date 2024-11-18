@@ -3,8 +3,11 @@ use crate::core::storage::base::PathExt;
 use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use aws_sdk_s3::primitives::ByteStream;
 use pyo3::prelude::*;
 use std::fs::{self};
+use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use walkdir::WalkDir;
@@ -269,7 +272,77 @@ impl StorageClient for LocalStorageClient {
                 .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
         }
 
-        Ok(full_path.to_str().unwrap().to_string())
+        Ok("ready".to_string())
+    }
+}
+
+impl LocalStorageClient {
+    async fn upload_part(&self, path: &Path, stream: ByteStream) -> Result<String, StorageError> {
+        let full_path = self.bucket.join(path);
+
+        let mut file = fs::File::create(&full_path)
+            .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
+
+        // open the file, convert stream to bytes and write to the file
+        let data = stream
+            .collect()
+            .await
+            .map_err(|e| StorageError::Error(format!("Unable to collect chunk data: {}", e)))?
+            .into_bytes();
+
+        file.write_all(&data)
+            .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+
+        Ok("success".to_string())
+    }
+
+    pub async fn validate_multipart(
+        &self,
+        total_chunks: u64,
+        file_path: &Path,
+        total_size: u64,
+    ) -> Result<(), StorageError> {
+        let mut final_file = fs::File::create(file_path)
+            .map_err(|e| StorageError::Error(format!("Unable to create final file: {}", e)))?;
+        let parent_path = file_path.parent().unwrap().to_str().unwrap();
+
+        for chunk_index in 0..total_chunks {
+            let chunk_file_path = format!("{}/chunk_{}", parent_path, chunk_index);
+            let mut chunk_file = fs::File::open(&chunk_file_path)
+                .map_err(|e| StorageError::Error(format!("Unable to open chunk file: {}", e)))?;
+
+            let mut buffer = Vec::new();
+            chunk_file
+                .read_to_end(buffer.as_mut())
+                .map_err(|e| StorageError::Error(format!("Unable to read chunk file: {}", e)))?;
+
+            final_file.write_all(&buffer).map_err(|e| {
+                StorageError::Error(format!("Unable to write to final file: {}", e))
+            })?;
+
+            // delete the chunk file
+            fs::remove_file(&chunk_file_path)
+                .map_err(|e| StorageError::Error(format!("Unable to delete chunk file: {}", e)))?;
+        }
+
+        // check if the final file size is the same as the total size
+        let final_file_size = final_file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Unable to get final file metadata: {}", e)))?
+            .len();
+
+        if final_file_size != total_size {
+            // delete the file
+            fs::remove_file(file_path)
+                .map_err(|e| StorageError::Error(format!("Unable to delete final file: {}", e)))?;
+
+            return Err(StorageError::Error(format!(
+                "Final file size does not match total size: {}",
+                final_file_size
+            )));
+        }
+
+        Ok(())
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::core::storage::local::LocalStorageClient;
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::{StorageClient, StorageSettings};
+use crate::core::storage::base::{FileInfo, StorageClient, StorageSettings};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
@@ -14,6 +14,7 @@ use reqwest::{
     header::{self, HeaderMap, HeaderValue},
     Body, Client,
 };
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
@@ -33,14 +34,23 @@ pub enum RequestType {
     Put,
 }
 
+#[derive(Debug, Clone)]
 pub enum Routes {
     Multipart,
+    List,
+    ListInfo,
+    Files,
+    ValidateFile,
 }
 
 impl Routes {
     pub fn as_str(&self) -> &str {
         match self {
+            Routes::Files => "opsml/files",
             Routes::Multipart => "opsml/files/multipart",
+            Routes::ValidateFile => "opsml/files/validate",
+            Routes::List => "opsml/files/list",
+            Routes::ListInfo => "opsml/files/list_info",
         }
     }
 }
@@ -72,7 +82,8 @@ impl MultiPartUploader {
         chunk_size: u64,
         first_chunk: u64,
         last_chunk: u64,
-        upload_uri: &str,
+        rpath: &str,
+        total_size: u64,
     ) -> Result<(), ApiError> {
         let data = chunk
             .collect()
@@ -80,7 +91,11 @@ impl MultiPartUploader {
             .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
             .into_bytes();
 
-        let part = Part::stream_with_length(data, chunk_index)
+        let filename = format!("chunk_{}", chunk_index);
+
+        let rpath = Path::new(upload_uri
+
+        let part = Part::stream_with_length(data, chunk_size)
             .file_name(format!("chunk_{}", chunk_index))
             .mime_str("application/octet-stream")
             .map_err(|e| ApiError::Error(format!("Failed to create mime type: {}", e)))?;
@@ -119,6 +134,13 @@ impl MultiPartUploader {
             })?,
         );
 
+        headers.insert(
+            "Total-Size",
+            HeaderValue::from_str(&total_size.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create total size header: {}", e))
+            })?,
+        );
+
         let response = client
             .client
             .post(format!(
@@ -132,6 +154,30 @@ impl MultiPartUploader {
             .send()
             .await
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
+
+        Ok(())
+    }
+
+    pub async fn validate_file(
+        mut client: ApiClient,
+        upload_uri: &str,
+        total_size: u64,
+        total_chunks: u64,
+    ) -> Result<(), ApiError> {
+        let mut body = HashMap::new();
+
+        body.insert("Upload-Uri", upload_uri.to_string());
+        body.insert("Total-Size", total_size.to_string());
+        body.insert("file_name", "test".to_string());
+        body.insert("Total-Chunks", total_chunks.to_string());
+
+        let response = client.request_with_retry(
+            Routes::ValidateFile,
+            RequestType::Post,
+            Some(json!(body)),
+            None,
+            None,
+        );
 
         Ok(())
     }
@@ -229,19 +275,19 @@ impl ApiClient {
 
     async fn request(
         self,
-        route: &str,
+        route: Routes,
         request_type: RequestType,
         body_params: Option<Value>,
         query_params: HashMap<String, String>,
         headers: Option<HeaderMap>,
     ) -> Result<Value, ApiError> {
-        let mut headers = headers.unwrap_or(HeaderMap::new());
+        let headers = headers.unwrap_or(HeaderMap::new());
 
         let token = self.auth_token.unwrap_or("".to_string());
         let response = match request_type {
             RequestType::Get => self
                 .client
-                .get(format!("{}/{}", self.base_url, route))
+                .get(format!("{}/{}", self.base_url, route.as_str()))
                 // add bearer token if it exists
                 .headers(headers)
                 .query(&query_params)
@@ -253,7 +299,7 @@ impl ApiClient {
                 })?,
             RequestType::Post => self
                 .client
-                .post(format!("{}/{}", self.base_url, route))
+                .post(format!("{}/{}", self.base_url, route.as_str()))
                 .headers(headers)
                 .json(&body_params)
                 .send()
@@ -263,7 +309,7 @@ impl ApiClient {
                 })?,
             RequestType::Put => self
                 .client
-                .put(format!("{}/{}", self.base_url, route))
+                .put(format!("{}/{}", self.base_url, route.as_str()))
                 .headers(headers)
                 .json(&body_params)
                 .send()
@@ -283,7 +329,7 @@ impl ApiClient {
 
     pub async fn request_with_retry(
         &mut self,
-        route: &str,
+        route: Routes,
         request_type: RequestType,
         body_params: Option<Value>,
         query_params: Option<HashMap<String, String>>,
@@ -302,7 +348,7 @@ impl ApiClient {
             let client = self.clone();
             response = client
                 .request(
-                    route,
+                    route.clone(),
                     request_type.clone(),
                     body_params.clone(),
                     query_params.clone(),
@@ -342,7 +388,7 @@ impl ApiClient {
 
         let result = self
             .request_with_retry(
-                &format!("{}/{}", self.base_url, Routes::Multipart.as_str()),
+                Routes::Multipart,
                 RequestType::Get,
                 None,
                 Some(query_params),
@@ -398,6 +444,7 @@ impl ApiClient {
             let client = self.clone();
             let upload_uri = session_uri.clone();
             let cloned_lpath = cloned_lpath.clone();
+            let total_size = file_size.clone();
 
             let future = tokio::spawn(async move {
                 let stream = MultiPartUploader::get_next_chunk(
@@ -417,6 +464,7 @@ impl ApiClient {
                     first_byte,
                     last_byte,
                     &upload_uri,
+                    total_size,
                 )
                 .await?;
                 Ok::<(), ApiError>(())
@@ -426,6 +474,10 @@ impl ApiClient {
         }
 
         join_all(futures).await;
+
+        // need to add logic to combine the parts
+        MultiPartUploader::validate_file(client, upload_uri, total_size, total_chunks)
+
         Ok(())
     }
 
@@ -713,7 +765,83 @@ impl StorageClient for HttpStorageClient {
         .await
         .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
 
-        Ok(Self { client, bucket })
+        let storage_client = LocalStorageClient::new(settings).await?;
+
+        Ok(Self {
+            client,
+            bucket,
+            storage_client,
+        })
+    }
+
+    async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+        let mut params = HashMap::new();
+        params.insert("path".to_string(), path.to_string());
+
+        // need to clone because self is borrowed
+        let mut client = self.client.clone();
+        let response = client
+            .request_with_retry(Routes::List, RequestType::Get, None, Some(params), None)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
+
+        // convert Value to Vec<String>
+        let files = response["files"]
+            .as_array()
+            .ok_or_else(|| StorageError::Error("Failed to get files".to_string()))?
+            .iter()
+            .map(|f| f.as_str().unwrap().to_string())
+            .collect();
+
+        Ok(files)
+    }
+
+    async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+        let mut params = HashMap::new();
+        params.insert("path".to_string(), path.to_string());
+
+        // need to clone because self is borrowed
+        let mut client = self.client.clone();
+        let response = client
+            .request_with_retry(Routes::ListInfo, RequestType::Get, None, Some(params), None)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
+
+        // convert Value to Vec<FileInfo>
+        let files = response["files"]
+            .as_array()
+            .ok_or_else(|| StorageError::Error("Failed to get files".to_string()))?
+            .iter()
+            .map(|f| {
+                let name = f["name"].as_str().unwrap().to_string();
+                let size = f["size"].as_i64().unwrap();
+                let object_type = f["object_type"].as_str().unwrap().to_string();
+                let created = f["created"].as_str().unwrap().to_string();
+                let suffix = f["suffix"].as_str().unwrap().to_string();
+                FileInfo {
+                    name,
+                    size,
+                    object_type,
+                    created,
+                    suffix,
+                }
+            })
+            .collect();
+
+        Ok(files)
+    }
+
+    async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError> {
+        let local_path = PathBuf::from(local_path);
+        let remote_path = PathBuf::from(remote_path);
+
+        let response = self
+            .client
+            .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -737,7 +865,7 @@ mod tests {
         let (mut server, server_url) = setup_server().await;
 
         let _mock = server
-            .mock("GET", "/opsml/test")
+            .mock("GET", "/opsml/files")
             .with_status(200)
             .with_body(r#"{"status": "ok"}"#)
             .create();
@@ -748,7 +876,7 @@ mod tests {
                 .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None, None, None)
+            .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -769,7 +897,7 @@ mod tests {
 
         // Mock protected endpoint
         let _protected_mock = server
-            .mock("GET", "/opsml/test")
+            .mock("GET", "/opsml/files")
             .match_header("Authorization", "Bearer test_token")
             .with_status(200)
             .with_body(r#"{"status": "authenticated"}"#)
@@ -788,7 +916,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None, None, None)
+            .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -809,7 +937,7 @@ mod tests {
 
         // Mock endpoint that succeeds
         let _success_mock = server
-            .mock("GET", "/opsml/test")
+            .mock("GET", "/opsml/files")
             .match_header("Authorization", "Bearer test_token")
             .with_status(200)
             .with_body(r#"{"status": "success"}"#)
@@ -828,7 +956,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None, None, None)
+            .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await
             .unwrap();
 
@@ -849,7 +977,7 @@ mod tests {
 
         // Mock endpoint that fails with 401 three times
         let _failure_mock = server
-            .mock("GET", "/opsml/test")
+            .mock("GET", "/opsml/files")
             .match_header("Authorization", "Bearer test_token")
             .with_status(401)
             .expect(3)
@@ -867,7 +995,7 @@ mod tests {
         .unwrap();
 
         let result = api_client
-            .request_with_retry("test", RequestType::Get, None, None, None)
+            .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await;
 
         assert!(result.is_err());
@@ -903,7 +1031,7 @@ mod tests {
 
         // Mock protected endpoint - second attempt succeeds with new token
         let _second_attempt_mock = server
-            .mock("GET", "/opsml/test")
+            .mock("GET", "/opsml/files")
             .match_header("Authorization", "Bearer refreshed_token")
             .with_status(200)
             .with_body(r#"{"status": "success_after_refresh"}"#)
@@ -922,7 +1050,7 @@ mod tests {
         .unwrap();
 
         let response = api_client
-            .request_with_retry("test", RequestType::Get, None, None, None)
+            .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await
             .unwrap();
 
