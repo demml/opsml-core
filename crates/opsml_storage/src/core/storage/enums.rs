@@ -1,7 +1,6 @@
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
-use crate::core::storage::base::FileInfo;
-use crate::core::storage::base::FileSystem;
+use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
 use crate::core::storage::local::LocalFSStorageClient;
 use crate::core::utils::error::StorageError;
 use pyo3::prelude::*;
@@ -34,27 +33,25 @@ impl StorageClientEnum {
     }
     // Implement the required methods for the StorageClient trait
     // For example:
-    pub async fn new(storage_uri: String) -> Result<Self, StorageError> {
+    pub async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
         // match start of storage uri with starts_with("gs://") or starts_with("s3://")
         // to determine the storage type
 
-        match storage_uri {
+        match settings.storage_uri {
             #[cfg(feature = "google_storage")]
-            _ if storage_uri.starts_with("gs://") => {
+            _ if settings.storage_uri.starts_with("gs://") => {
                 // strip the gs:// prefix
-                let bucket = storage_uri.strip_prefix("gs://").unwrap().to_string();
-                let client = GCSFSStorageClient::new(bucket).await;
+                let client = GCSFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Google(client))
             }
             #[cfg(feature = "aws_storage")]
-            _ if storage_uri.starts_with("s3://") => {
+            _ if settings.storage_uri.starts_with("s3://") => {
                 // strip the s3:// prefix
-                let bucket = storage_uri.strip_prefix("s3://").unwrap().to_string();
-                let client = S3FStorageClient::new(bucket).await;
+                let client = S3FStorageClient::new(settings).await;
                 Ok(StorageClientEnum::AWS(client))
             }
             _ => {
-                let client = LocalFSStorageClient::new(storage_uri).await;
+                let client = LocalFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Local(client))
             }
         }
@@ -178,10 +175,10 @@ pub struct PyStorageClient {
 #[pymethods]
 impl PyStorageClient {
     #[new]
-    fn new(storage_uri: String) -> PyResult<Self> {
+    fn new(settings: StorageSettings) -> PyResult<Self> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = rt
-            .block_on(StorageClientEnum::new(storage_uri))
+            .block_on(StorageClientEnum::new(settings))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
         Ok(PyStorageClient {
             inner: client,
@@ -259,6 +256,6 @@ impl PyStorageClient {
 }
 
 #[pyfunction]
-pub fn get_storage_client(storage_uri: String) -> PyResult<PyStorageClient> {
-    PyStorageClient::new(storage_uri)
+pub fn get_storage_client(settings: StorageSettings) -> PyResult<PyStorageClient> {
+    PyStorageClient::new(settings)
 }

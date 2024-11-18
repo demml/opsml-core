@@ -1,7 +1,7 @@
 use crate::core::storage::local::LocalStorageClient;
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::StorageClient;
+use crate::core::storage::base::{StorageClient, StorageSettings};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
@@ -638,10 +638,48 @@ impl ApiClient {
     }
 }
 
+pub struct ApiClientArgs {
+    pub base_url: String,
+    pub use_auth: bool,
+    pub path_prefix: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub token: Option<String>,
+}
+
 pub struct HttpStorageClient {
     client: ApiClient,
     storage_client: LocalStorageClient,
     pub bucket: PathBuf,
+}
+
+impl HttpStorageClient {
+    fn get_http_kwargs(kwargs: HashMap<String, String>) -> Result<ApiClientArgs, StorageError> {
+        let base_url = kwargs.get("base_url").ok_or(StorageError::Error(
+            "base_url not found in kwargs".to_string(),
+        ))?;
+
+        let auth_auth = kwargs
+            .get("use_auth")
+            .ok_or(StorageError::Error("auth not found in kwargs".to_string()))?;
+
+        let path_prefix = kwargs.get("path_prefix").ok_or(StorageError::Error(
+            "path_prefix not found in kwargs".to_string(),
+        ))?;
+
+        let username = kwargs.get("username");
+        let password = kwargs.get("password");
+        let token = kwargs.get("token");
+
+        Ok(ApiClientArgs {
+            base_url: base_url.to_string(),
+            use_auth: auth_auth.parse().unwrap(),
+            path_prefix: path_prefix.to_string(),
+            username: username.map(|s| s.to_string()),
+            password: password.map(|s| s.to_string()),
+            token: token.map(|s| s.to_string()),
+        })
+    }
 }
 
 #[async_trait]
@@ -650,19 +688,32 @@ impl StorageClient for HttpStorageClient {
         self.bucket.to_str().unwrap()
     }
 
-    async fn new(bucket: String) -> Result<Self, StorageError> {
-        let bucket = PathBuf::from(bucket);
+    async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
+        let bucket = PathBuf::from(settings.storage_uri.clone());
 
         // bucket should be a dir. Check if it exists. If not, create it
         if !bucket.exists() {
-            fs::create_dir_all(&bucket)
+            std::fs::create_dir_all(&bucket)
                 .map_err(|e| {
                     StorageError::Error(format!("Unable to create bucket directory: {}", e))
                 })
                 .unwrap();
         }
 
-        Ok(Self { bucket })
+        let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
+
+        let client = ApiClient::new(
+            api_kwargs.base_url,
+            api_kwargs.use_auth,
+            api_kwargs.path_prefix,
+            api_kwargs.username,
+            api_kwargs.password,
+            api_kwargs.token,
+        )
+        .await
+        .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
+
+        Ok(Self { client, bucket })
     }
 }
 

@@ -1,9 +1,8 @@
 use crate::core::storage::base::get_files;
 use crate::core::storage::base::PathExt;
-use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
+use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
-use opsml_settings::config::OpsmlConfig;
 use pyo3::prelude::*;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
@@ -20,8 +19,8 @@ impl StorageClient for LocalStorageClient {
         self.bucket.to_str().unwrap()
     }
 
-    async fn new(config: OpsmlConfig) -> Result<Self, StorageError> {
-        let bucket = PathBuf::from(config.storage_root());
+    async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
+        let bucket = PathBuf::from(settings.storage_uri.as_str());
 
         // bucket should be a dir. Check if it exists. If not, create it
         if !bucket.exists() {
@@ -288,9 +287,9 @@ impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
         &self.client
     }
 
-    async fn new(root: String) -> Self {
+    async fn new(seetings: StorageSettings) -> Self {
         Self {
-            client: LocalStorageClient::new(root).await.unwrap(),
+            client: LocalStorageClient::new(seetings).await.unwrap(),
         }
     }
 }
@@ -304,10 +303,10 @@ pub struct PyLocalFSStorageClient {
 #[pymethods]
 impl PyLocalFSStorageClient {
     #[new]
-    fn new(bucket: String) -> Self {
+    fn new(settings: StorageSettings) -> Self {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = rt
-            .block_on(async { LocalStorageClient::new(bucket).await })
+            .block_on(async { LocalStorageClient::new(settings).await })
             .unwrap();
         Self {
             client,
@@ -514,9 +513,14 @@ mod tests {
 
     const CHUNK_SIZE: u64 = 1024 * 256;
 
-    pub fn get_bucket() -> String {
-        std::env::var("CLOUD_BUCKET_NAME")
-            .unwrap_or_else(|_| "opsml-storage-integration".to_string())
+    pub fn get_settings() -> StorageSettings {
+        let bucket = std::env::var("CLOUD_BUCKET_NAME")
+            .unwrap_or_else(|_| "opsml-storage-integration".to_string());
+
+        StorageSettings {
+            storage_uri: bucket,
+            ..Default::default()
+        }
     }
 
     pub fn create_file(name: &str, chunk_size: &u64) {
@@ -588,14 +592,24 @@ mod tests {
     fn test_local_storage_client_creds() {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().to_str().unwrap().to_string();
-        let _client = LocalStorageClient::new(root.clone());
+        let settings = StorageSettings {
+            storage_uri: root.clone(),
+            ..Default::default()
+        };
+        let _client = LocalStorageClient::new(settings);
     }
 
     #[tokio::test]
     async fn test_local_storage_client_get_object() {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().to_str().unwrap().to_string();
-        let client = LocalStorageClient::new(root.clone()).await.unwrap();
+
+        let settings = StorageSettings {
+            storage_uri: root.clone(),
+            ..Default::default()
+        };
+
+        let client = LocalStorageClient::new(settings).await.unwrap();
 
         // should fail since there are no suffixes
         let result = client.get_object("local_path", "remote_path").await;
@@ -606,7 +620,12 @@ mod tests {
     async fn test_local_storage_client_put() {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().to_str().unwrap().to_string();
-        let client = LocalFSStorageClient::new(root.clone()).await;
+
+        let settings = StorageSettings {
+            storage_uri: root.clone(),
+            ..Default::default()
+        };
+        let client = LocalFSStorageClient::new(settings).await;
 
         //
         let dirname = create_nested_data(&CHUNK_SIZE);
@@ -663,8 +682,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_local_storage_client_generate_presigned_url() {
-        let bucket = get_bucket();
-        let client = LocalFSStorageClient::new(bucket).await;
+        let settings = get_settings();
+        let client = LocalFSStorageClient::new(settings).await;
 
         // create file
         let key = create_single_file(&CHUNK_SIZE);
@@ -684,8 +703,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_local_large_file_upload() {
-        let bucket = get_bucket();
-        let client = LocalFSStorageClient::new(bucket).await;
+        let settings = get_settings();
+        let client = LocalFSStorageClient::new(settings).await;
 
         // create file
         let chunk_size = 1024 * 1024 * 5; // 5MB

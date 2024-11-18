@@ -200,10 +200,17 @@ pub mod google_storage {
 
             let client = Client::new(config);
 
+            // strip gs:// from the bucket name if exists
+            let bucket = settings
+                .storage_uri
+                .strip_prefix("gs://")
+                .unwrap_or(&settings.storage_uri)
+                .to_string();
+
             Ok(GoogleStorageClient {
-                client: client,
-                bucket: settings.storage_uri,
-                http: http,
+                client,
+                bucket,
+                http,
             })
         }
 
@@ -914,7 +921,7 @@ pub mod google_storage {
         }
 
         #[test]
-        fn test_aws_google_client_new() {
+        fn test_google_client_new() {
             let settings = get_settings();
             let _client = GoogleStorageClient::new(settings);
         }

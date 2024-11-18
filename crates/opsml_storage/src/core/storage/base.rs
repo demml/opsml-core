@@ -1,7 +1,6 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
-use opsml_settings::config::OpsmlConfig;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
