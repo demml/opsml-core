@@ -263,7 +263,7 @@ impl StorageClient for LocalStorageClient {
         Ok(true)
     }
 
-    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+    async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
         let full_path = self.bucket.join(path);
 
         // check if parents path exists. If not, create it

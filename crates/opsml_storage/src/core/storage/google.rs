@@ -328,7 +328,9 @@ pub mod google_storage {
                 chunk_count -= 1;
             }
 
-            let session_url = self.create_multipart_upload(rpath).await?;
+            let session_url = self
+                .create_multipart_upload(rpath.to_str().unwrap())
+                .await?;
 
             let mut uploader = GoogleMultipartUploadClient {
                 client: ResumableUploadClient::new(session_url, self.http.clone()),
@@ -521,8 +523,8 @@ pub mod google_storage {
             Ok(true)
         }
 
-        async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
-            let _filename = path.to_str().unwrap().to_string();
+        async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+            let _filename = path.to_string();
 
             let metadata = Object {
                 name: _filename.clone(),

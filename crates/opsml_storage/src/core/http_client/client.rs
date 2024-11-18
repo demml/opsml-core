@@ -6,7 +6,6 @@ use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
 use futures::future::join_all;
 use futures::stream::TryStreamExt;
-use futures::TryFutureExt;
 use reqwest::multipart::{Form, Part};
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
@@ -927,8 +926,8 @@ impl StorageClient for HttpStorageClient {
 
     async fn generate_presigned_url(
         &self,
-        path: &str,
-        expiration: u64,
+        __path: &str,
+        __expiration: u64,
     ) -> Result<String, StorageError> {
         unimplemented!()
     }
@@ -1223,7 +1222,7 @@ mod tests {
 
         // Mock successful download endpoint
         let download_mock = server
-            .mock("GET", "/opsml/download")
+            .mock("GET", "/opsml/files")
             .match_header("READ_PATH", read_path.to_str().unwrap())
             .with_status(200)
             .with_body("test content")
@@ -1236,7 +1235,7 @@ mod tests {
                 .unwrap();
 
         let response = api_client
-            .download_to_file_with_retry("download", local_path.clone(), read_path)
+            .download_to_file_with_retry(Routes::Files, local_path.clone(), read_path)
             .await
             .unwrap();
 

@@ -249,6 +249,13 @@ pub trait FileSystem<T: StorageClient> {
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
             .await
     }
+
+    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client().bucket().await);
+        self.client()
+            .create_multipart_upload(stripped_path.to_str().unwrap())
+            .await
+    }
 }
 
 #[derive(Debug)]
