@@ -82,7 +82,7 @@ impl MultiPartUploader {
         chunk_size: u64,
         first_chunk: u64,
         last_chunk: u64,
-        rpath: &str,
+        session_uri: &str,
         total_size: u64,
     ) -> Result<(), ApiError> {
         let data = chunk
@@ -90,10 +90,6 @@ impl MultiPartUploader {
             .await
             .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
             .into_bytes();
-
-        let filename = format!("chunk_{}", chunk_index);
-
-        let rpath = Path::new(rpath).
 
         let part = Part::stream_with_length(data, chunk_size)
             .file_name(format!("chunk_{}", chunk_index))
@@ -128,8 +124,8 @@ impl MultiPartUploader {
         );
 
         headers.insert(
-            "Upload-Uri",
-            HeaderValue::from_str(upload_uri).map_err(|e| {
+            "Session-Uri",
+            HeaderValue::from_str(session_uri).map_err(|e| {
                 ApiError::Error(format!("Failed to create upload uri header: {}", e))
             })?,
         );
@@ -141,7 +137,7 @@ impl MultiPartUploader {
             })?,
         );
 
-        let response = client
+        let _response = client
             .client
             .post(format!(
                 "{}/{}",
@@ -159,19 +155,18 @@ impl MultiPartUploader {
     }
 
     pub async fn validate_file(
-        mut client: ApiClient,
-        upload_uri: &str,
+        client: &mut ApiClient,
+        rpath: &str,
         total_size: u64,
         total_chunks: u64,
     ) -> Result<(), ApiError> {
         let mut body = HashMap::new();
 
-        body.insert("Upload-Uri", upload_uri.to_string());
+        body.insert("Path", rpath.to_string());
         body.insert("Total-Size", total_size.to_string());
-        body.insert("file_name", "test".to_string());
         body.insert("Total-Chunks", total_chunks.to_string());
 
-        let response = client.request_with_retry(
+        let _response = client.request_with_retry(
             Routes::ValidateFile,
             RequestType::Post,
             Some(json!(body)),
@@ -382,9 +377,9 @@ impl ApiClient {
     /// # Returns
     ///
     /// * `Result<String, ApiError>` - the upload uri
-    async fn create_multipart_upload(&mut self, rpath: &Path) -> Result<String, ApiError> {
+    async fn create_multipart_upload(&mut self, rpath: &str) -> Result<String, ApiError> {
         let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), rpath.to_str().unwrap().to_string());
+        query_params.insert("path".to_string(), rpath.to_string());
 
         let result = self
             .request_with_retry(
@@ -396,11 +391,11 @@ impl ApiClient {
             )
             .await?;
 
-        let upload_uri = result["upload_uri"]
+        let session_uri = result["upload_uri"]
             .as_str()
             .ok_or_else(|| ApiError::Error("Failed to get upload uri".to_string()))?;
 
-        Ok(upload_uri.to_string())
+        Ok(session_uri.to_string())
     }
 
     async fn upload_file_in_chunks(
@@ -429,7 +424,9 @@ impl ApiClient {
         let chunk_count = (file_size + chunk_size - 1) / chunk_size;
         let size_of_last_chunk = file_size % chunk_size;
 
-        let session_uri = self.create_multipart_upload(rpath).await?;
+        let session_uri = self
+            .create_multipart_upload(rpath.to_str().unwrap())
+            .await?;
         let mut futures = Vec::new();
 
         for chunk_index in 0..chunk_count {
@@ -442,7 +439,7 @@ impl ApiClient {
             let first_byte = chunk_index * chunk_size;
             let last_byte = first_byte + this_chunk - 1;
             let client = self.clone();
-            let upload_uri = session_uri.clone();
+            let cloned_session_uri = session_uri.clone();
             let cloned_lpath = cloned_lpath.clone();
             let total_size = file_size.clone();
 
@@ -463,7 +460,7 @@ impl ApiClient {
                     chunk_size,
                     first_byte,
                     last_byte,
-                    &upload_uri,
+                    &cloned_session_uri,
                     total_size,
                 )
                 .await?;
@@ -475,8 +472,7 @@ impl ApiClient {
 
         join_all(futures).await;
 
-        // need to add logic to combine the parts
-        MultiPartUploader::validate_file(client, upload_uri, total_size, total_chunks)
+        MultiPartUploader::validate_file(self, &session_uri, file_size, chunk_count).await?;
 
         Ok(())
     }
@@ -586,7 +582,7 @@ impl ApiClient {
     }
 
     async fn download_to_file(
-        &self,
+        &mut self,
         route: Routes,
         local_path: PathBuf,
         read_path: PathBuf,
@@ -667,9 +663,8 @@ impl ApiClient {
         loop {
             attempts += 1;
 
-            let client = self.clone();
-            response = client
-                .download_to_file(route, local_path.clone(), read_path.clone())
+            response = self
+                .download_to_file(route.clone(), local_path.clone(), read_path.clone())
                 .await;
 
             if response.is_ok() || attempts >= max_attempts {
@@ -834,12 +829,38 @@ impl StorageClient for HttpStorageClient {
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError> {
         let local_path = PathBuf::from(local_path);
         let remote_path = PathBuf::from(remote_path);
+        let mut client = self.client.clone();
 
-        let response = self
-            .client
+        let _response = client
             .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+        let mut client = self.client.clone();
+
+        let response = client.create_multipart_upload(path).await.map_err(|e| {
+            StorageError::Error(format!("Failed to create multipart upload: {}", e))
+        })?;
+
+        Ok(response)
+    }
+
+    async fn upload_file_in_chunks(
+        &self,
+        local_path: &Path,
+        remote_path: &Path,
+        chunk_size: Option<u64>,
+    ) -> Result<(), StorageError> {
+        let mut client = self.client.clone();
+
+        client
+            .upload_file_in_chunks(local_path, remote_path, chunk_size)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to upload file: {}", e)))?;
 
         Ok(())
     }

@@ -113,11 +113,6 @@ pub trait FileSystem<T: StorageClient> {
     fn client(&self) -> &T;
     async fn new(settings: StorageSettings) -> Self;
 
-    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
-        let stripped_path = path.strip_path(self.client().bucket().await);
-        self.client().create_multipart_upload(&stripped_path).await
-    }
-
     async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
         let stripped_path = path.strip_path(self.client().bucket().await);
         self.client().find(stripped_path.to_str().unwrap()).await
