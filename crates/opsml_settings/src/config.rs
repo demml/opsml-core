@@ -115,7 +115,7 @@ impl OpsmlConfig {
         }
     }
 
-    pub fn is_tracking_local(&self) -> bool {
+    pub fn is_using_http(&self) -> bool {
         !self
             .opsml_tracking_uri
             .to_lowercase()
@@ -124,7 +124,7 @@ impl OpsmlConfig {
     }
 
     pub fn storage_root(&self) -> String {
-        if self.is_tracking_local() {
+        if self.is_using_http() {
             let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
             if storage_uri_lower.starts_with("gs://") {
                 // strip the gs:// prefix

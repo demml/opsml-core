@@ -16,15 +16,19 @@ pub struct StorageSettings {
     pub storage_uri: String,
 
     #[pyo3(get)]
+    pub using_http: bool,
+
+    #[pyo3(get)]
     pub kwargs: HashMap<String, String>,
 }
 
 #[pymethods]
 impl StorageSettings {
     #[new]
-    pub fn new(storage_uri: String, kwargs: HashMap<String, String>) -> Self {
+    pub fn new(storage_uri: String, using_http: bool, kwargs: HashMap<String, String>) -> Self {
         StorageSettings {
             storage_uri,
+            using_http,
             kwargs,
         }
     }
@@ -34,6 +38,7 @@ impl Default for StorageSettings {
     fn default() -> Self {
         StorageSettings {
             storage_uri: "".to_string(),
+            using_http: false,
             kwargs: HashMap::new(),
         }
     }

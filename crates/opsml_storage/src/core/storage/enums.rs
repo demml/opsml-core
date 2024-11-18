@@ -1,3 +1,4 @@
+use crate::core::http_client::client::HttpFSStorageClient;
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
@@ -19,6 +20,7 @@ pub enum StorageClientEnum {
     #[cfg(feature = "aws_storage")]
     AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
+    HTTP(HttpFSStorageClient),
 }
 
 impl StorageClientEnum {
@@ -29,6 +31,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
+            StorageClientEnum::HTTP(client) => client.name(),
         }
     }
     // Implement the required methods for the StorageClient trait
@@ -36,6 +39,10 @@ impl StorageClientEnum {
     pub async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
         // match start of storage uri with starts_with("gs://") or starts_with("s3://")
         // to determine the storage type
+        if settings.using_http {
+            let client = HttpFSStorageClient::new(settings).await;
+            return Ok(StorageClientEnum::HTTP(client));
+        }
 
         match settings.storage_uri {
             #[cfg(feature = "google_storage")]
@@ -64,6 +71,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
+            StorageClientEnum::HTTP(client) => client.find(path).await,
         }
     }
 
@@ -74,6 +82,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.find_info(path).await,
             StorageClientEnum::Local(client) => client.find_info(path).await,
+            StorageClientEnum::HTTP(client) => client.find_info(path).await,
         }
     }
 
@@ -89,6 +98,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
+            StorageClientEnum::HTTP(client) => client.get(lpath, rpath, recursive).await,
         }
     }
 
@@ -104,6 +114,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
+            StorageClientEnum::HTTP(client) => client.put(lpath, rpath, recursive).await,
         }
     }
 
@@ -114,6 +125,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
+            StorageClientEnum::HTTP(client) => client.copy(src, dest, recursive).await,
         }
     }
 
@@ -124,6 +136,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
+            StorageClientEnum::HTTP(client) => client.rm(path, recursive).await,
         }
     }
 
@@ -134,6 +147,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
+            StorageClientEnum::HTTP(client) => client.exists(path).await,
         }
     }
 
@@ -152,6 +166,9 @@ impl StorageClientEnum {
             StorageClientEnum::Local(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
+            StorageClientEnum::HTTP(client) => {
+                client.generate_presigned_url(path, expiration).await
+            }
         }
     }
 
@@ -162,6 +179,7 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.create_multipart_upload(path).await,
             StorageClientEnum::Local(client) => client.create_multipart_upload(path).await,
+            StorageClientEnum::HTTP(client) => client.create_multipart_upload(path).await,
         }
     }
 }
