@@ -93,7 +93,7 @@ impl MultiPartUploader {
 
         let filename = format!("chunk_{}", chunk_index);
 
-        let rpath = Path::new(upload_uri
+        let rpath = Path::new(rpath).
 
         let part = Part::stream_with_length(data, chunk_size)
             .file_name(format!("chunk_{}", chunk_index))
@@ -587,7 +587,7 @@ impl ApiClient {
 
     async fn download_to_file(
         &self,
-        route: &str,
+        route: Routes,
         local_path: PathBuf,
         read_path: PathBuf,
     ) -> Result<Value, ApiError> {
@@ -615,7 +615,7 @@ impl ApiClient {
         // Make streaming GET request
         let response = self
             .client
-            .get(format!("{}/{}", self.base_url, route))
+            .get(format!("{}/{}", self.base_url, route.as_str()))
             .headers(headers)
             .bearer_auth(self.auth_token.clone().unwrap_or_default())
             .send()
@@ -656,7 +656,7 @@ impl ApiClient {
 
     pub async fn download_to_file_with_retry(
         &mut self,
-        route: &str,
+        route: Routes,
         local_path: PathBuf,
         read_path: PathBuf,
     ) -> Result<Value, ApiError> {
