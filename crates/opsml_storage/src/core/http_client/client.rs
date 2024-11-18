@@ -1,26 +1,26 @@
-use crate::core::storage::local::LocalStorageClient;
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::{FileInfo, StorageClient, StorageSettings};
+use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
 use futures::future::join_all;
 use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
-use google_cloud_storage::http::objects::upload;
 use reqwest::multipart::{Form, Part};
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
     Body, Client,
 };
-use serde::Serialize;
+
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
+
 use tokio::fs::File;
-use tokio::task::JoinHandle;
+use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 const TIMEOUT_SECS: u64 = 30;
@@ -32,6 +32,7 @@ pub enum RequestType {
     Get,
     Post,
     Put,
+    Delete,
 }
 
 #[derive(Debug, Clone)]
@@ -307,6 +308,16 @@ impl ApiClient {
                 .put(format!("{}/{}", self.base_url, route.as_str()))
                 .headers(headers)
                 .json(&body_params)
+                .send()
+                .await
+                .map_err(|e| {
+                    ApiError::Error(format!("Failed to send request with error: {}", e))
+                })?,
+            RequestType::Delete => self
+                .client
+                .delete(format!("{}/{}", self.base_url, route.as_str()))
+                .headers(headers)
+                .query(&query_params)
                 .send()
                 .await
                 .map_err(|e| {
@@ -695,8 +706,7 @@ pub struct ApiClientArgs {
 }
 
 pub struct HttpStorageClient {
-    client: ApiClient,
-    storage_client: LocalStorageClient,
+    api_client: Arc<Mutex<ApiClient>>,
     pub bucket: PathBuf,
 }
 
@@ -749,23 +759,22 @@ impl StorageClient for HttpStorageClient {
 
         let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
 
-        let client = ApiClient::new(
-            api_kwargs.base_url,
-            api_kwargs.use_auth,
-            api_kwargs.path_prefix,
-            api_kwargs.username,
-            api_kwargs.password,
-            api_kwargs.token,
-        )
-        .await
-        .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
-
-        let storage_client = LocalStorageClient::new(settings).await?;
+        let client = Arc::new(Mutex::new(
+            ApiClient::new(
+                api_kwargs.base_url,
+                api_kwargs.use_auth,
+                api_kwargs.path_prefix,
+                api_kwargs.username,
+                api_kwargs.password,
+                api_kwargs.token,
+            )
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?,
+        ));
 
         Ok(Self {
-            client,
+            api_client: client,
             bucket,
-            storage_client,
         })
     }
 
@@ -773,9 +782,11 @@ impl StorageClient for HttpStorageClient {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
 
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
         // need to clone because self is borrowed
-        let mut client = self.client.clone();
-        let response = client
+        let response = api_client
             .request_with_retry(Routes::List, RequestType::Get, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
@@ -796,8 +807,10 @@ impl StorageClient for HttpStorageClient {
         params.insert("path".to_string(), path.to_string());
 
         // need to clone because self is borrowed
-        let mut client = self.client.clone();
-        let response = client
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
+        let response = api_client
             .request_with_retry(Routes::ListInfo, RequestType::Get, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
@@ -829,9 +842,11 @@ impl StorageClient for HttpStorageClient {
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError> {
         let local_path = PathBuf::from(local_path);
         let remote_path = PathBuf::from(remote_path);
-        let mut client = self.client.clone();
+        // Lock the Mutex to get mutable access to the ApiClient
 
-        let _response = client
+        let mut api_client = self.api_client.lock().await;
+
+        let _response = api_client
             .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
@@ -840,11 +855,15 @@ impl StorageClient for HttpStorageClient {
     }
 
     async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-        let mut client = self.client.clone();
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
 
-        let response = client.create_multipart_upload(path).await.map_err(|e| {
-            StorageError::Error(format!("Failed to create multipart upload: {}", e))
-        })?;
+        let response = api_client
+            .create_multipart_upload(path)
+            .await
+            .map_err(|e| {
+                StorageError::Error(format!("Failed to create multipart upload: {}", e))
+            })?;
 
         Ok(response)
     }
@@ -855,14 +874,84 @@ impl StorageClient for HttpStorageClient {
         remote_path: &Path,
         chunk_size: Option<u64>,
     ) -> Result<(), StorageError> {
-        let mut client = self.client.clone();
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
 
-        client
+        api_client
             .upload_file_in_chunks(local_path, remote_path, chunk_size)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to upload file: {}", e)))?;
 
         Ok(())
+    }
+
+    async fn copy_objects(&self, _source: &str, _destination: &str) -> Result<bool, StorageError> {
+        unimplemented!();
+    }
+
+    async fn copy_object(&self, _source: &str, _destination: &str) -> Result<bool, StorageError> {
+        unimplemented!();
+    }
+
+    async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
+        let mut params = HashMap::new();
+        params.insert("path".to_string(), path.to_string());
+        params.insert("recursive".to_string(), "false".to_string());
+
+        let _response = api_client
+            .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
+
+        Ok(true)
+    }
+
+    async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
+        let mut params = HashMap::new();
+        params.insert("path".to_string(), path.to_string());
+        params.insert("recursive".to_string(), "false".to_string());
+
+        let _response = api_client
+            .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
+
+        Ok(true)
+    }
+
+    async fn generate_presigned_url(
+        &self,
+        path: &str,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        unimplemented!()
+    }
+}
+
+pub struct HttpFSStorageClient {
+    client: HttpStorageClient,
+}
+
+#[async_trait]
+impl FileSystem<HttpStorageClient> for HttpFSStorageClient {
+    fn name(&self) -> &str {
+        "HttpFSStorageClient"
+    }
+
+    fn client(&self) -> &HttpStorageClient {
+        &self.client
+    }
+
+    async fn new(settings: StorageSettings) -> Self {
+        HttpFSStorageClient {
+            client: HttpStorageClient::new(settings).await.unwrap(),
+        }
     }
 }
 
