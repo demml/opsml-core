@@ -6,7 +6,11 @@ use opsml_storage::core::storage::enums::StorageClientEnum;
 
 pub async fn get_storage_system(config: &OpsmlConfig) -> Result<StorageClientEnum, anyhow::Error> {
     // we don't use http
-    let settings = StorageSettings::new(config.opsml_storage_uri.clone(), Default::default());
+    let settings = StorageSettings::new(
+        config.opsml_storage_uri.clone(),
+        config.is_using_client(),
+        Default::default(),
+    );
 
     StorageClientEnum::new(settings).await.with_context(|| {
         format!(

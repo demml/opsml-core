@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::{http::HeaderMap, response::IntoResponse};
+use opsml_storage::core::storage::base::UploadPartArgs;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -8,33 +9,27 @@ pub struct ResumableArgs {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ResumableId {
-    pub upload_uri: String,
+pub struct ResumableSession {
+    pub session_uri: String,
 }
 
 // Implement IntoResponse for Alive
-impl IntoResponse for ResumableId {
+impl IntoResponse for ResumableSession {
     fn into_response(self) -> axum::response::Response {
         Json(self).into_response()
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UploadPartArgs {
-    pub first_chunk: u64,
-    pub last_chunk: u64,
-    pub chunk_size: u64,
-    pub part_index: usize,
-    pub upload_uri: String,
-}
+pub struct UploadPartArgParser {}
 
-impl UploadPartArgs {
-    pub fn new(headers: HeaderMap) -> Self {
+impl UploadPartArgParser {
+    pub fn to_args(headers: HeaderMap) -> UploadPartArgs {
         // get headers from the request
         let chunk_size = headers
             .get("Chunk-Size")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<usize>().ok())
+            .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(0);
 
         let chunk_range = headers
@@ -54,23 +49,31 @@ impl UploadPartArgs {
             None => (0, 0),
         };
 
-        let part_index = headers
-            .get("Part-Index")
+        let part_number = headers
+            .get("Part-Number")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(0);
 
-        let upload_uri = headers
-            .get("Upload-Uri")
+        let session_uri = headers
+            .get("Session-Uri")
             .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
+            .unwrap_or("")
+            .to_string();
+
+        let rpath = headers
+            .get("Rpath")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
 
         UploadPartArgs {
             first_chunk,
             last_chunk,
-            chunk_size: chunk_size as u64,
-            part_index,
-            upload_uri: upload_uri.to_string(),
+            chunk_size,
+            part_number,
+            session_uri,
+            rpath,
         }
     }
 }

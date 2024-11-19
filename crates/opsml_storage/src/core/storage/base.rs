@@ -1,6 +1,8 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use aws_smithy_types::byte_stream::ByteStream;
+use futures::TryStream;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
@@ -16,7 +18,7 @@ pub struct StorageSettings {
     pub storage_uri: String,
 
     #[pyo3(get)]
-    pub using_http: bool,
+    pub using_client: bool,
 
     #[pyo3(get)]
     pub kwargs: HashMap<String, String>,
@@ -25,10 +27,10 @@ pub struct StorageSettings {
 #[pymethods]
 impl StorageSettings {
     #[new]
-    pub fn new(storage_uri: String, using_http: bool, kwargs: HashMap<String, String>) -> Self {
+    pub fn new(storage_uri: String, using_client: bool, kwargs: HashMap<String, String>) -> Self {
         StorageSettings {
             storage_uri,
-            using_http,
+            using_client,
             kwargs,
         }
     }
@@ -38,10 +40,19 @@ impl Default for StorageSettings {
     fn default() -> Self {
         StorageSettings {
             storage_uri: "".to_string(),
-            using_http: false,
+            using_client: false,
             kwargs: HashMap::new(),
         }
     }
+}
+
+pub struct UploadPartArgs {
+    pub first_chunk: u64,
+    pub last_chunk: u64,
+    pub chunk_size: u64,
+    pub part_number: usize,
+    pub rpath: String,
+    pub session_uri: String,
 }
 
 pub trait PathExt {
@@ -94,7 +105,6 @@ pub trait StorageClient: Sized {
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
-    async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError>;
     async fn upload_file_in_chunks(
         &self,
         local_path: &Path,
@@ -110,6 +120,13 @@ pub trait StorageClient: Sized {
         path: &str,
         expiration: u64,
     ) -> Result<String, StorageError>;
+
+    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+    where
+        S: TryStream + Send + Sync + Unpin + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+        ByteStream: From<S>;
 }
 
 #[async_trait]
@@ -254,11 +271,16 @@ pub trait FileSystem<T: StorageClient> {
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
             .await
     }
-
-    async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+    async fn put_stream<S>(&self, path: &Path, stream: S) -> Result<(), StorageError>
+    where
+        S: TryStream + Send + Sync + Unpin + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+        ByteStream: From<S>,
+    {
         let stripped_path = path.strip_path(self.client().bucket().await);
         self.client()
-            .create_multipart_upload(stripped_path.to_str().unwrap())
+            .put_stream_to_object(stripped_path.to_str().unwrap(), stream)
             .await
     }
 }

@@ -4,6 +4,9 @@ use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSet
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_sdk_s3::primitives::ByteStream;
+use bytes::Bytes;
+use futures::TryStream;
+use futures::TryStreamExt;
 use pyo3::prelude::*;
 use std::fs::{self};
 use std::io::Read;
@@ -11,6 +14,29 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use walkdir::WalkDir;
+
+pub struct LocalMultiPartUpload {
+    pub file: fs::File,
+}
+
+impl LocalMultiPartUpload {
+    pub async fn new(path: &Path) -> Self {
+        // create a new file
+        let file = fs::File::create(path)
+            .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))
+            .unwrap();
+
+        Self { file }
+    }
+
+    pub async fn write_chunk(&mut self, chunk: bytes::Bytes) -> Result<(), StorageError> {
+        self.file
+            .write_all(&chunk)
+            .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+
+        Ok(())
+    }
+}
 
 pub struct LocalStorageClient {
     pub bucket: PathBuf,
@@ -263,16 +289,36 @@ impl StorageClient for LocalStorageClient {
         Ok(true)
     }
 
-    async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+    where
+        S: TryStream + Send + Sync + Unpin + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+        ByteStream: From<S>,
+    {
         let full_path = self.bucket.join(path);
 
-        // check if parents path exists. If not, create it
         if let Some(parent) = full_path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
         }
 
-        Ok("ready".to_string())
+        let mut file = fs::File::create(&full_path)
+            .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
+
+        let mut pinned_stream = Box::pin(stream);
+
+        while let Some(chunk) = pinned_stream
+            .try_next()
+            .await
+            .map_err(|e| StorageError::Error(format!("Stream error: {}", e.into())))?
+        {
+            let bytes: bytes::Bytes = chunk.into();
+            file.write_all(&bytes)
+                .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+        }
+
+        Ok(())
     }
 }
 

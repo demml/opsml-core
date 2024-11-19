@@ -99,11 +99,36 @@ pub mod google_storage {
         }
     }
 
-    pub struct GoogleMultipartUploadClient {
+    pub struct GoogleMultipartUpload {
         pub client: ResumableUploadClient,
     }
 
-    impl GoogleMultipartUploadClient {
+    impl GoogleMultipartUpload {
+        pub async fn new(client: &Client, bucket: &str, path: &str) -> Result<Self, StorageError> {
+            let _filename = path.to_string();
+
+            let metadata = Object {
+                name: _filename.clone(),
+                content_type: Some("application/octet-stream".to_string()),
+                ..Default::default()
+            };
+
+            let result = client
+                .prepare_resumable_upload(
+                    &UploadObjectRequest {
+                        bucket: bucket.to_string(),
+                        ..Default::default()
+                    },
+                    &UploadType::Multipart(Box::new(metadata)),
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create resumable session: {}", e))
+                })?;
+
+            Ok(GoogleMultipartUpload { client: result })
+        }
+
         pub async fn get_next_chunk(
             &self,
             path: &Path,
@@ -328,13 +353,9 @@ pub mod google_storage {
                 chunk_count -= 1;
             }
 
-            let session_url = self
-                .create_multipart_upload(rpath.to_str().unwrap())
-                .await?;
-
-            let mut uploader = GoogleMultipartUploadClient {
-                client: ResumableUploadClient::new(session_url, self.http.clone()),
-            };
+            let mut uploader =
+                GoogleMultipartUpload::new(&self.client, &self.bucket, rpath.to_str().unwrap())
+                    .await?;
 
             let mut status = UploadStatus::NotStarted;
 
@@ -523,6 +544,46 @@ pub mod google_storage {
             Ok(true)
         }
 
+        /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        /// * `stream` - The stream of bytes to upload
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object name if successful
+        ///
+        ///
+
+        async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+        where
+            S: TryStream + Send + Sync + Unpin + 'static,
+            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+            bytes::Bytes: From<S::Ok>,
+        {
+            let filename = path.to_string();
+            let object_file = Media::new(filename);
+            let upload_type = UploadType::Simple(object_file);
+
+            self.client
+                .upload_streamed_object(
+                    &UploadObjectRequest {
+                        bucket: self.bucket.clone(),
+                        ..Default::default()
+                    },
+                    stream,
+                    &upload_type,
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
+
+            Ok(())
+        }
+    }
+
+    impl GoogleStorageClient {
         async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
             let _filename = path.to_string();
 
@@ -547,49 +608,6 @@ pub mod google_storage {
                 })?;
 
             Ok(result.url().to_string())
-        }
-    }
-
-    impl GoogleStorageClient {
-        /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
-        ///
-        /// # Arguments
-        ///
-        /// * `path` - The path to the object in the bucket
-        /// * `stream` - The stream of bytes to upload
-        ///
-        /// # Returns
-        ///
-        /// A Result with the object name if successful
-
-        pub async fn upload_stream_to_object<S>(
-            &self,
-            path: &str,
-            stream: S,
-        ) -> Result<String, StorageError>
-        where
-            S: TryStream + Send + Sync + 'static,
-            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-            bytes::Bytes: From<S::Ok>,
-        {
-            let filename = path.to_string();
-            let object_file = Media::new(filename);
-            let upload_type = UploadType::Simple(object_file);
-
-            let result = self
-                .client
-                .upload_streamed_object(
-                    &UploadObjectRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    },
-                    stream,
-                    &upload_type,
-                )
-                .await
-                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
-
-            Ok(result.name)
         }
 
         /// Get an object from the storage bucket and return a stream of bytes to pass to

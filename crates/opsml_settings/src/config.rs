@@ -115,7 +115,7 @@ impl OpsmlConfig {
         }
     }
 
-    pub fn is_using_http(&self) -> bool {
+    pub fn is_using_client(&self) -> bool {
         !self
             .opsml_tracking_uri
             .to_lowercase()
@@ -124,7 +124,7 @@ impl OpsmlConfig {
     }
 
     pub fn storage_root(&self) -> String {
-        if self.is_using_http() {
+        if self.is_using_client() {
             let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
             if storage_uri_lower.starts_with("gs://") {
                 // strip the gs:// prefix
@@ -217,13 +217,13 @@ mod tests {
             opsml_tracking_uri: "sqlite:///opsml.db".to_string(),
             ..Default::default()
         };
-        assert!(opsml_config.is_tracking_local());
+        assert!(opsml_config.is_using_client());
 
         let opsml_config = OpsmlConfig {
             opsml_tracking_uri: "http://localhost:5000".to_string(),
             ..Default::default()
         };
-        assert!(!opsml_config.is_tracking_local());
+        assert!(!opsml_config.is_using_client());
 
         cleanup();
     }

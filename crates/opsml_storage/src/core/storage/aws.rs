@@ -1,7 +1,7 @@
 #[cfg(feature = "aws_storage")]
 pub mod aws_storage {
     use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
+        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, UploadPartArgs,
     };
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
@@ -13,12 +13,16 @@ pub mod aws_storage {
     use aws_sdk_s3::primitives::Length;
     use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
     use aws_sdk_s3::Client;
+    use futures::stream;
+    use futures::TryStream;
+    use google_cloud_storage::http::objects::upload;
     use pyo3::prelude::*;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str;
+    use tokio_util::io::StreamReader;
 
     const MAX_CHUNKS: u64 = 10000;
 
@@ -49,21 +53,27 @@ pub mod aws_storage {
     }
 
     impl AWSMulitPartUpload {
-        pub async fn new(
-            bucket: String,
-            path: String,
-            upload_id: String,
-        ) -> Result<Self, StorageError> {
+        pub async fn new(bucket: String, path: String) -> Result<Self, StorageError> {
             // create a resuable runtime for the multipart upload
 
             let creds = AWSCreds::new().await?;
             let client = Client::new(&creds.config);
 
+            let response = client
+                .create_multipart_upload()
+                .bucket(&bucket)
+                .key(&path)
+                .send()
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Failed to create multipart upload: {}", e))
+                })?;
+
             Ok(Self {
                 client,
                 bucket,
                 path,
-                upload_id,
+                upload_id: response.upload_id.unwrap(),
                 upload_parts: Vec::new(),
             })
         }
@@ -455,16 +465,9 @@ pub mod aws_storage {
                 chunk_count -= 1;
             }
 
-            let upload_id = self
-                .create_multipart_upload(rpath.to_str().unwrap())
-                .await?;
-
-            let mut uploader = AWSMulitPartUpload::new(
-                self.bucket.clone(),
-                rpath.to_str().unwrap().to_string(),
-                upload_id,
-            )
-            .await?;
+            let mut uploader =
+                AWSMulitPartUpload::new(self.bucket.clone(), rpath.to_str().unwrap().to_string())
+                    .await?;
 
             for chunk_index in 0..chunk_count {
                 let this_chunk = if chunk_count - 1 == chunk_index {
@@ -476,6 +479,7 @@ pub mod aws_storage {
                 let stream = uploader
                     .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
                     .await?;
+
                 let part_number = (chunk_index as i32) + 1;
                 uploader.upload_part(part_number, stream).await?;
             }
@@ -485,20 +489,26 @@ pub mod aws_storage {
             Ok(())
         }
 
-        async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-            let response = self
-                .client
-                .create_multipart_upload()
+        async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+        where
+            S: TryStream + Send + Sync + Unpin + 'static,
+            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+            bytes::Bytes: From<S::Ok>,
+            ByteStream: From<S>,
+        {
+            self.client
+                .put_object()
                 .bucket(&self.bucket)
                 .key(path)
+                .body(ByteStream::from(stream))
                 .send()
                 .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Failed to create multipart upload: {}", e))
-                })?;
+                .map_err(|e| StorageError::Error(format!("Failed to put object: {}", e)))?;
 
-            Ok(response.upload_id.unwrap())
+            Ok(())
         }
+
+        // put object stream
     }
 
     impl AWSStorageClient {

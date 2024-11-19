@@ -4,6 +4,8 @@ use crate::core::http_client::client::HttpFSStorageClient;
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
 use crate::core::storage::local::LocalFSStorageClient;
 use crate::core::utils::error::StorageError;
+use aws_smithy_types::byte_stream::ByteStream;
+use futures::TryStream;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -39,7 +41,7 @@ impl StorageClientEnum {
     pub async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
         // match start of storage uri with starts_with("gs://") or starts_with("s3://")
         // to determine the storage type
-        if settings.using_http {
+        if settings.using_client {
             let client = HttpFSStorageClient::new(settings).await;
             return Ok(StorageClientEnum::HTTP(client));
         }
@@ -172,14 +174,20 @@ impl StorageClientEnum {
         }
     }
 
-    pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+    pub async fn put_stream<S>(&self, path: &Path, stream: S) -> Result<(), StorageError>
+    where
+        S: TryStream + Send + Sync + Unpin + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+        ByteStream: From<S>,
+    {
         match self {
             #[cfg(feature = "google_storage")]
-            StorageClientEnum::Google(client) => client.create_multipart_upload(path).await,
+            StorageClientEnum::Google(client) => client.put_stream(path, stream).await,
             #[cfg(feature = "aws_storage")]
-            StorageClientEnum::AWS(client) => client.create_multipart_upload(path).await,
-            StorageClientEnum::Local(client) => client.create_multipart_upload(path).await,
-            StorageClientEnum::HTTP(client) => client.create_multipart_upload(path).await,
+            StorageClientEnum::AWS(client) => client.put_stream(path, stream).await,
+            StorageClientEnum::Local(client) => client.put_stream(path, stream).await,
+            StorageClientEnum::HTTP(client) => client.put_stream(path, stream).await,
         }
     }
 }

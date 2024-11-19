@@ -1,17 +1,19 @@
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
+use crate::core::storage::base::{
+    FileInfo, FileSystem, StorageClient, StorageSettings, UploadPartArgs,
+};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
 use futures::future::join_all;
 use futures::stream::TryStreamExt;
+use futures::TryStream;
 use reqwest::multipart::{Form, Part};
 use reqwest::{
     header::{self, HeaderMap, HeaderValue},
     Body, Client,
 };
-
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
@@ -78,10 +80,11 @@ impl MultiPartUploader {
     pub async fn upload_part(
         client: ApiClient,
         chunk: ByteStream,
+        rpath: &str,
         chunk_index: u64,
         chunk_size: u64,
-        first_chunk: u64,
-        last_chunk: u64,
+        first_byte: u64,
+        last_byte: u64,
         session_uri: &str,
         total_size: u64,
     ) -> Result<(), ApiError> {
@@ -110,14 +113,21 @@ impl MultiPartUploader {
         );
 
         headers.insert(
+            "RPath",
+            HeaderValue::from_str(&rpath.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create content length header: {}", e))
+            })?,
+        );
+
+        headers.insert(
             "Chunk-Range",
-            HeaderValue::from_str(&format!("{}/{}", first_chunk, last_chunk)).map_err(|e| {
+            HeaderValue::from_str(&format!("{}/{}", first_byte, last_byte)).map_err(|e| {
                 ApiError::Error(format!("Failed to create content range header: {}", e))
             })?,
         );
 
         headers.insert(
-            "Part-Index",
+            "Part-Number",
             HeaderValue::from_str(&format!("{}", chunk_index)).map_err(|e| {
                 ApiError::Error(format!("Failed to create content range header: {}", e))
             })?,
@@ -401,9 +411,9 @@ impl ApiClient {
             )
             .await?;
 
-        let session_uri = result["upload_uri"]
+        let session_uri = result["session_uri"]
             .as_str()
-            .ok_or_else(|| ApiError::Error("Failed to get upload uri".to_string()))?;
+            .ok_or_else(|| ApiError::Error("Failed to get resumable id".to_string()))?;
 
         Ok(session_uri.to_string())
     }
@@ -452,9 +462,10 @@ impl ApiClient {
             let cloned_session_uri = session_uri.clone();
             let cloned_lpath = cloned_lpath.clone();
             let total_size = file_size.clone();
+            let cloned_rpath = rpath.to_str().unwrap().to_string();
 
             let future = tokio::spawn(async move {
-                let stream = MultiPartUploader::get_next_chunk(
+                let chunk = MultiPartUploader::get_next_chunk(
                     Path::new(&cloned_lpath),
                     chunk_size,
                     chunk_index,
@@ -465,7 +476,8 @@ impl ApiClient {
 
                 MultiPartUploader::upload_part(
                     client,
-                    stream,
+                    chunk,
+                    &cloned_rpath,
                     chunk_index,
                     chunk_size,
                     first_byte,
@@ -526,7 +538,7 @@ impl ApiClient {
         );
 
         headers.insert(
-            "WRITE_PATH",
+            "Write-Path",
             HeaderValue::from_str(&file_name).map_err(|e| {
                 ApiError::Error(format!("Failed to create write path header: {}", e))
             })?,
@@ -853,20 +865,6 @@ impl StorageClient for HttpStorageClient {
         Ok(())
     }
 
-    async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
-        let response = api_client
-            .create_multipart_upload(path)
-            .await
-            .map_err(|e| {
-                StorageError::Error(format!("Failed to create multipart upload: {}", e))
-            })?;
-
-        Ok(response)
-    }
-
     async fn upload_file_in_chunks(
         &self,
         local_path: &Path,
@@ -929,6 +927,16 @@ impl StorageClient for HttpStorageClient {
         __path: &str,
         __expiration: u64,
     ) -> Result<String, StorageError> {
+        unimplemented!()
+    }
+
+    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+    where
+        S: TryStream + Send + Sync + Unpin + 'static,
+        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+        bytes::Bytes: From<S::Ok>,
+        ByteStream: From<S>,
+    {
         unimplemented!()
     }
 }
