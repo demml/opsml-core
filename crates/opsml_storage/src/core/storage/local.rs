@@ -4,6 +4,7 @@ use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSet
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_smithy_types::byte_stream::Length;
 use futures::TryStream;
 use futures::TryStreamExt;
 use pyo3::prelude::*;
@@ -32,6 +33,24 @@ impl LocalMultiPartUpload {
             .unwrap();
 
         Self { file }
+    }
+
+    pub async fn get_next_chunk(
+        &self,
+        path: &Path,
+        chunk_size: u64,
+        chunk_index: u64,
+        this_chunk_size: u64,
+    ) -> Result<ByteStream, StorageError> {
+        let stream = ByteStream::read_from()
+            .path(path)
+            .offset(chunk_index * chunk_size)
+            .length(Length::Exact(this_chunk_size))
+            .build()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
+
+        Ok(stream)
     }
 
     pub async fn upload_part(&mut self, chunk: bytes::Bytes) -> Result<bool, StorageError> {

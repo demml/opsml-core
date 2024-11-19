@@ -1,4 +1,5 @@
 // create pyo3 async iterator
+use crate::core::storage::enums::MultiPartUploader;
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
@@ -107,6 +108,7 @@ pub trait StorageClient: Sized {
         local_path: &Path,
         remote_path: &Path,
         chunk_size: Option<u64>,
+        uploader: MultiPartUploader,
     ) -> Result<(), StorageError>;
     async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
     async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError>;

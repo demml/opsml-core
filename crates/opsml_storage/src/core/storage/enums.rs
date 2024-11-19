@@ -58,6 +58,38 @@ impl MultiPartUploader {
         }
     }
 
+    pub async fn get_next_chunk(
+        &self,
+        path: &Path,
+        chunk_size: u64,
+        chunk_index: u64,
+        this_chunk_size: u64,
+    ) -> Result<ByteStream, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            MultiPartUploader::Local(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+                unimplemented!()
+            }
+        }
+    }
+
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
         match self {
             #[cfg(feature = "google_storage")]

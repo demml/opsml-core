@@ -4,6 +4,7 @@ pub mod google_storage {
     use crate::core::storage::base::{
         get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
     };
+    use crate::core::storage::enums::MultiPartUploader;
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_smithy_types::byte_stream::ByteStream;
@@ -345,6 +346,7 @@ pub mod google_storage {
             lpath: &Path,
             rpath: &Path,
             chunk_size: Option<u64>,
+            mut uploader: MultiPartUploader,
         ) -> Result<(), StorageError> {
             let file = File::open(lpath)
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
@@ -371,10 +373,6 @@ pub mod google_storage {
                 chunk_count -= 1;
             }
 
-            let mut uploader =
-                GoogleMultipartUpload::new(&self.client, &self.bucket, rpath.to_str().unwrap())
-                    .await?;
-
             for chunk_index in 0..chunk_count {
                 let this_chunk = if chunk_count - 1 == chunk_index {
                     size_of_last_chunk
@@ -389,8 +387,9 @@ pub mod google_storage {
                     .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
                     .await?;
 
+                let part_number = (chunk_index as i32) + 1;
                 uploader
-                    .upload_part(stream, &first_byte, &last_byte, &file_size)
+                    .upload_part(&first_byte, &last_byte, &part_number, &file_size, stream)
                     .await?;
             } // extract the range from the result and update the first_byte and last_byte
 
@@ -633,11 +632,30 @@ pub mod google_storage {
             Ok(result)
         }
 
-        pub async fn create_multipart_upload(
-            &self,
-            path: &str,
-        ) -> Result<GoogleMultipartUpload, StorageError> {
-            Ok(GoogleMultipartUpload::new(&self.client, &self.bucket, path).await?)
+        pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+            let _filename = path.to_string();
+
+            let metadata = Object {
+                name: _filename.clone(),
+                content_type: Some("application/octet-stream".to_string()),
+                ..Default::default()
+            };
+
+            let result = self
+                .client
+                .prepare_resumable_upload(
+                    &UploadObjectRequest {
+                        bucket: self.bucket.to_string(),
+                        ..Default::default()
+                    },
+                    &UploadType::Multipart(Box::new(metadata)),
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Unable to create resumable session: {}", e))
+                })?;
+
+            Ok(result.url().to_string())
         }
     }
 
