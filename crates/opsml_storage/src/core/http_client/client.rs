@@ -57,6 +57,18 @@ impl Routes {
     }
 }
 
+pub struct HttpMultiPartUpload {}
+
+impl HttpMultiPartUpload {
+    pub async fn new() -> Self {
+        unimplemented!()
+    }
+
+    pub async fn write_chunk(&mut self) -> Result<(), StorageError> {
+        unimplemented!()
+    }
+}
+
 pub struct MultiPartUploader {}
 
 impl MultiPartUploader {
@@ -938,6 +950,12 @@ impl StorageClient for HttpStorageClient {
         ByteStream: From<S>,
     {
         unimplemented!()
+    }
+}
+
+impl HttpStorageClient {
+    pub async fn create_multipart_upload(&self) -> Result<HttpMultiPartUpload, StorageError> {
+        Ok(HttpMultiPartUpload::new().await)
     }
 }
 

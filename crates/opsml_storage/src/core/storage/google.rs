@@ -584,32 +584,6 @@ pub mod google_storage {
     }
 
     impl GoogleStorageClient {
-        async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-            let _filename = path.to_string();
-
-            let metadata = Object {
-                name: _filename.clone(),
-                content_type: Some("application/octet-stream".to_string()),
-                ..Default::default()
-            };
-
-            let result = self
-                .client
-                .prepare_resumable_upload(
-                    &UploadObjectRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    },
-                    &UploadType::Multipart(Box::new(metadata)),
-                )
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Unable to create resumable session: {}", e))
-                })?;
-
-            Ok(result.url().to_string())
-        }
-
         /// Get an object from the storage bucket and return a stream of bytes to pass to
         /// an async iterator
         ///
@@ -641,6 +615,13 @@ pub mod google_storage {
                 .await
                 .map_err(|e| StorageError::Error(format!("Unable to download object: {}", e)))?;
             Ok(result)
+        }
+
+        pub async fn create_multipart_upload(
+            &self,
+            path: &str,
+        ) -> Result<(GoogleMultipartUpload), StorageError> {
+            Ok(GoogleMultipartUpload::new(&self.client, &self.bucket, path).await?)
         }
     }
 

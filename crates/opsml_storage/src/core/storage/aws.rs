@@ -7,6 +7,7 @@ pub mod aws_storage {
     use async_trait::async_trait;
     use aws_config::BehaviorVersion;
     use aws_config::SdkConfig;
+    use aws_sdk_s3::operation::create_multipart_upload;
     use aws_sdk_s3::operation::get_object::GetObjectOutput;
     use aws_sdk_s3::presigning::PresigningConfig;
     use aws_sdk_s3::primitives::ByteStream;
@@ -535,6 +536,13 @@ pub mod aws_storage {
                 .await
                 .map_err(|e| StorageError::Error(format!("Failed to get object stream: {}", e)))?;
             Ok(response)
+        }
+
+        pub async fn create_multipart_upload(
+            &self,
+            path: &str,
+        ) -> Result<(AWSMulitPartUpload), StorageError> {
+            Ok(AWSMulitPartUpload::new(self.bucket.clone(), path.to_string()).await?)
         }
     }
 

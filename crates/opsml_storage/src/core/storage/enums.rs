@@ -1,8 +1,8 @@
-use crate::core::http_client::client::HttpFSStorageClient;
+use crate::core::http_client::client::{HttpFSStorageClient, HttpMultiPartUpload};
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
-use crate::core::storage::local::LocalFSStorageClient;
+use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
 use crate::core::utils::error::StorageError;
 use aws_smithy_types::byte_stream::ByteStream;
 use futures::TryStream;
@@ -11,10 +11,19 @@ use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "google_storage")]
-use crate::core::storage::google::google_storage::GCSFSStorageClient;
+use crate::core::storage::google::google_storage::{GCSFSStorageClient, GoogleMultipartUpload};
 
 #[cfg(feature = "aws_storage")]
-use crate::core::storage::aws::aws_storage::S3FStorageClient;
+use crate::core::storage::aws::aws_storage::{AWSMulitPartUpload, S3FStorageClient};
+
+pub enum MultiPartUploader {
+    #[cfg(feature = "google_storage")]
+    Google(GoogleMultipartUpload),
+    #[cfg(feature = "aws_storage")]
+    AWS(AWSMulitPartUpload),
+    Local(LocalMultiPartUpload),
+    HTTP(HttpMultiPartUpload),
+}
 
 pub enum StorageClientEnum {
     #[cfg(feature = "google_storage")]
@@ -188,6 +197,41 @@ impl StorageClientEnum {
             StorageClientEnum::AWS(client) => client.put_stream(path, stream).await,
             StorageClientEnum::Local(client) => client.put_stream(path, stream).await,
             StorageClientEnum::HTTP(client) => client.put_stream(path, stream).await,
+        }
+    }
+
+    pub async fn create_multipart_upload(
+        &self,
+        path: &Path,
+    ) -> Result<MultiPartUploader, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            StorageClientEnum::Google(client) => {
+                let uploader = client
+                    .client()
+                    .create_multipart_upload(path.to_str().unwrap())
+                    .await?;
+                Ok(MultiPartUploader::Google(uploader))
+            }
+            #[cfg(feature = "aws_storage")]
+            StorageClientEnum::AWS(client) => {
+                let uploader = client
+                    .client()
+                    .create_multipart_upload(path.to_str().unwrap())
+                    .await?;
+                Ok(MultiPartUploader::AWS(uploader))
+            }
+            StorageClientEnum::Local(client) => {
+                let uploader = client
+                    .client()
+                    .create_multipart_upload(path.to_str().unwrap())
+                    .await?;
+                Ok(MultiPartUploader::Local(uploader))
+            }
+            StorageClientEnum::HTTP(client) => {
+                let uploader = client.client().create_multipart_upload().await?;
+                Ok(MultiPartUploader::HTTP(uploader))
+            }
         }
     }
 }
