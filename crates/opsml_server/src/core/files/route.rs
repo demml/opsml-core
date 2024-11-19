@@ -119,3 +119,71 @@ pub async fn upload_file(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::setup::setup_components;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        Router,
+    };
+
+    use std::sync::Arc;
+    use tower::ServiceExt; // for `oneshot` method
+
+    async fn setup() -> Router {
+        let (config, storage_client) = setup_components().await.unwrap();
+
+        let state = Arc::new(AppState::new(storage_client, config));
+        Router::new()
+            .route("/upload", axum::routing::post(upload_file))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_success() {
+        let app = setup().await;
+
+        let multipart_body = Body::from("..."); // Replace with actual multipart body
+        let request = Request::builder()
+            .method("POST")
+            .uri("/upload")
+            .header("content-type", "multipart/form-data")
+            .body(multipart_body)
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    async fn test_upload_file_missing_headers() {
+        let app = setup().await;
+
+        let multipart_body = Body::from("..."); // Replace with actual multipart body
+        let request = Request::builder()
+            .method("POST")
+            .uri("/upload")
+            .body(multipart_body)
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    async fn test_upload_file_invalid_multipart() {
+        let app = setup().await;
+
+        let invalid_body = Body::from("invalid multipart body");
+        let request = Request::builder()
+            .method("POST")
+            .uri("/upload")
+            .header("content-type", "multipart/form-data")
+            .body(invalid_body)
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

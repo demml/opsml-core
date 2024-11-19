@@ -4,12 +4,10 @@ use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSet
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_sdk_s3::primitives::ByteStream;
-use bytes::Bytes;
 use futures::TryStream;
 use futures::TryStreamExt;
 use pyo3::prelude::*;
 use std::fs::{self};
-use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;

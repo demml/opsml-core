@@ -1,8 +1,6 @@
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::{
-    FileInfo, FileSystem, StorageClient, StorageSettings, UploadPartArgs,
-};
+use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
@@ -19,14 +17,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-
 use tokio::fs::File;
+
 use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 const TIMEOUT_SECS: u64 = 30;
 
-const CHUNK_SIZE: usize = 1024 * 1024;
+const CHUNK_SIZE: usize = 1024 * 1024 * 5;
 
 #[derive(Debug, Clone)]
 pub enum RequestType {
@@ -436,77 +434,55 @@ impl ApiClient {
         rpath: &Path,
         chunk_size: Option<u64>,
     ) -> Result<(), ApiError> {
-        let cloned_lpath = lpath.to_path_buf();
+        let chunk_size = chunk_size.unwrap_or(CHUNK_SIZE as u64);
+        let file_size = lpath.metadata().unwrap().len();
 
+        let token = self.auth_token.clone().unwrap_or_default();
+        let mut headers = HeaderMap::new();
+
+        // add chunk size, chunk index, and upload uri to headers
+        headers.insert(
+            "Chunk-Size",
+            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create content length header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Path",
+            HeaderValue::from_str(rpath.to_str().unwrap()).map_err(|e| {
+                ApiError::Error(format!("Failed to create content length header: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "File-Size",
+            HeaderValue::from_str(&file_size.to_string()).map_err(|e| {
+                ApiError::Error(format!("Failed to create total size header: {}", e))
+            })?,
+        );
+
+        // create a multipart form from lpath
+        // Open the file and create a stream from it
         let file = File::open(lpath)
             .await
             .map_err(|e| ApiError::Error(format!("Failed to open file: {}", e)))?;
+        let stream = FramedRead::new(file, BytesCodec::new())
+            .map_ok(|bytes| bytes.freeze())
+            .map_err(|e| ApiError::Error(format!("Failed to create stream: {}", e)));
 
-        let metadata = file
-            .metadata()
+        let body = Body::wrap_stream(stream);
+        let form = Form::new().part("file", Part::stream(body));
+
+        let _response = self
+            .client
+            .post(format!("{}/{}", self.base_url, Routes::Multipart.as_str()))
+            .headers(headers)
+            .bearer_auth(token)
+            .multipart(form)
+            .send()
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-
-        // Set chunk size to 5MB if None, or to file size if greater than file size
-        let chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5).min(file_size);
-
-        // Calculate the number of parts
-        let chunk_count = (file_size + chunk_size - 1) / chunk_size;
-        let size_of_last_chunk = file_size % chunk_size;
-
-        let session_uri = self
-            .create_multipart_upload(rpath.to_str().unwrap())
-            .await?;
-        let mut futures = Vec::new();
-
-        for chunk_index in 0..chunk_count {
-            let this_chunk = if chunk_index == chunk_count - 1 && size_of_last_chunk != 0 {
-                size_of_last_chunk
-            } else {
-                chunk_size
-            };
-
-            let first_byte = chunk_index * chunk_size;
-            let last_byte = first_byte + this_chunk - 1;
-            let client = self.clone();
-            let cloned_session_uri = session_uri.clone();
-            let cloned_lpath = cloned_lpath.clone();
-            let total_size = file_size.clone();
-            let cloned_rpath = rpath.to_str().unwrap().to_string();
-
-            let future = tokio::spawn(async move {
-                let chunk = MultiPartUploader::get_next_chunk(
-                    Path::new(&cloned_lpath),
-                    chunk_size,
-                    chunk_index,
-                    this_chunk,
-                )
-                .await
-                .map_err(|e| ApiError::Error(format!("Failed to get next chunk: {}", e)))?;
-
-                MultiPartUploader::upload_part(
-                    client,
-                    chunk,
-                    &cloned_rpath,
-                    chunk_index,
-                    chunk_size,
-                    first_byte,
-                    last_byte,
-                    &cloned_session_uri,
-                    total_size,
-                )
-                .await?;
-                Ok::<(), ApiError>(())
-            });
-
-            futures.push(future);
-        }
-
-        join_all(futures).await;
-
-        MultiPartUploader::validate_file(self, &session_uri, file_size, chunk_count).await?;
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
 
         Ok(())
     }
@@ -942,7 +918,7 @@ impl StorageClient for HttpStorageClient {
         unimplemented!()
     }
 
-    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
+    async fn put_stream_to_object<S>(&self, _path: &str, _stream: S) -> Result<(), StorageError>
     where
         S: TryStream + Send + Sync + Unpin + 'static,
         S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,

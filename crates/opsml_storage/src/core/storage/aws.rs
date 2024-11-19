@@ -540,7 +540,7 @@ pub mod aws_storage {
         pub async fn create_multipart_upload(
             &self,
             path: &str,
-        ) -> Result<(AWSMulitPartUpload), StorageError> {
+        ) -> Result<AWSMulitPartUpload, StorageError> {
             Ok(AWSMulitPartUpload::new(self.bucket.clone(), path.to_string()).await?)
         }
     }

@@ -47,8 +47,6 @@ impl Default for StorageSettings {
 }
 
 pub struct UploadPartArgs {
-    pub first_chunk: u64,
-    pub last_chunk: u64,
     pub chunk_size: u64,
     pub file_size: u64,
     pub path: PathBuf,
