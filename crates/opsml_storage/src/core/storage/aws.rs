@@ -1,29 +1,28 @@
 #[cfg(feature = "aws_storage")]
 pub mod aws_storage {
     use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, UploadPartArgs,
+        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
     };
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_config::BehaviorVersion;
     use aws_config::SdkConfig;
-    use aws_sdk_s3::operation::create_multipart_upload;
+
     use aws_sdk_s3::operation::get_object::GetObjectOutput;
     use aws_sdk_s3::presigning::PresigningConfig;
     use aws_sdk_s3::primitives::ByteStream;
     use aws_sdk_s3::primitives::Length;
     use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
     use aws_sdk_s3::Client;
-    use futures::stream;
+
     use futures::TryStream;
-    use google_cloud_storage::http::objects::upload;
+
     use pyo3::prelude::*;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str;
-    use tokio_util::io::StreamReader;
 
     const MAX_CHUNKS: u64 = 10000;
 
@@ -106,7 +105,7 @@ pub mod aws_storage {
             Ok(true)
         }
 
-        pub async fn complete(&self) -> Result<(), StorageError> {
+        pub async fn complete_upload(&self) -> Result<(), StorageError> {
             let completed_multipart_upload: CompletedMultipartUpload =
                 CompletedMultipartUpload::builder()
                     .set_parts(Some(self.upload_parts.clone()))
@@ -485,7 +484,7 @@ pub mod aws_storage {
                 uploader.upload_part(part_number, stream).await?;
             }
 
-            uploader.complete().await?;
+            uploader.complete_upload().await?;
 
             Ok(())
         }

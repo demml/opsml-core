@@ -25,6 +25,54 @@ pub enum MultiPartUploader {
     HTTP(HttpMultiPartUpload),
 }
 
+impl MultiPartUploader {
+    pub async fn upload_part(
+        &mut self,
+        first_byte: &u64,
+        last_byte: &u64,
+        part_number: &i32,
+        total_size: &u64,
+        body: bytes::Bytes,
+    ) -> Result<bool, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => {
+                let stream = ByteStream::from(body);
+                uploader
+                    .upload_part(stream, first_byte, last_byte, total_size)
+                    .await?;
+                Ok(true)
+            }
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => {
+                let stream = ByteStream::from(body);
+                uploader.upload_part(*part_number, stream).await
+            }
+
+            MultiPartUploader::Local(uploader) => uploader.upload_part(body).await,
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+
+                Ok(false)
+            }
+        }
+    }
+
+    pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => uploader.complete_upload().await,
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => uploader.complete_upload().await,
+            MultiPartUploader::Local(uploader) => uploader.complete_upload().await,
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+                Ok(())
+            }
+        }
+    }
+}
+
 pub enum StorageClientEnum {
     #[cfg(feature = "google_storage")]
     Google(GCSFSStorageClient),

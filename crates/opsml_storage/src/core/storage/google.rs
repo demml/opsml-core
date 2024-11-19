@@ -101,6 +101,7 @@ pub mod google_storage {
 
     pub struct GoogleMultipartUpload {
         pub client: ResumableUploadClient,
+        pub upload_status: UploadStatus,
     }
 
     impl GoogleMultipartUpload {
@@ -126,7 +127,10 @@ pub mod google_storage {
                     StorageError::Error(format!("Unable to create resumable session: {}", e))
                 })?;
 
-            Ok(GoogleMultipartUpload { client: result })
+            Ok(GoogleMultipartUpload {
+                client: result,
+                upload_status: UploadStatus::NotStarted,
+            })
         }
 
         pub async fn get_next_chunk(
@@ -149,11 +153,11 @@ pub mod google_storage {
         pub async fn upload_part(
             &mut self,
             chunk: ByteStream,
-            first_byte: u64,
-            last_byte: u64,
-            total_size: u64,
-        ) -> Result<UploadStatus, StorageError> {
-            let size = ChunkSize::new(first_byte, last_byte, Some(total_size));
+            first_byte: &u64,
+            last_byte: &u64,
+            total_size: &u64,
+        ) -> Result<(), StorageError> {
+            let size = ChunkSize::new(*first_byte, *last_byte, Some(*total_size));
 
             let data = chunk
                 .collect()
@@ -172,7 +176,21 @@ pub mod google_storage {
                     ))
                 })?;
 
-            Ok(result)
+            self.upload_status = result;
+
+            Ok(())
+        }
+
+        pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
+            match self.upload_status {
+                UploadStatus::Ok(_) => {
+                    // complete the upload
+                    Ok(())
+                }
+                _ => Err(StorageError::Error(format!(
+                    "Failed to upload file in chunks",
+                ))),
+            }
         }
     }
 
@@ -357,8 +375,6 @@ pub mod google_storage {
                 GoogleMultipartUpload::new(&self.client, &self.bucket, rpath.to_str().unwrap())
                     .await?;
 
-            let mut status = UploadStatus::NotStarted;
-
             for chunk_index in 0..chunk_count {
                 let this_chunk = if chunk_count - 1 == chunk_index {
                     size_of_last_chunk
@@ -372,19 +388,19 @@ pub mod google_storage {
                 let stream = uploader
                     .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
                     .await?;
-                status = uploader
-                    .upload_part(stream, first_byte, last_byte, file_size)
+
+                uploader
+                    .upload_part(stream, &first_byte, &last_byte, &file_size)
                     .await?;
             } // extract the range from the result and update the first_byte and last_byte
 
-            match status {
+            match uploader.upload_status {
                 UploadStatus::Ok(_) => {
                     // complete the upload
                     Ok(())
                 }
                 _ => Err(StorageError::Error(format!(
-                    "Failed to upload file in chunks: {:?}",
-                    status
+                    "Failed to upload file in chunks"
                 ))),
             }
 
@@ -620,7 +636,7 @@ pub mod google_storage {
         pub async fn create_multipart_upload(
             &self,
             path: &str,
-        ) -> Result<(GoogleMultipartUpload), StorageError> {
+        ) -> Result<GoogleMultipartUpload, StorageError> {
             Ok(GoogleMultipartUpload::new(&self.client, &self.bucket, path).await?)
         }
     }

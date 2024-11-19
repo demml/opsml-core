@@ -2,6 +2,7 @@ use axum::Json;
 use axum::{http::HeaderMap, response::IntoResponse};
 use opsml_storage::core::storage::base::UploadPartArgs;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct ResumableArgs {
@@ -49,31 +50,25 @@ impl UploadPartArgParser {
             None => (0, 0),
         };
 
-        let part_number = headers
-            .get("Part-Number")
+        let file_size = headers
+            .get("File-Size")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<usize>().ok())
+            .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(0);
 
-        let session_uri = headers
-            .get("Session-Uri")
+        let path = headers
+            .get("File-Path")
             .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        let rpath = headers
-            .get("Rpath")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+            .map(|v| Path::new(v))
+            .unwrap_or(Path::new(""))
+            .to_path_buf();
 
         UploadPartArgs {
             first_chunk,
             last_chunk,
             chunk_size,
-            part_number,
-            session_uri,
-            rpath,
+            file_size,
+            path,
         }
     }
 }

@@ -1,11 +1,15 @@
 use crate::core::debug::route::debug_info;
+use crate::core::files::route::upload_file;
 use crate::core::health::route::health_check;
 use crate::core::state::AppState;
 use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
 };
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
@@ -26,6 +30,7 @@ pub async fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route(&format!("{}/healthcheck", ROUTE_PREFIX), get(health_check))
         .route(&format!("{}/debug", ROUTE_PREFIX), get(debug_info))
+        .route(&format!("{}/files", ROUTE_PREFIX), post(upload_file))
         .with_state(app_state)
         .layer(cors)
 }

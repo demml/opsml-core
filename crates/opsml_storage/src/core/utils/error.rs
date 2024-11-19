@@ -14,6 +14,9 @@ pub enum StorageError {
 
     #[error("Storage client failure. Unsupported client.")]
     UnsupportedClient,
+
+    #[error("Storage client failure. Unsupported operation.")]
+    UnsupportedOperation,
 }
 
 impl From<StorageError> for PyErr {

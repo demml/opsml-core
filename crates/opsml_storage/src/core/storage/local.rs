@@ -36,15 +36,15 @@ impl LocalMultiPartUpload {
         Self { file }
     }
 
-    pub async fn write_chunk(&mut self, chunk: bytes::Bytes) -> Result<(), StorageError> {
+    pub async fn upload_part(&mut self, chunk: bytes::Bytes) -> Result<bool, StorageError> {
         self.file
             .write_all(&chunk)
             .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
 
-        Ok(())
+        Ok(true)
     }
 
-    pub async fn complete(&mut self) -> Result<(), StorageError> {
+    pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
         Ok(())
     }
 }

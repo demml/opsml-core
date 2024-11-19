@@ -26,6 +26,8 @@ opsml-storage = { workspace = true, optional = true, features = [] }
 async-trait = "0.1.83"
 anyhow = "1.0.93"
 time = "0.3.36"
+thiserror = "2.0.3"
+bytes = "1.8.0"
 
 [features]
 default = ["opsml-storage"]
