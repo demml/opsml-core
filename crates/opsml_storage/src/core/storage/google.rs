@@ -4,7 +4,6 @@ pub mod google_storage {
     use crate::core::storage::base::{
         get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
     };
-    use crate::core::storage::enums::MultiPartUploader;
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_smithy_types::byte_stream::ByteStream;
@@ -12,15 +11,14 @@ pub mod google_storage {
     use base64::prelude::*;
     use futures::stream::Stream;
     use futures::StreamExt;
-    use futures::TryStream;
     use google_cloud_auth::credentials::CredentialsFile;
     use google_cloud_storage::client::{Client, ClientConfig};
     use google_cloud_storage::http::objects::delete::DeleteObjectRequest;
     use google_cloud_storage::http::objects::download::Range;
     use google_cloud_storage::http::objects::get::GetObjectRequest;
     use google_cloud_storage::http::objects::list::ListObjectsRequest;
+    use google_cloud_storage::http::objects::upload::UploadObjectRequest;
     use google_cloud_storage::http::objects::upload::UploadType;
-    use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest};
     use google_cloud_storage::http::objects::Object;
     use google_cloud_storage::http::resumable_upload_client::ChunkSize;
     use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
@@ -156,9 +154,9 @@ pub mod google_storage {
             chunk: ByteStream,
             first_byte: &u64,
             last_byte: &u64,
-            total_size: &u64,
+            file_size: &u64,
         ) -> Result<(), StorageError> {
-            let size = ChunkSize::new(*first_byte, *last_byte, Some(*total_size));
+            let size = ChunkSize::new(*first_byte, *last_byte, Some(*file_size));
 
             let data = chunk
                 .collect()
@@ -329,84 +327,6 @@ pub mod google_storage {
             Ok(presigned_url)
         }
 
-        async fn 
-
-        /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
-        ///
-        /// # Arguments
-        ///
-        /// * `lpath` - The path to the file to upload
-        /// * `rpath` - The path to the remote file
-        /// * `chunk_size` - The size of each chunk
-        ///
-        /// # Returns
-        ///
-        /// A Result with the object name if successful
-        ///
-        async fn upload_file_in_chunks(
-            &self,
-            lpath: &Path,
-            rpath: &Path,
-            chunk_size: Option<u64>,
-        ) -> Result<(), StorageError> {
-            let file = File::open(lpath)
-                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-            let metadata = file
-                .metadata()
-                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-            let file_size = metadata.len();
-
-            // check chunk size. IF chunk size is None, set chunk size to 5MB. If chunk size is greater than file size, set chunk size to file size
-            let mut chunk_size = chunk_size.unwrap_or(1024 * 1024 * 5);
-            if chunk_size > file_size {
-                chunk_size = file_size;
-            }
-
-            // calculate the number of parts
-            let mut chunk_count = (file_size / chunk_size) + 1;
-            let mut size_of_last_chunk = file_size % chunk_size;
-
-            // if the last chunk is empty, reduce the number of parts
-            if size_of_last_chunk == 0 {
-                size_of_last_chunk = chunk_size;
-                chunk_count -= 1;
-            }
-
-            for chunk_index in 0..chunk_count {
-                let this_chunk = if chunk_count - 1 == chunk_index {
-                    size_of_last_chunk
-                } else {
-                    chunk_size
-                };
-
-                let first_byte = chunk_index * chunk_size;
-                let last_byte = first_byte + this_chunk - 1;
-
-                let stream = uploader
-                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
-                    .await?;
-
-                let part_number = (chunk_index as i32) + 1;
-                uploader
-                    .upload_part(&first_byte, &last_byte, &part_number, &file_size, stream)
-                    .await?;
-            } // extract the range from the result and update the first_byte and last_byte
-
-            match uploader.upload_status {
-                UploadStatus::Ok(_) => {
-                    // complete the upload
-                    Ok(())
-                }
-                _ => Err(StorageError::Error(format!(
-                    "Failed to upload file in chunks"
-                ))),
-            }
-
-            // check if enum is Ok
-        }
-
         /// List all objects in a path
         ///
         /// # Arguments
@@ -559,7 +479,6 @@ pub mod google_storage {
 
             Ok(true)
         }
-
     }
 
     impl GoogleStorageClient {
@@ -621,6 +540,83 @@ pub mod google_storage {
 
             Ok(result.url().to_string())
         }
+
+        pub async fn get_uploader(
+            &self,
+            path: &str,
+        ) -> Result<GoogleMultipartUpload, StorageError> {
+            let client = GoogleMultipartUpload::new(&self.client, &self.bucket, path).await?;
+            Ok(client)
+        }
+
+        /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
+        ///
+        /// # Arguments
+        ///
+        /// * `lpath` - The path to the file to upload
+        /// * `rpath` - The path to the remote file
+        /// * `chunk_size` - The size of each chunk
+        ///
+        /// # Returns
+        ///
+        /// A Result with the object name if successful
+        ///
+        async fn upload_file_in_chunks(
+            &self,
+            lpath: &Path,
+            uploader: &mut GoogleMultipartUpload,
+        ) -> Result<(), StorageError> {
+            let file = File::open(lpath)
+                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+            let metadata = file
+                .metadata()
+                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+            let file_size = metadata.len();
+            let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+
+            // calculate the number of parts
+            let mut chunk_count = (file_size / chunk_size) + 1;
+            let mut size_of_last_chunk = file_size % chunk_size;
+
+            // if the last chunk is empty, reduce the number of parts
+            if size_of_last_chunk == 0 {
+                size_of_last_chunk = chunk_size;
+                chunk_count -= 1;
+            }
+
+            for chunk_index in 0..chunk_count {
+                let this_chunk = if chunk_count - 1 == chunk_index {
+                    size_of_last_chunk
+                } else {
+                    chunk_size
+                };
+
+                let first_byte = chunk_index * chunk_size;
+                let last_byte = first_byte + this_chunk - 1;
+
+                let chunk = uploader
+                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
+                    .await?;
+
+                uploader
+                    .upload_part(chunk, &first_byte, &last_byte, &file_size)
+                    .await?;
+            } // extract the range from the result and update the first_byte and last_byte
+
+            match uploader.upload_status {
+                UploadStatus::Ok(_) => {
+                    // complete the upload
+                    Ok(())
+                }
+                _ => Err(StorageError::Error(format!(
+                    "Failed to upload file in chunks"
+                ))),
+            }
+
+            // check if enum is Ok
+        }
     }
 
     pub struct GCSFSStorageClient {
@@ -638,6 +634,58 @@ pub mod google_storage {
         async fn new(settings: StorageSettings) -> Self {
             GCSFSStorageClient {
                 client: GoogleStorageClient::new(settings).await.unwrap(),
+            }
+        }
+    }
+
+    impl GCSFSStorageClient {
+        pub async fn put(
+            &self,
+            lpath: &Path,
+            rpath: &Path,
+            recursive: bool,
+        ) -> Result<(), StorageError> {
+            let stripped_lpath = lpath.strip_path(self.client().bucket().await);
+            let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+
+            if recursive {
+                if !stripped_lpath.is_dir() {
+                    return Err(StorageError::Error(
+                        "Local path must be a directory for recursive put".to_string(),
+                    ));
+                }
+
+                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+                for file in files {
+                    let stripped_lpath_clone = stripped_lpath.clone();
+                    let stripped_rpath_clone = stripped_rpath.clone();
+                    let stripped_file_path = file.strip_path(self.client().bucket().await);
+
+                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                    let remote_path = stripped_rpath_clone.join(relative_path);
+
+                    let mut uploader = self
+                        .client()
+                        .get_uploader(remote_path.to_str().unwrap())
+                        .await?;
+
+                    self.client()
+                        .upload_file_in_chunks(&stripped_file_path, &mut uploader)
+                        .await?;
+                }
+
+                Ok(())
+            } else {
+                let mut uploader = self
+                    .client()
+                    .get_uploader(stripped_rpath.to_str().unwrap())
+                    .await?;
+
+                self.client()
+                    .upload_file_in_chunks(&stripped_lpath, &mut uploader)
+                    .await?;
+                Ok(())
             }
         }
     }
@@ -741,15 +789,25 @@ pub mod google_storage {
                         let relative_path = file.relative_path(&stripped_lpath_clone)?;
                         let remote_path = stripped_rpath_clone.join(relative_path);
 
+                        let mut uploader = self
+                            .client
+                            .get_uploader(remote_path.to_str().unwrap())
+                            .await?;
+
                         self.client
-                            .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                            .upload_file_in_chunks(&stripped_file_path, &mut uploader)
                             .await?;
                     }
 
                     Ok(())
                 } else {
+                    let mut uploader = self
+                        .client
+                        .get_uploader(stripped_rpath.to_str().unwrap())
+                        .await?;
+
                     self.client
-                        .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                        .upload_file_in_chunks(&stripped_lpath, &mut uploader)
                         .await?;
                     Ok(())
                 }

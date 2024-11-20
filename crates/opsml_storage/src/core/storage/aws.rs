@@ -483,8 +483,6 @@ pub mod aws_storage {
             lpath: &Path,
             uploader: &mut AWSMulitPartUpload,
         ) -> Result<(), StorageError> {
-            let chunk_size = 5 * 1024 * 1024; // 5MB
-
             let file = File::open(lpath)
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
@@ -494,6 +492,7 @@ pub mod aws_storage {
                 .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
 
             let file_size = metadata.len();
+            let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
 
             // calculate the number of parts
             let mut chunk_count = (file_size / chunk_size) + 1;
@@ -552,7 +551,7 @@ pub mod aws_storage {
     }
 
     impl S3FStorageClient {
-        async fn put(
+        pub async fn put(
             &self,
             lpath: &Path,
             rpath: &Path,

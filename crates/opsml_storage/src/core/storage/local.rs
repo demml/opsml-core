@@ -5,8 +5,6 @@ use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_smithy_types::byte_stream::Length;
-use futures::TryStream;
-use futures::TryStreamExt;
 use pyo3::prelude::*;
 use std::fs::{self};
 use std::io::Write;
@@ -127,25 +125,6 @@ impl StorageClient for LocalStorageClient {
                 full_path.display()
             )))
         }
-    }
-
-    async fn upload_file_in_chunks(
-        &self,
-        lpath: &Path,
-        rpath: &Path,
-        _chunk_size: Option<u64>,
-    ) -> Result<(), StorageError> {
-        let dest_path = self.bucket.join(rpath);
-
-        if let Some(parent) = dest_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
-        }
-
-        fs::copy(lpath, &dest_path)
-            .map_err(|e| StorageError::Error(format!("Unable to copy file: {}", e)))?;
-
-        Ok(())
     }
 
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
@@ -322,6 +301,20 @@ impl LocalStorageClient {
     pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
         Ok(path.to_string())
     }
+
+    async fn upload_file(&self, lpath: &Path, rpath: &Path) -> Result<(), StorageError> {
+        let dest_path = self.bucket.join(rpath);
+
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
+        }
+
+        fs::copy(lpath, &dest_path)
+            .map_err(|e| StorageError::Error(format!("Unable to copy file: {}", e)))?;
+
+        Ok(())
+    }
 }
 
 pub struct LocalFSStorageClient {
@@ -341,6 +334,48 @@ impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
     async fn new(seetings: StorageSettings) -> Self {
         Self {
             client: LocalStorageClient::new(seetings).await.unwrap(),
+        }
+    }
+}
+
+impl LocalFSStorageClient {
+    pub async fn put(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        recursive: bool,
+    ) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+
+        if recursive {
+            if !stripped_lpath.is_dir() {
+                return Err(StorageError::Error(
+                    "Local path must be a directory for recursive put".to_string(),
+                ));
+            }
+
+            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+            for file in files {
+                let stripped_lpath_clone = stripped_lpath.clone();
+                let stripped_rpath_clone = stripped_rpath.clone();
+                let stripped_file_path = file.strip_path(self.client().bucket().await);
+
+                let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                let remote_path = stripped_rpath_clone.join(relative_path);
+
+                self.client()
+                    .upload_file(&stripped_file_path, &remote_path)
+                    .await?;
+            }
+
+            Ok(())
+        } else {
+            self.client()
+                .upload_file(&stripped_lpath, &stripped_rpath)
+                .await?;
+            Ok(())
         }
     }
 }
@@ -456,14 +491,14 @@ impl PyLocalFSStorageClient {
                     let remote_path = stripped_rpath_clone.join(relative_path);
 
                     self.client
-                        .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                        .upload_file(&stripped_file_path, &remote_path)
                         .await?;
                 }
 
                 Ok(())
             } else {
                 self.client
-                    .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                    .upload_file(&stripped_lpath, &stripped_rpath)
                     .await?;
                 Ok(())
             }
