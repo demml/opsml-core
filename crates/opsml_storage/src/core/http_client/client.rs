@@ -1,10 +1,6 @@
-use crate::core::utils::error::{ApiError, StorageError};
-
-use crate::core::storage::base::PathExt;
-use crate::core::storage::base::{
-    FileInfo, FileSystem, StorageClient, StorageSettings, StorageType,
-};
+use crate::core::storage::base::{FileInfo, StorageClient, StorageSettings, StorageType};
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
+use crate::core::utils::error::{ApiError, StorageError};
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use reqwest::{
@@ -19,7 +15,6 @@ use std::sync::Arc;
 use tokio::fs::File;
 use tokio::sync::Mutex;
 
-use crate::core::storage::base::get_files;
 const TIMEOUT_SECS: u64 = 30;
 const MAX_CHUNKS: u64 = 10000;
 
@@ -150,7 +145,7 @@ impl ApiClient {
         query_params: HashMap<String, String>,
         headers: Option<HeaderMap>,
     ) -> Result<Value, ApiError> {
-        let headers = headers.unwrap_or(HeaderMap::new());
+        let headers = headers.unwrap_or_default();
 
         let token = self.auth_token.unwrap_or("".to_string());
         let response = match request_type {
@@ -219,7 +214,7 @@ impl ApiClient {
         let max_attempts = 3;
         let mut response: Result<Value, ApiError>;
 
-        let query_params = query_params.unwrap_or(HashMap::new());
+        let query_params = query_params.unwrap_or_default();
 
         loop {
             attempts += 1;
@@ -264,7 +259,7 @@ pub struct ApiClientArgs {
 
 pub struct HttpStorageClient {
     api_client: Arc<Mutex<ApiClient>>,
-    pub bucket: PathBuf,
+    bucket: String,
     storage_client: StorageClientEnum,
 }
 
@@ -274,11 +269,11 @@ impl StorageClient for HttpStorageClient {
         self.storage_client.storage_type()
     }
     async fn bucket(&self) -> &str {
-        self.bucket.to_str().unwrap()
+        &self.bucket
     }
 
     async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
-        let bucket = PathBuf::from(settings.storage_uri.clone());
+        let bucket = settings.storage_uri.clone();
         let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
 
         let api_client = Arc::new(Mutex::new(
@@ -369,11 +364,11 @@ impl StorageClient for HttpStorageClient {
     }
 
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError> {
-        let local_path = PathBuf::from(local_path);
-        let remote_path = PathBuf::from(remote_path);
+        let _local_path = PathBuf::from(local_path);
+        let _remote_path = PathBuf::from(remote_path);
         // Lock the Mutex to get mutable access to the ApiClient
 
-        let mut api_client = self.api_client.lock().await;
+        let mut _api_client = self.api_client.lock().await;
 
         //let _response = api_client
         //    .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
@@ -438,13 +433,18 @@ impl HttpStorageClient {
             "base_url not found in kwargs".to_string(),
         ))?;
 
-        let auth_auth = kwargs
-            .get("use_auth")
-            .ok_or(StorageError::Error("auth not found in kwargs".to_string()))?;
+        // check if auth is required (default is false)
+        let auth_auth = if kwargs.get("use_auth").is_some() {
+            kwargs.get("use_auth").unwrap()
+        } else {
+            "false"
+        };
 
-        let path_prefix = kwargs.get("path_prefix").ok_or(StorageError::Error(
-            "path_prefix not found in kwargs".to_string(),
-        ))?;
+        let path_prefix = if kwargs.get("path_prefix").is_some() {
+            kwargs.get("path_prefix").unwrap()
+        } else {
+            "opsml"
+        };
 
         let username = kwargs.get("username");
         let password = kwargs.get("password");
@@ -533,7 +533,7 @@ impl HttpStorageClient {
         Ok(uploader)
     }
 
-    async fn upload_file_in_chunks(
+    pub async fn upload_file_in_chunks(
         &self,
         lpath: &Path,
         rpath: &Path,
@@ -612,82 +612,10 @@ impl HttpStorageClient {
     }
 }
 
-pub struct HttpFSStorageClient {
-    client: HttpStorageClient,
-}
-
-#[async_trait]
-impl FileSystem<HttpStorageClient> for HttpFSStorageClient {
-    fn name(&self) -> &str {
-        "HttpFSStorageClient"
-    }
-
-    fn client(&self) -> &HttpStorageClient {
-        &self.client
-    }
-
-    async fn new(settings: StorageSettings) -> Self {
-        HttpFSStorageClient {
-            client: HttpStorageClient::new(settings).await.unwrap(),
-        }
-    }
-}
-
-impl HttpFSStorageClient {
-    pub async fn put(
-        &self,
-        lpath: &Path,
-        rpath: &Path,
-        recursive: bool,
-    ) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
-        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
-
-        if recursive {
-            if !stripped_lpath.is_dir() {
-                return Err(StorageError::Error(
-                    "Local path must be a directory for recursive put".to_string(),
-                ));
-            }
-
-            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
-
-            for file in files {
-                let stripped_lpath_clone = stripped_lpath.clone();
-                let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket().await);
-
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
-
-                let mut uploader = self.client().create_multipart_uploader(rpath).await?;
-
-                self.client()
-                    .upload_file_in_chunks(&stripped_file_path, &remote_path, &mut uploader)
-                    .await?;
-            }
-
-            Ok(())
-        } else {
-            let mut uploader = self
-                .client()
-                .create_multipart_uploader(&stripped_rpath)
-                .await?;
-
-            self.client()
-                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, &mut uploader)
-                .await?;
-
-            Ok(())
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use mockito::{Server, ServerGuard};
-    use std::fs;
     use tokio;
 
     const PATH_PREFIX: &str = "opsml";

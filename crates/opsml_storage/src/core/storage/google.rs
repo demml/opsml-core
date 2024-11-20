@@ -110,7 +110,7 @@ pub mod google_storage {
         ) -> Result<Self, StorageError> {
             let client = ResumableUploadClient::new(session_url, http);
             Ok(GoogleMultipartUpload {
-                client: client,
+                client,
                 upload_status: UploadStatus::NotStarted,
             })
         }
@@ -169,9 +169,9 @@ pub mod google_storage {
                     // complete the upload
                     Ok(())
                 }
-                _ => Err(StorageError::Error(format!(
-                    "Failed to upload file in chunks",
-                ))),
+                _ => Err(StorageError::Error(
+                    "Failed to upload file in chunks".to_string(),
+                )),
             }
         }
     }
@@ -612,9 +612,9 @@ pub mod google_storage {
                     // complete the upload
                     Ok(())
                 }
-                _ => Err(StorageError::Error(format!(
-                    "Failed to upload file in chunks"
-                ))),
+                _ => Err(StorageError::Error(
+                    "Failed to upload file in chunks".to_string(),
+                )),
             }
 
             // check if enum is Ok
@@ -720,6 +720,7 @@ pub mod google_storage {
             }
         }
 
+        #[pyo3(signature = (path=PathBuf::new()))]
         fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
 

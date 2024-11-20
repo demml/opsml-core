@@ -6,10 +6,7 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
 };
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::{routing::get, Router};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 

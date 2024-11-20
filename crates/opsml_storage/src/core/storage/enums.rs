@@ -179,6 +179,7 @@ impl StorageClientEnum {
                 let client = GCSFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Google(client))
             }
+
             #[cfg(feature = "aws_storage")]
             StorageType::AWS => {
                 // strip the s3:// prefix
@@ -189,6 +190,14 @@ impl StorageClientEnum {
                 let client = LocalFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Local(client))
             }
+            #[cfg(not(feature = "aws_storage"))]
+            StorageType::AWS => Err(StorageError::Error(
+                "AWS storage feature is not enabled".to_string(),
+            )),
+            #[cfg(not(feature = "google_storage"))]
+            StorageType::Google => Err(StorageError::Error(
+                "Google storage feature is not enabled".to_string(),
+            )),
         }
     }
 

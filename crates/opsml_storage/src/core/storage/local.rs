@@ -5,8 +5,7 @@ use crate::core::storage::base::{
 };
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
-use aws_sdk_s3::primitives::ByteStream;
-use aws_smithy_types::byte_stream::Length;
+use aws_smithy_types::byte_stream::{ByteStream, Length};
 use pyo3::prelude::*;
 use std::fs::{self};
 use std::io::Write;
@@ -416,6 +415,7 @@ impl PyLocalFSStorageClient {
         }
     }
 
+    #[pyo3(signature = (path=PathBuf::new()))]
     fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
         let stripped_path = path.strip_path(self.client.bucket.to_str().unwrap());
 

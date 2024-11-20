@@ -49,7 +49,7 @@ impl UploadPartArgParser {
         let path = headers
             .get("File-Path")
             .and_then(|v| v.to_str().ok())
-            .map(|v| Path::new(v))
+            .map(Path::new)
             .unwrap_or(Path::new(""))
             .to_path_buf();
 

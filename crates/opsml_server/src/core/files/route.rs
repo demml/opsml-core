@@ -104,17 +104,3 @@ pub async fn generate_presigned_url(
 
     Ok(PresignedUrl { url })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::core::setup::setup_components;
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-        Router,
-    };
-
-    use std::sync::Arc;
-    use tower::ServiceExt; // for `oneshot` method
-}

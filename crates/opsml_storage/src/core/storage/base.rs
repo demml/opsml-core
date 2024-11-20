@@ -21,20 +21,19 @@ pub struct StorageSettings {
     #[pyo3(get)]
     pub kwargs: HashMap<String, String>,
 
+    #[pyo3(get)]
     pub storage_type: StorageType,
 }
 
 #[pymethods]
 impl StorageSettings {
     #[new]
-    pub fn new(storage_uri: String, using_client: bool, kwargs: HashMap<String, String>) -> Self {
-        let storage_type = if storage_uri.starts_with("gs://") {
-            StorageType::Google
-        } else if storage_uri.starts_with("s3://") {
-            StorageType::AWS
-        } else {
-            StorageType::Local
-        };
+    pub fn new(
+        storage_uri: String,
+        using_client: bool,
+        storage_type: StorageType,
+        kwargs: HashMap<String, String>,
+    ) -> Self {
         StorageSettings {
             storage_uri,
             using_client,

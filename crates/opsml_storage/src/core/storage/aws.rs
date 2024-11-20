@@ -713,6 +713,7 @@ pub mod aws_storage {
             }
         }
 
+        #[pyo3(signature = (path=PathBuf::new()))]
         fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
             let stripped_path = path.strip_path(&self.client.bucket);
             self.runtime
