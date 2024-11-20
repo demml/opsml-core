@@ -2,7 +2,7 @@
 pub mod google_storage {
 
     use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
+        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, StorageType,
     };
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
@@ -104,30 +104,13 @@ pub mod google_storage {
     }
 
     impl GoogleMultipartUpload {
-        pub async fn new(client: &Client, bucket: &str, path: &str) -> Result<Self, StorageError> {
-            let _filename = path.to_string();
-
-            let metadata = Object {
-                name: _filename,
-                content_type: Some("application/octet-stream".to_string()),
-                ..Default::default()
-            };
-
-            let result = client
-                .prepare_resumable_upload(
-                    &UploadObjectRequest {
-                        bucket: bucket.to_string(),
-                        ..Default::default()
-                    },
-                    &UploadType::Multipart(Box::new(metadata)),
-                )
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Unable to create resumable session: {}", e))
-                })?;
-
+        pub async fn new(
+            http: ClientWithMiddleware,
+            session_url: String,
+        ) -> Result<Self, StorageError> {
+            let client = ResumableUploadClient::new(session_url, http);
             Ok(GoogleMultipartUpload {
-                client: result,
+                client: client,
                 upload_status: UploadStatus::NotStarted,
             })
         }
@@ -201,6 +184,9 @@ pub mod google_storage {
 
     #[async_trait]
     impl StorageClient for GoogleStorageClient {
+        fn storage_type(&self) -> StorageType {
+            StorageType::Google
+        }
         async fn bucket(&self) -> &str {
             &self.bucket
         }
@@ -541,11 +527,27 @@ pub mod google_storage {
             Ok(result.url().to_string())
         }
 
-        pub async fn get_uploader(
+        /// Will create a google multipart uploader and return the client
+        ///
+        /// # Arguments
+        ///
+        /// * `path` - The path to the object in the bucket
+        /// * `session_url` - The session url if it exists
+        ///
+        /// # Returns
+        ///
+        /// A GoogleMultipartUpload client
+        pub async fn get_multipart_uploader(
             &self,
             path: &str,
+            session_url: Option<String>,
         ) -> Result<GoogleMultipartUpload, StorageError> {
-            let client = GoogleMultipartUpload::new(&self.client, &self.bucket, path).await?;
+            let session_url = match session_url {
+                Some(url) => url,
+                None => self.create_multipart_upload(path).await?,
+            };
+
+            let client = GoogleMultipartUpload::new(self.http.clone(), session_url).await?;
             Ok(client)
         }
 
@@ -639,6 +641,14 @@ pub mod google_storage {
     }
 
     impl GCSFSStorageClient {
+        /// Server side logic for doing a multipart upload
+        ///
+        /// # Arguments
+        ///
+        /// * `lpath` - The path to the local file
+        /// * `rpath` - The path to the remote file
+        /// * `recursive` - Whether to upload the file recursively
+        ///
         pub async fn put(
             &self,
             lpath: &Path,
@@ -667,7 +677,7 @@ pub mod google_storage {
 
                     let mut uploader = self
                         .client()
-                        .get_uploader(remote_path.to_str().unwrap())
+                        .get_multipart_uploader(remote_path.to_str().unwrap(), None)
                         .await?;
 
                     self.client()
@@ -679,7 +689,7 @@ pub mod google_storage {
             } else {
                 let mut uploader = self
                     .client()
-                    .get_uploader(stripped_rpath.to_str().unwrap())
+                    .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                     .await?;
 
                 self.client()
@@ -791,7 +801,7 @@ pub mod google_storage {
 
                         let mut uploader = self
                             .client
-                            .get_uploader(remote_path.to_str().unwrap())
+                            .get_multipart_uploader(remote_path.to_str().unwrap(), None)
                             .await?;
 
                         self.client
@@ -803,7 +813,7 @@ pub mod google_storage {
                 } else {
                     let mut uploader = self
                         .client
-                        .get_uploader(stripped_rpath.to_str().unwrap())
+                        .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                         .await?;
 
                     self.client

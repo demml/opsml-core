@@ -1,6 +1,8 @@
 use crate::core::storage::base::get_files;
 use crate::core::storage::base::PathExt;
-use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
+use crate::core::storage::base::{
+    FileInfo, FileSystem, StorageClient, StorageSettings, StorageType,
+};
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_sdk_s3::primitives::ByteStream;
@@ -21,6 +23,7 @@ use walkdir::WalkDir;
 
 pub struct LocalMultiPartUpload {
     pub file: fs::File,
+    pub path: String,
 }
 
 impl LocalMultiPartUpload {
@@ -37,7 +40,10 @@ impl LocalMultiPartUpload {
             .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))
             .unwrap();
 
-        Self { file }
+        Self {
+            file,
+            path: path.to_str().unwrap().to_string(),
+        }
     }
 
     pub async fn get_next_chunk(
@@ -77,6 +83,9 @@ pub struct LocalStorageClient {
 
 #[async_trait]
 impl StorageClient for LocalStorageClient {
+    fn storage_type(&self) -> StorageType {
+        StorageType::Local
+    }
     async fn bucket(&self) -> &str {
         self.bucket.to_str().unwrap()
     }

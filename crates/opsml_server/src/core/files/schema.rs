@@ -10,12 +10,32 @@ pub struct MultiPartQuery {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ResumableSession {
-    pub session_uri: String,
+pub struct PresignedQuery {
+    pub path: String,
+    pub session_url: Option<String>,
+    pub part_number: Option<u64>,
+    pub for_multi_part: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MultiPartSession {
+    pub session_url: String,
 }
 
 // Implement IntoResponse for Alive
-impl IntoResponse for ResumableSession {
+impl IntoResponse for MultiPartSession {
+    fn into_response(self) -> axum::response::Response {
+        Json(self).into_response()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PresignedUrl {
+    pub url: String,
+}
+
+// Implement IntoResponse for Alive
+impl IntoResponse for PresignedUrl {
     fn into_response(self) -> axum::response::Response {
         Json(self).into_response()
     }

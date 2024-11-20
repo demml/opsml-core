@@ -1,7 +1,7 @@
 #[cfg(feature = "aws_storage")]
 pub mod aws_storage {
     use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
+        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, StorageType,
     };
 
     use crate::core::utils::error::StorageError;
@@ -15,13 +15,14 @@ pub mod aws_storage {
     use aws_sdk_s3::primitives::Length;
     use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
     use aws_sdk_s3::Client;
-
     use pyo3::prelude::*;
+    use reqwest::Client as HttpClient;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str;
+    use std::time::Duration;
 
     const MAX_CHUNKS: u64 = 10000;
 
@@ -52,7 +53,7 @@ pub mod aws_storage {
     }
 
     impl AWSMulitPartUpload {
-        pub async fn new(bucket: &str, path: &str) -> Result<Self, StorageError> {
+        pub async fn new(bucket: &str, path: &str, upload_id: &str) -> Result<Self, StorageError> {
             // create a resuable runtime for the multipart upload
 
             let creds = AWSCreds::new().await?;
@@ -61,23 +62,59 @@ pub mod aws_storage {
             let _bucket = bucket.to_string();
             let _path = path.to_string();
 
-            let response = client
-                .create_multipart_upload()
-                .bucket(&_bucket)
-                .key(&_path)
-                .send()
-                .await
-                .map_err(|e| {
-                    StorageError::Error(format!("Failed to create multipart upload: {}", e))
-                })?;
-
             Ok(Self {
                 client,
                 bucket: _bucket,
                 path: _path,
-                upload_id: response.upload_id.unwrap(),
+                upload_id: upload_id.to_string(),
                 upload_parts: Vec::new(),
             })
+        }
+
+        pub async fn upload_part_with_presigned_url(
+            &mut self,
+            part_number: &i32,
+            body: ByteStream,
+            presigned_url: &str,
+        ) -> Result<bool, StorageError> {
+            // collect the ByteStream
+            let body = body
+                .collect()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to collect ByteStream: {}", e)))?;
+
+            // convert to bytes::Bytes
+
+            let http_client = HttpClient::new();
+            let response = http_client
+                .put(presigned_url)
+                .body(body.into_bytes())
+                .send()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to upload part: {}", e)))?;
+
+            if response.status().is_success() {
+                self.upload_parts.push(
+                    CompletedPart::builder()
+                        .e_tag(
+                            response
+                                .headers()
+                                .get("ETag")
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_string(),
+                        )
+                        .part_number(*part_number)
+                        .build(),
+                );
+                Ok(true)
+            } else {
+                Err(StorageError::Error(format!(
+                    "Failed to upload part: {}",
+                    response.status()
+                )))
+            }
         }
 
         pub async fn upload_part(
@@ -155,6 +192,9 @@ pub mod aws_storage {
 
     #[async_trait]
     impl StorageClient for AWSStorageClient {
+        fn storage_type(&self) -> StorageType {
+            StorageType::AWS
+        }
         async fn bucket(&self) -> &str {
             &self.bucket
         }
@@ -462,10 +502,6 @@ pub mod aws_storage {
             Ok(response)
         }
 
-        pub async fn get_uploader(&self, path: &str) -> Result<AWSMulitPartUpload, StorageError> {
-            AWSMulitPartUpload::new(&self.bucket, path).await
-        }
-
         pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
             let response = self
                 .client
@@ -479,6 +515,18 @@ pub mod aws_storage {
                 })?;
 
             Ok(response.upload_id.unwrap())
+        }
+
+        pub async fn get_multipart_uploader(
+            &self,
+            path: &str,
+            session_url: Option<String>,
+        ) -> Result<AWSMulitPartUpload, StorageError> {
+            let upload_id = match session_url {
+                Some(session_url) => session_url,
+                None => self.create_multipart_upload(path).await?,
+            };
+            AWSMulitPartUpload::new(&self.bucket, path, &upload_id).await
         }
 
         async fn upload_file_in_chunks(
@@ -532,6 +580,34 @@ pub mod aws_storage {
 
             Ok(())
         }
+
+        /// Generate a presigned url for a part in the multipart upload
+        /// This needs to be a non-self method because it is called from both client or server
+        pub async fn generate_presigned_url_for_part(
+            &self,
+            part_number: i32,
+            path: &str,
+            upload_id: &str,
+        ) -> Result<String, StorageError> {
+            let expires_in = Duration::from_secs(600); // Set expiration time for presigned URL
+
+            let presigned_request = self
+                .client
+                .upload_part()
+                .bucket(&self.bucket)
+                .key(path)
+                .upload_id(upload_id)
+                .part_number(part_number)
+                .presigned(PresigningConfig::expires_in(expires_in).map_err(|e| {
+                    StorageError::Error(format!("Failed to set presigned config: {}", e))
+                })?)
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Failed to generate presigned url: {}", e))
+                })?;
+
+            Ok(presigned_request.uri().to_string())
+        }
     }
 
     // For both python and rust, we need to define 2 structs: one for rust that supports async and one for python that does not
@@ -582,7 +658,7 @@ pub mod aws_storage {
 
                     let mut uploader = self
                         .client()
-                        .get_uploader(remote_path.to_str().unwrap())
+                        .get_multipart_uploader(remote_path.to_str().unwrap(), None)
                         .await?;
 
                     self.client()
@@ -594,7 +670,7 @@ pub mod aws_storage {
             } else {
                 let mut uploader = self
                     .client()
-                    .get_uploader(stripped_rpath.to_str().unwrap())
+                    .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                     .await?;
 
                 self.client()
@@ -602,6 +678,17 @@ pub mod aws_storage {
                     .await?;
                 Ok(())
             }
+        }
+
+        pub async fn generate_presigned_url_for_part(
+            &self,
+            part_number: i32,
+            path: &str,
+            upload_id: &str,
+        ) -> Result<String, StorageError> {
+            self.client()
+                .generate_presigned_url_for_part(part_number, path, upload_id)
+                .await
         }
     }
 
@@ -704,7 +791,7 @@ pub mod aws_storage {
 
                         let mut uploader = self
                             .client
-                            .get_uploader(remote_path.to_str().unwrap())
+                            .get_multipart_uploader(remote_path.to_str().unwrap(), None)
                             .await?;
 
                         self.client
@@ -716,7 +803,7 @@ pub mod aws_storage {
                 } else {
                     let mut uploader = self
                         .client
-                        .get_uploader(stripped_rpath.to_str().unwrap())
+                        .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                         .await?;
 
                     self.client

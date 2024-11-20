@@ -20,16 +20,26 @@ pub struct StorageSettings {
 
     #[pyo3(get)]
     pub kwargs: HashMap<String, String>,
+
+    pub storage_type: StorageType,
 }
 
 #[pymethods]
 impl StorageSettings {
     #[new]
     pub fn new(storage_uri: String, using_client: bool, kwargs: HashMap<String, String>) -> Self {
+        let storage_type = if storage_uri.starts_with("gs://") {
+            StorageType::Google
+        } else if storage_uri.starts_with("s3://") {
+            StorageType::AWS
+        } else {
+            StorageType::Local
+        };
         StorageSettings {
             storage_uri,
             using_client,
             kwargs,
+            storage_type,
         }
     }
 }
@@ -40,6 +50,7 @@ impl Default for StorageSettings {
             storage_uri: "".to_string(),
             using_client: false,
             kwargs: HashMap::new(),
+            storage_type: StorageType::Local,
         }
     }
 }
@@ -93,6 +104,7 @@ pub fn get_files(path: &Path) -> Result<Vec<PathBuf>, StorageError> {
 // Define the StorageClient trait with common methods
 #[async_trait]
 pub trait StorageClient: Sized {
+    fn storage_type(&self) -> StorageType;
     async fn bucket(&self) -> &str;
     async fn new(settings: StorageSettings) -> Result<Self, StorageError>;
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
@@ -113,6 +125,10 @@ pub trait StorageClient: Sized {
 pub trait FileSystem<T: StorageClient> {
     fn name(&self) -> &str;
     fn client(&self) -> &T;
+
+    fn storage_type(&self) -> StorageType {
+        self.client().storage_type()
+    }
 
     async fn new(settings: StorageSettings) -> Self;
 
@@ -219,6 +235,14 @@ pub trait FileSystem<T: StorageClient> {
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
             .await
     }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum StorageType {
+    Google,
+    AWS,
+    Local,
 }
 
 #[derive(Debug)]

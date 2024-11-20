@@ -1,12 +1,15 @@
 use crate::core::utils::error::{ApiError, StorageError};
 
-use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
-use crate::core::storage::enums::StorageClientEnum;
+use crate::core::storage::base::{
+    FileInfo, FileSystem, StorageClient, StorageSettings, StorageType,
+};
+use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
 
 use futures::stream::TryStreamExt;
+use futures::TryFutureExt;
 use futures::TryStream;
 use reqwest::multipart::{Form, Part};
 use reqwest::{
@@ -23,8 +26,8 @@ use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 const TIMEOUT_SECS: u64 = 30;
-
 const CHUNK_SIZE: usize = 1024 * 1024 * 5;
+const MAX_CHUNKS: u64 = 10000;
 
 #[derive(Debug, Clone)]
 pub enum RequestType {
@@ -37,10 +40,10 @@ pub enum RequestType {
 #[derive(Debug, Clone)]
 pub enum Routes {
     Multipart,
+    Presigned,
     List,
     ListInfo,
     Files,
-    ValidateFile,
 }
 
 impl Routes {
@@ -48,153 +51,10 @@ impl Routes {
         match self {
             Routes::Files => "opsml/files",
             Routes::Multipart => "opsml/files/multipart",
-            Routes::ValidateFile => "opsml/files/validate",
+            Routes::Presigned => "opsml/files/presigned",
             Routes::List => "opsml/files/list",
             Routes::ListInfo => "opsml/files/list_info",
         }
-    }
-}
-
-pub struct HttpMultiPartUpload {}
-
-impl HttpMultiPartUpload {
-    pub async fn new() -> Self {
-        unimplemented!()
-    }
-
-    pub async fn write_chunk(&mut self) -> Result<(), StorageError> {
-        unimplemented!()
-    }
-}
-
-pub struct MultiPartUploader {}
-
-impl MultiPartUploader {
-    pub async fn get_next_chunk(
-        path: &Path,
-        chunk_size: u64,
-        chunk_index: u64,
-        this_chunk_size: u64,
-    ) -> Result<ByteStream, ApiError> {
-        let stream = ByteStream::read_from()
-            .path(path)
-            .offset(chunk_index * chunk_size)
-            .length(Length::Exact(this_chunk_size))
-            .build()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to get next chunk: {}", e)))?;
-
-        Ok(stream)
-    }
-
-    pub async fn upload_part(
-        client: ApiClient,
-        chunk: ByteStream,
-        rpath: &str,
-        chunk_index: u64,
-        chunk_size: u64,
-        first_byte: u64,
-        last_byte: u64,
-        session_uri: &str,
-        total_size: u64,
-    ) -> Result<(), ApiError> {
-        let data = chunk
-            .collect()
-            .await
-            .map_err(|e| ApiError::Error(format!("Unable to collect chunk data: {}", e)))?
-            .into_bytes();
-
-        let part = Part::stream_with_length(data, chunk_size)
-            .file_name(format!("chunk_{}", chunk_index))
-            .mime_str("application/octet-stream")
-            .map_err(|e| ApiError::Error(format!("Failed to create mime type: {}", e)))?;
-
-        let form = Form::new().part("file", part);
-
-        let token = client.auth_token.clone().unwrap_or_default();
-        let mut headers = HeaderMap::new();
-
-        // add chunk size, chunk index, and upload uri to headers
-        headers.insert(
-            "Chunk-Size",
-            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "RPath",
-            HeaderValue::from_str(&rpath.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Chunk-Range",
-            HeaderValue::from_str(&format!("{}/{}", first_byte, last_byte)).map_err(|e| {
-                ApiError::Error(format!("Failed to create content range header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Part-Number",
-            HeaderValue::from_str(&format!("{}", chunk_index)).map_err(|e| {
-                ApiError::Error(format!("Failed to create content range header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Session-Uri",
-            HeaderValue::from_str(session_uri).map_err(|e| {
-                ApiError::Error(format!("Failed to create upload uri header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Total-Size",
-            HeaderValue::from_str(&total_size.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create total size header: {}", e))
-            })?,
-        );
-
-        let _response = client
-            .client
-            .post(format!(
-                "{}/{}",
-                client.base_url,
-                Routes::Multipart.as_str()
-            ))
-            .headers(headers)
-            .bearer_auth(token)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        Ok(())
-    }
-
-    pub async fn validate_file(
-        client: &mut ApiClient,
-        rpath: &str,
-        total_size: u64,
-        total_chunks: u64,
-    ) -> Result<(), ApiError> {
-        let mut body = HashMap::new();
-
-        body.insert("Path", rpath.to_string());
-        body.insert("Total-Size", total_size.to_string());
-        body.insert("Total-Chunks", total_chunks.to_string());
-
-        let _response = client.request_with_retry(
-            Routes::ValidateFile,
-            RequestType::Post,
-            Some(json!(body)),
-            None,
-            None,
-        );
-
-        Ok(())
     }
 }
 
@@ -421,277 +281,11 @@ impl ApiClient {
             )
             .await?;
 
-        let session_uri = result["session_uri"]
+        let session_url = result["session_url"]
             .as_str()
             .ok_or_else(|| ApiError::Error("Failed to get resumable id".to_string()))?;
 
-        Ok(session_uri.to_string())
-    }
-
-    async fn upload_file_in_chunks(
-        &mut self,
-        lpath: &Path,
-        rpath: &Path,
-        chunk_size: Option<u64>,
-    ) -> Result<(), ApiError> {
-        let chunk_size = chunk_size.unwrap_or(CHUNK_SIZE as u64);
-        let file_size = lpath.metadata().unwrap().len();
-
-        let token = self.auth_token.clone().unwrap_or_default();
-        let mut headers = HeaderMap::new();
-
-        // add chunk size, chunk index, and upload uri to headers
-        headers.insert(
-            "Chunk-Size",
-            HeaderValue::from_str(&chunk_size.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Path",
-            HeaderValue::from_str(rpath.to_str().unwrap()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "File-Size",
-            HeaderValue::from_str(&file_size.to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create total size header: {}", e))
-            })?,
-        );
-
-        // create a multipart form from lpath
-        // Open the file and create a stream from it
-        let file = File::open(lpath)
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to open file: {}", e)))?;
-        let stream = FramedRead::new(file, BytesCodec::new())
-            .map_ok(|bytes| bytes.freeze())
-            .map_err(|e| ApiError::Error(format!("Failed to create stream: {}", e)));
-
-        let body = Body::wrap_stream(stream);
-        let form = Form::new().part("file", Part::stream(body));
-
-        let _response = self
-            .client
-            .post(format!("{}/{}", self.base_url, Routes::Multipart.as_str()))
-            .headers(headers)
-            .bearer_auth(token)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        Ok(())
-    }
-
-    pub async fn upload_file(&self, route: &str, file_path: PathBuf) -> Result<Value, ApiError> {
-        let file_name = file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| ApiError::Error("Invalid filename".to_string()))?
-            .to_string();
-
-        // Open file as async stream
-        let file = File::open(file_path)
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to open file with error: {}", e)))?;
-
-        // Get file size for Content-Length header
-        let metadata = file
-            .metadata()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        // get filename from pathBuf
-
-        // create stream of bytes
-        let stream = FramedRead::with_capacity(file, BytesCodec::new(), CHUNK_SIZE);
-        let body = Body::wrap_stream(stream);
-
-        let mut headers = header::HeaderMap::new();
-
-        headers.insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/octet-stream"),
-        );
-
-        headers.insert(
-            header::CONTENT_LENGTH,
-            HeaderValue::from_str(&metadata.len().to_string()).map_err(|e| {
-                ApiError::Error(format!("Failed to create content length header: {}", e))
-            })?,
-        );
-
-        headers.insert(
-            "Write-Path",
-            HeaderValue::from_str(&file_name).map_err(|e| {
-                ApiError::Error(format!("Failed to create write path header: {}", e))
-            })?,
-        );
-
-        //add auth
-        headers.insert(
-            "Authorization",
-            HeaderValue::from_str(&format!(
-                "Bearer {}",
-                self.auth_token.clone().unwrap_or_default()
-            ))
-            .map_err(|e| ApiError::Error(format!("Failed to create auth header: {}", e)))?,
-        );
-
-        let response = self
-            .client
-            .post(format!("{}/{}", self.base_url, route))
-            .headers(headers)
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        let response = response
-            .json::<Value>()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
-
-        Ok(response)
-    }
-
-    pub async fn upload_file_with_retry(
-        &mut self,
-        route: &str,
-        file_path: PathBuf,
-    ) -> Result<Value, ApiError> {
-        let mut attempts = 0;
-        let max_attempts = 3;
-        let mut response: Result<Value, ApiError>;
-
-        loop {
-            attempts += 1;
-
-            let client = self.clone();
-            response = client.upload_file(route, file_path.clone()).await;
-
-            if response.is_ok() || attempts >= max_attempts {
-                break;
-            }
-
-            if response.is_err() {
-                self.refresh_token().await.map_err(|e| {
-                    ApiError::Error(format!("Failed to refresh token with error: {}", e))
-                })?;
-            }
-        }
-
-        let response = response
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        Ok(response)
-    }
-
-    async fn download_to_file(
-        &mut self,
-        route: Routes,
-        local_path: PathBuf,
-        read_path: PathBuf,
-    ) -> Result<Value, ApiError> {
-        // Create parent directories if they don't exist
-        if let Some(parent) = local_path.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| ApiError::Error(format!("Failed to create directories: {}", e)))?;
-        }
-
-        // Convert read_path to string for header
-        let read_path_str = read_path
-            .to_str()
-            .ok_or_else(|| ApiError::Error("Invalid read path".to_string()))?;
-
-        // Set up headers
-        let mut headers = header::HeaderMap::new();
-        headers.insert(
-            "READ_PATH",
-            HeaderValue::from_str(read_path_str).map_err(|e| {
-                ApiError::Error(format!("Failed to create read path header: {}", e))
-            })?,
-        );
-
-        // Make streaming GET request
-        let response = self
-            .client
-            .get(format!("{}/{}", self.base_url, route.as_str()))
-            .headers(headers)
-            .bearer_auth(self.auth_token.clone().unwrap_or_default())
-            .send()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request: {}", e)))?;
-
-        // Check if request was successful
-        if !response.status().is_success() {
-            return Err(ApiError::Error(format!(
-                "Download failed with status: {}",
-                response.status()
-            )));
-        }
-
-        // Create file
-        let mut file = File::create(&local_path)
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to create file: {}", e)))?;
-
-        // Stream chunks to file
-        let mut stream = response.bytes_stream();
-
-        while let Some(chunk) = stream
-            .try_next()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to read chunk: {}", e)))?
-        {
-            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk)
-                .await
-                .map_err(|e| ApiError::Error(format!("Failed to write chunk: {}", e)))?;
-        }
-
-        Ok(json!({
-            "status": "success",
-            "path": local_path.to_string_lossy()
-        }))
-    }
-
-    pub async fn download_to_file_with_retry(
-        &mut self,
-        route: Routes,
-        local_path: PathBuf,
-        read_path: PathBuf,
-    ) -> Result<Value, ApiError> {
-        let mut attempts = 0;
-        let max_attempts = 3;
-        let mut response: Result<Value, ApiError>;
-
-        loop {
-            attempts += 1;
-
-            response = self
-                .download_to_file(route.clone(), local_path.clone(), read_path.clone())
-                .await;
-
-            if response.is_ok() || attempts >= max_attempts {
-                break;
-            }
-
-            if response.is_err() {
-                self.refresh_token().await.map_err(|e| {
-                    ApiError::Error(format!("Failed to refresh token with error: {}", e))
-                })?;
-            }
-        }
-
-        let response = response
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
-
-        Ok(response)
+        Ok(session_url.to_string())
     }
 }
 
@@ -741,6 +335,9 @@ impl HttpStorageClient {
 
 #[async_trait]
 impl StorageClient for HttpStorageClient {
+    fn storage_type(&self) -> StorageType {
+        self.storage_client.storage_type()
+    }
     async fn bucket(&self) -> &str {
         self.bucket.to_str().unwrap()
     }
@@ -749,7 +346,7 @@ impl StorageClient for HttpStorageClient {
         let bucket = PathBuf::from(settings.storage_uri.clone());
         let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
 
-        let client = Arc::new(Mutex::new(
+        let api_client = Arc::new(Mutex::new(
             ApiClient::new(
                 api_kwargs.base_url,
                 api_kwargs.use_auth,
@@ -762,13 +359,16 @@ impl StorageClient for HttpStorageClient {
             .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?,
         ));
 
-        settings.t
+        let storage_client = StorageClientEnum::new(settings.clone())
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to create storage client: {}", e)))?;
 
         // if setti
 
         Ok(Self {
-            api_client: client,
+            api_client,
             bucket,
+            storage_client,
         })
     }
 
@@ -840,27 +440,10 @@ impl StorageClient for HttpStorageClient {
 
         let mut api_client = self.api_client.lock().await;
 
-        let _response = api_client
-            .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
-
-        Ok(())
-    }
-
-    async fn upload_file_in_chunks(
-        &self,
-        local_path: &Path,
-        remote_path: &Path,
-        chunk_size: Option<u64>,
-    ) -> Result<(), StorageError> {
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
-        api_client
-            .upload_file_in_chunks(local_path, remote_path, chunk_size)
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to upload file: {}", e)))?;
+        //let _response = api_client
+        //    .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
+        //    .await
+        //    .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
 
         Ok(())
     }
@@ -912,10 +495,40 @@ impl StorageClient for HttpStorageClient {
     ) -> Result<String, StorageError> {
         unimplemented!()
     }
-
 }
 
 impl HttpStorageClient {
+    pub async fn generate_presigned_url_for_part(
+        &self,
+        path: &str,
+        session_url: &str,
+        part_number: u64,
+    ) -> Result<String, StorageError> {
+        let mut query_params = HashMap::new();
+        query_params.insert("path".to_string(), path.to_string());
+        query_params.insert("session_url".to_string(), session_url.to_string());
+        query_params.insert("part_number".to_string(), part_number.to_string());
+        query_params.insert("for_multi_part".to_string(), "true".to_string());
+
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
+        let response = api_client
+            .request_with_retry(
+                Routes::Presigned,
+                RequestType::Get,
+                None,
+                Some(query_params),
+                None,
+            )
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+        let url = &response["url"];
+
+        Ok(url.to_string())
+    }
+
     pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
         // Lock the Mutex to get mutable access to the ApiClient
         let mut api_client = self.api_client.lock().await;
@@ -939,6 +552,83 @@ impl HttpStorageClient {
         let session_uri = &response["session_uri"];
 
         Ok(session_uri.to_string())
+    }
+
+    async fn upload_file_in_chunks(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        uploader: &mut MultiPartUploader,
+    ) -> Result<(), StorageError> {
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))
+            .await?;
+
+        // get file size
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))
+            .await?;
+
+        let file_size = metadata.len();
+        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        if chunk_count > MAX_CHUNKS {
+            return Err(StorageError::Error(
+                "File size is too large for multipart upload".to_string(),
+            ));
+        }
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_count - 1 == chunk_index {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let first_byte = chunk_index * chunk_size;
+            let last_byte = first_byte + this_chunk - 1;
+
+            let body = uploader
+                .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
+                .await?;
+
+            let part_number = (chunk_index as i32) + 1;
+
+            let presigned_url = self
+                .storage_client
+                .generate_presigned_url_for_part(
+                    part_number,
+                    rpath.to_str().unwrap(),
+                    uploader.session_url(),
+                )
+                .await?;
+
+            uploader
+                .upload_part_with_presigned_url(
+                    &first_byte,
+                    &last_byte,
+                    &part_number,
+                    &file_size,
+                    body,
+                    &presigned_url,
+                )
+                .await?;
+        }
+
+        uploader.complete_upload().await?;
+
+        Ok(())
     }
 }
 
@@ -1178,88 +868,5 @@ mod tests {
         _second_attempt_mock.assert();
         _initial_token_mock.assert();
         _refresh_token_mock.assert();
-    }
-
-    #[tokio::test]
-    async fn test_upload_file() {
-        let (mut server, server_url) = setup_server().await;
-
-        // Create temp file for testing
-        let temp_dir = std::env::temp_dir();
-        let file_path = temp_dir.join("test_upload.txt");
-        fs::write(&file_path, "test content").unwrap();
-
-        // Mock upload endpoint
-        let upload_mock = server
-            .mock("POST", "/opsml/upload")
-            .match_header("Content-Type", "application/octet-stream")
-            .match_header("Content-Length", "12") // length of "test content"
-            .match_header("WRITE_PATH", "test_upload.txt")
-            .with_status(200)
-            .with_body(r#"{"status": "uploaded"}"#)
-            .expect(1)
-            .create();
-
-        let mut api_client =
-            ApiClient::new(server_url, false, PATH_PREFIX.to_string(), None, None, None)
-                .await
-                .unwrap();
-
-        let response = api_client
-            .upload_file_with_retry("upload", file_path.clone())
-            .await
-            .unwrap();
-
-        // Verify response
-        assert_eq!(response["status"], "uploaded");
-
-        // Verify mock was called
-        upload_mock.assert();
-
-        // Cleanup
-        fs::remove_file(file_path).unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_download_to_file_with_retry_success() {
-        let (mut server, server_url) = setup_server().await;
-
-        // Create temp paths
-        let temp_dir = std::env::temp_dir();
-        let local_path = temp_dir.join("test_download.txt");
-        let read_path = PathBuf::from("remote/test_file.txt");
-
-        // Mock successful download endpoint
-        let download_mock = server
-            .mock("GET", "/opsml/files")
-            .match_header("READ_PATH", read_path.to_str().unwrap())
-            .with_status(200)
-            .with_body("test content")
-            .expect(1)
-            .create();
-
-        let mut api_client =
-            ApiClient::new(server_url, false, PATH_PREFIX.to_string(), None, None, None)
-                .await
-                .unwrap();
-
-        let response = api_client
-            .download_to_file_with_retry(Routes::Files, local_path.clone(), read_path)
-            .await
-            .unwrap();
-
-        // Verify response
-        assert_eq!(response["status"], "success");
-        assert_eq!(response["path"], local_path.to_str().unwrap());
-
-        // Verify file contents
-        let content = fs::read_to_string(&local_path).unwrap();
-        assert_eq!(content, "test content");
-
-        // Verify mock was called
-        download_mock.assert();
-
-        // Cleanup
-        fs::remove_file(local_path).unwrap();
     }
 }
