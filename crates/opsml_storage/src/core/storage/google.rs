@@ -329,6 +329,8 @@ pub mod google_storage {
             Ok(presigned_url)
         }
 
+        async fn 
+
         /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
         ///
         /// # Arguments
@@ -346,7 +348,6 @@ pub mod google_storage {
             lpath: &Path,
             rpath: &Path,
             chunk_size: Option<u64>,
-            mut uploader: MultiPartUploader,
         ) -> Result<(), StorageError> {
             let file = File::open(lpath)
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
@@ -559,43 +560,6 @@ pub mod google_storage {
             Ok(true)
         }
 
-        /// upload stream to google cloud storage object. This method will take an async iterator and upload it in chunks to the object
-        ///
-        /// # Arguments
-        ///
-        /// * `path` - The path to the object in the bucket
-        /// * `stream` - The stream of bytes to upload
-        ///
-        /// # Returns
-        ///
-        /// A Result with the object name if successful
-        ///
-        ///
-
-        async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
-        where
-            S: TryStream + Send + Sync + Unpin + 'static,
-            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-            bytes::Bytes: From<S::Ok>,
-        {
-            let filename = path.to_string();
-            let object_file = Media::new(filename);
-            let upload_type = UploadType::Simple(object_file);
-
-            self.client
-                .upload_streamed_object(
-                    &UploadObjectRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    },
-                    stream,
-                    &upload_type,
-                )
-                .await
-                .map_err(|e| StorageError::Error(format!("Unable to upload object: {}", e)))?;
-
-            Ok(())
-        }
     }
 
     impl GoogleStorageClient {

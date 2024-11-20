@@ -1,10 +1,11 @@
 use crate::core::utils::error::{ApiError, StorageError};
 
 use crate::core::storage::base::{FileInfo, FileSystem, StorageClient, StorageSettings};
+use crate::core::storage::enums::StorageClientEnum;
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
-use futures::future::join_all;
+
 use futures::stream::TryStreamExt;
 use futures::TryStream;
 use reqwest::multipart::{Form, Part};
@@ -18,7 +19,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs::File;
-
 use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
@@ -707,6 +707,7 @@ pub struct ApiClientArgs {
 pub struct HttpStorageClient {
     api_client: Arc<Mutex<ApiClient>>,
     pub bucket: PathBuf,
+    storage_client: StorageClientEnum,
 }
 
 impl HttpStorageClient {
@@ -746,16 +747,6 @@ impl StorageClient for HttpStorageClient {
 
     async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
         let bucket = PathBuf::from(settings.storage_uri.clone());
-
-        // bucket should be a dir. Check if it exists. If not, create it
-        if !bucket.exists() {
-            std::fs::create_dir_all(&bucket)
-                .map_err(|e| {
-                    StorageError::Error(format!("Unable to create bucket directory: {}", e))
-                })
-                .unwrap();
-        }
-
         let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
 
         let client = Arc::new(Mutex::new(
@@ -770,6 +761,10 @@ impl StorageClient for HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?,
         ));
+
+        settings.t
+
+        // if setti
 
         Ok(Self {
             api_client: client,
@@ -918,20 +913,32 @@ impl StorageClient for HttpStorageClient {
         unimplemented!()
     }
 
-    async fn put_stream_to_object<S>(&self, _path: &str, _stream: S) -> Result<(), StorageError>
-    where
-        S: TryStream + Send + Sync + Unpin + 'static,
-        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        bytes::Bytes: From<S::Ok>,
-        ByteStream: From<S>,
-    {
-        unimplemented!()
-    }
 }
 
 impl HttpStorageClient {
-    pub async fn create_multipart_upload(&self) -> Result<HttpMultiPartUpload, StorageError> {
-        Ok(HttpMultiPartUpload::new().await)
+    pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+        // Lock the Mutex to get mutable access to the ApiClient
+        let mut api_client = self.api_client.lock().await;
+
+        let mut query_params = HashMap::new();
+        query_params.insert("path".to_string(), path.to_string());
+
+        let response = api_client
+            .request_with_retry(
+                Routes::Multipart,
+                RequestType::Get,
+                None,
+                Some(query_params),
+                None,
+            )
+            .await
+            .map_err(|e| {
+                StorageError::Error(format!("Failed to create multipart upload: {}", e))
+            })?;
+
+        let session_uri = &response["session_uri"];
+
+        Ok(session_uri.to_string())
     }
 }
 

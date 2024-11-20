@@ -316,46 +316,11 @@ impl StorageClient for LocalStorageClient {
 
         Ok(true)
     }
-
-    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
-    where
-        S: TryStream + Send + Sync + Unpin + 'static,
-        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        bytes::Bytes: From<S::Ok>,
-        ByteStream: From<S>,
-    {
-        let full_path = self.bucket.join(path);
-
-        if let Some(parent) = full_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))?;
-        }
-
-        let mut file = fs::File::create(&full_path)
-            .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))?;
-
-        let mut pinned_stream = Box::pin(stream);
-
-        while let Some(chunk) = pinned_stream
-            .try_next()
-            .await
-            .map_err(|e| StorageError::Error(format!("Stream error: {}", e.into())))?
-        {
-            let bytes: bytes::Bytes = chunk.into();
-            file.write_all(&bytes)
-                .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
-        }
-
-        Ok(())
-    }
 }
 
 impl LocalStorageClient {
-    pub async fn create_multipart_upload(
-        &self,
-        path: &str,
-    ) -> Result<LocalMultiPartUpload, StorageError> {
-        Ok(LocalMultiPartUpload::new(&self.bucket.join(path)).await)
+    pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+        Ok(path.to_string())
     }
 }
 

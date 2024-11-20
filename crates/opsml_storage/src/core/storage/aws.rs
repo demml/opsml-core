@@ -3,6 +3,7 @@ pub mod aws_storage {
     use crate::core::storage::base::{
         get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings,
     };
+
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_config::BehaviorVersion;
@@ -14,8 +15,6 @@ pub mod aws_storage {
     use aws_sdk_s3::primitives::Length;
     use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
     use aws_sdk_s3::Client;
-
-    use futures::TryStream;
 
     use pyo3::prelude::*;
     use std::fs::File;
@@ -431,83 +430,6 @@ pub mod aws_storage {
             Ok(true)
         }
 
-        async fn upload_file_in_chunks(
-            &self,
-            lpath: &Path,
-            rpath: &Path,
-            chunk_size: Option<u64>,
-        ) -> Result<(), StorageError> {
-            let chunk_size = chunk_size.unwrap_or(5 * 1024 * 1024); // 5MB
-
-            let file = File::open(lpath)
-                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-            // get file size
-            let metadata = file
-                .metadata()
-                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-            let file_size = metadata.len();
-
-            // calculate the number of parts
-            let mut chunk_count = (file_size / chunk_size) + 1;
-            let mut size_of_last_chunk = file_size % chunk_size;
-
-            if chunk_count > MAX_CHUNKS {
-                return Err(StorageError::Error(
-                    "File size is too large for multipart upload".to_string(),
-                ));
-            }
-
-            // if the last chunk is empty, reduce the number of parts
-            if size_of_last_chunk == 0 {
-                size_of_last_chunk = chunk_size;
-                chunk_count -= 1;
-            }
-
-            let mut uploader =
-                AWSMulitPartUpload::new(self.bucket.clone(), rpath.to_str().unwrap().to_string())
-                    .await?;
-
-            for chunk_index in 0..chunk_count {
-                let this_chunk = if chunk_count - 1 == chunk_index {
-                    size_of_last_chunk
-                } else {
-                    chunk_size
-                };
-
-                let stream = uploader
-                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
-                    .await?;
-
-                let part_number = (chunk_index as i32) + 1;
-                uploader.upload_part(part_number, stream).await?;
-            }
-
-            uploader.complete_upload().await?;
-
-            Ok(())
-        }
-
-        async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
-        where
-            S: TryStream + Send + Sync + Unpin + 'static,
-            S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-            bytes::Bytes: From<S::Ok>,
-            ByteStream: From<S>,
-        {
-            self.client
-                .put_object()
-                .bucket(&self.bucket)
-                .key(path)
-                .body(ByteStream::from(stream))
-                .send()
-                .await
-                .map_err(|e| StorageError::Error(format!("Failed to put object: {}", e)))?;
-
-            Ok(())
-        }
-
         // put object stream
     }
 
@@ -537,11 +459,76 @@ pub mod aws_storage {
             Ok(response)
         }
 
-        pub async fn create_multipart_upload(
+        pub async fn get_uploader(&self, path: &str) -> Result<AWSMulitPartUpload, StorageError> {
+            AWSMulitPartUpload::new(self.bucket.clone(), path.to_string()).await
+        }
+
+        pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+            let response = self
+                .client
+                .create_multipart_upload()
+                .bucket(&self.bucket)
+                .key(path)
+                .send()
+                .await
+                .map_err(|e| {
+                    StorageError::Error(format!("Failed to create multipart upload: {}", e))
+                })?;
+
+            Ok(response.upload_id.unwrap())
+        }
+
+        async fn upload_file_in_chunks(
             &self,
-            path: &str,
-        ) -> Result<AWSMulitPartUpload, StorageError> {
-            Ok(AWSMulitPartUpload::new(self.bucket.clone(), path.to_string()).await?)
+            lpath: &Path,
+            uploader: &mut AWSMulitPartUpload,
+        ) -> Result<(), StorageError> {
+            let chunk_size = 5 * 1024 * 1024; // 5MB
+
+            let file = File::open(lpath)
+                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+            // get file size
+            let metadata = file
+                .metadata()
+                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+            let file_size = metadata.len();
+
+            // calculate the number of parts
+            let mut chunk_count = (file_size / chunk_size) + 1;
+            let mut size_of_last_chunk = file_size % chunk_size;
+
+            if chunk_count > MAX_CHUNKS {
+                return Err(StorageError::Error(
+                    "File size is too large for multipart upload".to_string(),
+                ));
+            }
+
+            // if the last chunk is empty, reduce the number of parts
+            if size_of_last_chunk == 0 {
+                size_of_last_chunk = chunk_size;
+                chunk_count -= 1;
+            }
+
+            for chunk_index in 0..chunk_count {
+                let this_chunk = if chunk_count - 1 == chunk_index {
+                    size_of_last_chunk
+                } else {
+                    chunk_size
+                };
+
+                let stream = uploader
+                    .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
+                    .await?;
+
+                let part_number = (chunk_index as i32) + 1;
+                uploader.upload_part(part_number, stream).await?;
+            }
+
+            uploader.complete_upload().await?;
+
+            Ok(())
         }
     }
 
@@ -561,6 +548,58 @@ pub mod aws_storage {
         async fn new(settings: StorageSettings) -> Self {
             let client = AWSStorageClient::new(settings).await.unwrap();
             Self { client }
+        }
+    }
+
+    impl S3FStorageClient {
+        async fn put(
+            &self,
+            lpath: &Path,
+            rpath: &Path,
+            recursive: bool,
+        ) -> Result<(), StorageError> {
+            let stripped_lpath = lpath.strip_path(self.client().bucket().await);
+            let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+
+            if recursive {
+                if !stripped_lpath.is_dir() {
+                    return Err(StorageError::Error(
+                        "Local path must be a directory for recursive put".to_string(),
+                    ));
+                }
+
+                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+                for file in files {
+                    let stripped_lpath_clone = stripped_lpath.clone();
+                    let stripped_rpath_clone = stripped_rpath.clone();
+                    let stripped_file_path = file.strip_path(self.client().bucket().await);
+
+                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                    let remote_path = stripped_rpath_clone.join(relative_path);
+
+                    let mut uploader = self
+                        .client()
+                        .get_uploader(remote_path.to_str().unwrap())
+                        .await?;
+
+                    self.client()
+                        .upload_file_in_chunks(&stripped_file_path, &mut uploader)
+                        .await?;
+                }
+
+                Ok(())
+            } else {
+                let mut uploader = self
+                    .client()
+                    .get_uploader(stripped_rpath.to_str().unwrap())
+                    .await?;
+
+                self.client()
+                    .upload_file_in_chunks(&stripped_lpath, &mut uploader)
+                    .await?;
+                Ok(())
+            }
         }
     }
 
@@ -661,15 +700,25 @@ pub mod aws_storage {
                         let relative_path = file.relative_path(&stripped_lpath_clone)?;
                         let remote_path = stripped_rpath_clone.join(relative_path);
 
+                        let mut uploader = self
+                            .client
+                            .get_uploader(remote_path.to_str().unwrap())
+                            .await?;
+
                         self.client
-                            .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
+                            .upload_file_in_chunks(&stripped_file_path, &mut uploader)
                             .await?;
                     }
 
                     Ok(())
                 } else {
+                    let mut uploader = self
+                        .client
+                        .get_uploader(stripped_rpath.to_str().unwrap())
+                        .await?;
+
                     self.client
-                        .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
+                        .upload_file_in_chunks(&stripped_lpath, &mut uploader)
                         .await?;
                     Ok(())
                 }

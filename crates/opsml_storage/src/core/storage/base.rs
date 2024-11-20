@@ -1,9 +1,6 @@
 // create pyo3 async iterator
-use crate::core::storage::enums::MultiPartUploader;
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
-use aws_smithy_types::byte_stream::ByteStream;
-use futures::TryStream;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
@@ -48,8 +45,6 @@ impl Default for StorageSettings {
 }
 
 pub struct UploadPartArgs {
-    pub chunk_size: u64,
-    pub file_size: u64,
     pub path: PathBuf,
 }
 
@@ -103,13 +98,6 @@ pub trait StorageClient: Sized {
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
-    async fn upload_file_in_chunks(
-        &self,
-        local_path: &Path,
-        remote_path: &Path,
-        chunk_size: Option<u64>,
-        uploader: MultiPartUploader,
-    ) -> Result<(), StorageError>;
     async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
     async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError>;
     async fn delete_objects(&self, path: &str) -> Result<bool, StorageError>;
@@ -119,13 +107,6 @@ pub trait StorageClient: Sized {
         path: &str,
         expiration: u64,
     ) -> Result<String, StorageError>;
-
-    async fn put_stream_to_object<S>(&self, path: &str, stream: S) -> Result<(), StorageError>
-    where
-        S: TryStream + Send + Sync + Unpin + 'static,
-        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        bytes::Bytes: From<S::Ok>,
-        ByteStream: From<S>;
 }
 
 #[async_trait]
@@ -182,40 +163,7 @@ pub trait FileSystem<T: StorageClient> {
 
         Ok(())
     }
-    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
-        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
 
-        if recursive {
-            if !stripped_lpath.is_dir() {
-                return Err(StorageError::Error(
-                    "Local path must be a directory for recursive put".to_string(),
-                ));
-            }
-
-            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
-
-            for file in files {
-                let stripped_lpath_clone = stripped_lpath.clone();
-                let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket().await);
-
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
-
-                self.client()
-                    .upload_file_in_chunks(&stripped_file_path, &remote_path, None)
-                    .await?;
-            }
-
-            Ok(())
-        } else {
-            self.client()
-                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, None)
-                .await?;
-            Ok(())
-        }
-    }
     async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
         let stripped_src = src.strip_path(self.client().bucket().await);
         let stripped_dest = dest.strip_path(self.client().bucket().await);
@@ -268,18 +216,6 @@ pub trait FileSystem<T: StorageClient> {
         let stripped_path = path.strip_path(self.client().bucket().await);
         self.client()
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
-            .await
-    }
-    async fn put_stream<S>(&self, path: &Path, stream: S) -> Result<(), StorageError>
-    where
-        S: TryStream + Send + Sync + Unpin + 'static,
-        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        bytes::Bytes: From<S::Ok>,
-        ByteStream: From<S>,
-    {
-        let stripped_path = path.strip_path(self.client().bucket().await);
-        self.client()
-            .put_stream_to_object(stripped_path.to_str().unwrap(), stream)
             .await
     }
 }

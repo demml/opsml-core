@@ -1,4 +1,4 @@
-use crate::core::files::schema::UploadPartArgParser;
+use crate::core::files::schema::{MultiPartQuery, UploadPartArgParser};
 use crate::core::state::AppState;
 /// Route for debugging information
 use serde_json::json;
@@ -11,6 +11,32 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+
+pub async fn create_multipart_upload(
+    State(state): State<Arc<AppState>>,
+    params: Query<MultiPartQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let path = &params.path;
+
+    let uploader = state
+        .storage_client
+        .create_multipart_upload(path)
+        .await
+        .map_err(|e| ServerError::Error(format!("Failed to create multipart upload: {}", e)));
+
+    let uploader = match uploader {
+        Ok(uploader) => uploader,
+        Err(e) => {
+            error!("Failed to create multipart upload: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e })),
+            ));
+        }
+    };
+
+    Ok(Json(json!({ "session_uri": uploader.session_uri() })))
+}
 
 /// Route for uploading a part of a file
 ///

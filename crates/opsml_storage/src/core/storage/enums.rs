@@ -1,4 +1,4 @@
-use crate::core::http_client::client::{HttpFSStorageClient, HttpMultiPartUpload};
+use crate::core::http_client::client::HttpMultiPartUpload;
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
@@ -26,6 +26,30 @@ pub enum MultiPartUploader {
 }
 
 impl MultiPartUploader {
+    pub async fn new(
+        storage_type: StorageType,
+        settings: StorageSettings,
+    ) -> Result<Self, StorageError> {
+        match storage_type {
+            #[cfg(feature = "google_storage")]
+            StorageType::Google => {
+                let client = GCSFSStorageClient::new(settings).await;
+                let uploader = GoogleMultipartUpload::new(client).await;
+                Ok(MultiPartUploader::Google(uploader))
+            }
+            #[cfg(feature = "aws_storage")]
+            StorageType::AWS => {
+                let client = S3FStorageClient::new(settings).await;
+                let uploader = AWSMulitPartUpload::new(client).await;
+                Ok(MultiPartUploader::AWS(uploader))
+            }
+            StorageType::Local => {
+                let client = LocalFSStorageClient::new(settings).await;
+                let uploader = LocalMultiPartUpload::new(client).await;
+                Ok(MultiPartUploader::Local(uploader))
+            }
+        }
+    }
     pub async fn upload_part(
         &mut self,
         first_byte: &u64,
@@ -105,13 +129,20 @@ impl MultiPartUploader {
     }
 }
 
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum StorageType {
+    Google,
+    AWS,
+    Local,
+}
+
 pub enum StorageClientEnum {
     #[cfg(feature = "google_storage")]
     Google(GCSFSStorageClient),
     #[cfg(feature = "aws_storage")]
     AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
-    HTTP(HttpFSStorageClient),
 }
 
 impl StorageClientEnum {
@@ -122,33 +153,27 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
-            StorageClientEnum::HTTP(client) => client.name(),
         }
     }
-    // Implement the required methods for the StorageClient trait
-    // For example:
-    pub async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
-        // match start of storage uri with starts_with("gs://") or starts_with("s3://")
-        // to determine the storage type
-        if settings.using_client {
-            let client = HttpFSStorageClient::new(settings).await;
-            return Ok(StorageClientEnum::HTTP(client));
-        }
 
-        match settings.storage_uri {
+    pub async fn new(
+        storage_type: StorageType,
+        settings: StorageSettings,
+    ) -> Result<Self, StorageError> {
+        match storage_type {
             #[cfg(feature = "google_storage")]
-            _ if settings.storage_uri.starts_with("gs://") => {
+            StorageType::Google => {
                 // strip the gs:// prefix
                 let client = GCSFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Google(client))
             }
             #[cfg(feature = "aws_storage")]
-            _ if settings.storage_uri.starts_with("s3://") => {
+            StorageType::AWS => {
                 // strip the s3:// prefix
                 let client = S3FStorageClient::new(settings).await;
                 Ok(StorageClientEnum::AWS(client))
             }
-            _ => {
+            StorageType::Local => {
                 let client = LocalFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Local(client))
             }
@@ -162,7 +187,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
-            StorageClientEnum::HTTP(client) => client.find(path).await,
         }
     }
 
@@ -173,7 +197,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.find_info(path).await,
             StorageClientEnum::Local(client) => client.find_info(path).await,
-            StorageClientEnum::HTTP(client) => client.find_info(path).await,
         }
     }
 
@@ -189,7 +212,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
-            StorageClientEnum::HTTP(client) => client.get(lpath, rpath, recursive).await,
         }
     }
 
@@ -205,7 +227,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
-            StorageClientEnum::HTTP(client) => client.put(lpath, rpath, recursive).await,
         }
     }
 
@@ -216,7 +237,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
-            StorageClientEnum::HTTP(client) => client.copy(src, dest, recursive).await,
         }
     }
 
@@ -227,7 +247,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
-            StorageClientEnum::HTTP(client) => client.rm(path, recursive).await,
         }
     }
 
@@ -238,7 +257,6 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
-            StorageClientEnum::HTTP(client) => client.exists(path).await,
         }
     }
 
@@ -257,9 +275,6 @@ impl StorageClientEnum {
             StorageClientEnum::Local(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
-            StorageClientEnum::HTTP(client) => {
-                client.generate_presigned_url(path, expiration).await
-            }
         }
     }
 
@@ -276,41 +291,33 @@ impl StorageClientEnum {
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.put_stream(path, stream).await,
             StorageClientEnum::Local(client) => client.put_stream(path, stream).await,
-            StorageClientEnum::HTTP(client) => client.put_stream(path, stream).await,
         }
     }
 
-    pub async fn create_multipart_upload(
-        &self,
-        path: &Path,
-    ) -> Result<MultiPartUploader, StorageError> {
+    pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
         match self {
             #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
-                let uploader = client
+                // google returns the session uri
+                client
                     .client()
                     .create_multipart_upload(path.to_str().unwrap())
-                    .await?;
-                Ok(MultiPartUploader::Google(uploader))
+                    .await
             }
             #[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => {
-                let uploader = client
+                // aws returns the session uri
+                client
                     .client()
                     .create_multipart_upload(path.to_str().unwrap())
-                    .await?;
-                Ok(MultiPartUploader::AWS(uploader))
+                    .await
             }
             StorageClientEnum::Local(client) => {
-                let uploader = client
+                // local returns the path
+                client
                     .client()
                     .create_multipart_upload(path.to_str().unwrap())
-                    .await?;
-                Ok(MultiPartUploader::Local(uploader))
-            }
-            StorageClientEnum::HTTP(client) => {
-                let uploader = client.client().create_multipart_upload().await?;
-                Ok(MultiPartUploader::HTTP(uploader))
+                    .await
             }
         }
     }
@@ -325,10 +332,10 @@ pub struct PyStorageClient {
 #[pymethods]
 impl PyStorageClient {
     #[new]
-    fn new(settings: StorageSettings) -> PyResult<Self> {
+    fn new(storage_type: StorageType, settings: StorageSettings) -> PyResult<Self> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = rt
-            .block_on(StorageClientEnum::new(settings))
+            .block_on(StorageClientEnum::new(storage_type, settings))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
         Ok(PyStorageClient {
             inner: client,
@@ -406,6 +413,9 @@ impl PyStorageClient {
 }
 
 #[pyfunction]
-pub fn get_storage_client(settings: StorageSettings) -> PyResult<PyStorageClient> {
-    PyStorageClient::new(settings)
+pub fn get_storage_client(
+    storage_type: StorageType,
+    settings: StorageSettings,
+) -> PyResult<PyStorageClient> {
+    PyStorageClient::new(storage_type, settings)
 }
