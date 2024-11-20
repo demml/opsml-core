@@ -537,7 +537,7 @@ pub mod google_storage {
         /// # Returns
         ///
         /// A GoogleMultipartUpload client
-        pub async fn get_multipart_uploader(
+        pub async fn create_multipart_uploader(
             &self,
             path: &str,
             session_url: Option<String>,
@@ -677,7 +677,7 @@ pub mod google_storage {
 
                     let mut uploader = self
                         .client()
-                        .get_multipart_uploader(remote_path.to_str().unwrap(), None)
+                        .create_multipart_uploader(remote_path.to_str().unwrap(), None)
                         .await?;
 
                     self.client()
@@ -689,7 +689,7 @@ pub mod google_storage {
             } else {
                 let mut uploader = self
                     .client()
-                    .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                    .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                     .await?;
 
                 self.client()
@@ -801,7 +801,7 @@ pub mod google_storage {
 
                         let mut uploader = self
                             .client
-                            .get_multipart_uploader(remote_path.to_str().unwrap(), None)
+                            .create_multipart_uploader(remote_path.to_str().unwrap(), None)
                             .await?;
 
                         self.client
@@ -813,7 +813,7 @@ pub mod google_storage {
                 } else {
                     let mut uploader = self
                         .client
-                        .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                        .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                         .await?;
 
                     self.client

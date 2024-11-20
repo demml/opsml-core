@@ -1,18 +1,15 @@
 use crate::core::error::ServerError;
-use crate::core::files::schema::{
-    MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl, UploadPartArgParser,
-};
+use crate::core::files::schema::{MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl};
 use crate::core::state::AppState;
 use axum::{
-    extract::{Multipart, Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Query, State},
+    http::StatusCode,
     Json,
 };
-use opsml_storage::core::storage::enums::MultiPartUploader;
 /// Route for debugging information
 use serde_json::json;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::error;
 
 pub async fn create_multipart_upload(
@@ -70,7 +67,7 @@ pub async fn generate_presigned_url(
 
         let url = state
             .storage_client
-            .generate_presigned_url_for_part(part_number as i32, &params.path, session_url)
+            .generate_presigned_url_for_part(part_number, &params.path, session_url)
             .await
             .map_err(|e| ServerError::Error(format!("Failed to generate presigned url: {}", e)));
 

@@ -1,20 +1,15 @@
 use crate::core::utils::error::{ApiError, StorageError};
 
+use crate::core::storage::base::PathExt;
 use crate::core::storage::base::{
     FileInfo, FileSystem, StorageClient, StorageSettings, StorageType,
 };
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use async_trait::async_trait;
-use aws_smithy_types::byte_stream::ByteStream;
-use aws_smithy_types::byte_stream::Length;
-
-use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
-use futures::TryStream;
-use reqwest::multipart::{Form, Part};
 use reqwest::{
-    header::{self, HeaderMap, HeaderValue},
-    Body, Client,
+    header::{HeaderMap, HeaderValue},
+    Client,
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -23,10 +18,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::sync::Mutex;
-use tokio_util::codec::{BytesCodec, FramedRead};
 
+use crate::core::storage::base::get_files;
 const TIMEOUT_SECS: u64 = 30;
-const CHUNK_SIZE: usize = 1024 * 1024 * 5;
 const MAX_CHUNKS: u64 = 10000;
 
 #[derive(Debug, Clone)]
@@ -257,36 +251,6 @@ impl ApiClient {
 
         Ok(response)
     }
-
-    /// creates a multipart upload request. Returns the upload uri
-    ///
-    /// # Arguments
-    ///
-    /// * `rpath` - the path to the file to upload
-    ///
-    /// # Returns
-    ///
-    /// * `Result<String, ApiError>` - the upload uri
-    async fn create_multipart_upload(&mut self, rpath: &str) -> Result<String, ApiError> {
-        let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), rpath.to_string());
-
-        let result = self
-            .request_with_retry(
-                Routes::Multipart,
-                RequestType::Get,
-                None,
-                Some(query_params),
-                None,
-            )
-            .await?;
-
-        let session_url = result["session_url"]
-            .as_str()
-            .ok_or_else(|| ApiError::Error("Failed to get resumable id".to_string()))?;
-
-        Ok(session_url.to_string())
-    }
 }
 
 pub struct ApiClientArgs {
@@ -302,35 +266,6 @@ pub struct HttpStorageClient {
     api_client: Arc<Mutex<ApiClient>>,
     pub bucket: PathBuf,
     storage_client: StorageClientEnum,
-}
-
-impl HttpStorageClient {
-    fn get_http_kwargs(kwargs: HashMap<String, String>) -> Result<ApiClientArgs, StorageError> {
-        let base_url = kwargs.get("base_url").ok_or(StorageError::Error(
-            "base_url not found in kwargs".to_string(),
-        ))?;
-
-        let auth_auth = kwargs
-            .get("use_auth")
-            .ok_or(StorageError::Error("auth not found in kwargs".to_string()))?;
-
-        let path_prefix = kwargs.get("path_prefix").ok_or(StorageError::Error(
-            "path_prefix not found in kwargs".to_string(),
-        ))?;
-
-        let username = kwargs.get("username");
-        let password = kwargs.get("password");
-        let token = kwargs.get("token");
-
-        Ok(ApiClientArgs {
-            base_url: base_url.to_string(),
-            use_auth: auth_auth.parse().unwrap(),
-            path_prefix: path_prefix.to_string(),
-            username: username.map(|s| s.to_string()),
-            password: password.map(|s| s.to_string()),
-            token: token.map(|s| s.to_string()),
-        })
-    }
 }
 
 #[async_trait]
@@ -498,11 +433,38 @@ impl StorageClient for HttpStorageClient {
 }
 
 impl HttpStorageClient {
+    fn get_http_kwargs(kwargs: HashMap<String, String>) -> Result<ApiClientArgs, StorageError> {
+        let base_url = kwargs.get("base_url").ok_or(StorageError::Error(
+            "base_url not found in kwargs".to_string(),
+        ))?;
+
+        let auth_auth = kwargs
+            .get("use_auth")
+            .ok_or(StorageError::Error("auth not found in kwargs".to_string()))?;
+
+        let path_prefix = kwargs.get("path_prefix").ok_or(StorageError::Error(
+            "path_prefix not found in kwargs".to_string(),
+        ))?;
+
+        let username = kwargs.get("username");
+        let password = kwargs.get("password");
+        let token = kwargs.get("token");
+
+        Ok(ApiClientArgs {
+            base_url: base_url.to_string(),
+            use_auth: auth_auth.parse().unwrap(),
+            path_prefix: path_prefix.to_string(),
+            username: username.map(|s| s.to_string()),
+            password: password.map(|s| s.to_string()),
+            token: token.map(|s| s.to_string()),
+        })
+    }
+
     pub async fn generate_presigned_url_for_part(
         &self,
         path: &str,
         session_url: &str,
-        part_number: u64,
+        part_number: i32,
     ) -> Result<String, StorageError> {
         let mut query_params = HashMap::new();
         query_params.insert("path".to_string(), path.to_string());
@@ -552,6 +514,23 @@ impl HttpStorageClient {
         let session_uri = &response["session_uri"];
 
         Ok(session_uri.to_string())
+    }
+
+    /// Create a multipart uploader based on configured storage type
+    pub async fn create_multipart_uploader(
+        &self,
+        rpath: &Path,
+    ) -> Result<MultiPartUploader, StorageError> {
+        let session_url = self
+            .create_multipart_upload(rpath.to_str().unwrap())
+            .await?;
+
+        let uploader = self
+            .storage_client
+            .create_multipart_uploader(rpath, session_url)
+            .await?;
+
+        Ok(uploader)
     }
 
     async fn upload_file_in_chunks(
@@ -605,15 +584,16 @@ impl HttpStorageClient {
 
             let part_number = (chunk_index as i32) + 1;
 
+            // call server to get presigned url for part
             let presigned_url = self
-                .storage_client
                 .generate_presigned_url_for_part(
-                    part_number,
                     rpath.to_str().unwrap(),
-                    uploader.session_url(),
+                    &uploader.session_url(),
+                    part_number,
                 )
                 .await?;
 
+            // pass presigned url to upload part
             uploader
                 .upload_part_with_presigned_url(
                     &first_byte,
@@ -649,6 +629,56 @@ impl FileSystem<HttpStorageClient> for HttpFSStorageClient {
     async fn new(settings: StorageSettings) -> Self {
         HttpFSStorageClient {
             client: HttpStorageClient::new(settings).await.unwrap(),
+        }
+    }
+}
+
+impl HttpFSStorageClient {
+    pub async fn put(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        recursive: bool,
+    ) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+
+        if recursive {
+            if !stripped_lpath.is_dir() {
+                return Err(StorageError::Error(
+                    "Local path must be a directory for recursive put".to_string(),
+                ));
+            }
+
+            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+            for file in files {
+                let stripped_lpath_clone = stripped_lpath.clone();
+                let stripped_rpath_clone = stripped_rpath.clone();
+                let stripped_file_path = file.strip_path(self.client().bucket().await);
+
+                let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                let remote_path = stripped_rpath_clone.join(relative_path);
+
+                let mut uploader = self.client().create_multipart_uploader(rpath).await?;
+
+                self.client()
+                    .upload_file_in_chunks(&stripped_file_path, &remote_path, &mut uploader)
+                    .await?;
+            }
+
+            Ok(())
+        } else {
+            let mut uploader = self
+                .client()
+                .create_multipart_uploader(&stripped_rpath)
+                .await?;
+
+            self.client()
+                .upload_file_in_chunks(&stripped_lpath, &stripped_rpath, &mut uploader)
+                .await?;
+
+            Ok(())
         }
     }
 }

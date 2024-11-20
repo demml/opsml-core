@@ -337,7 +337,7 @@ impl StorageClientEnum {
         }
     }
 
-    pub async fn get_multipart_uploader(
+    pub async fn create_multipart_uploader(
         &self,
         path: &Path,
         session_url: String,
@@ -347,7 +347,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => {
                 let uploader = client
                     .client()
-                    .get_multipart_uploader(path.to_str().unwrap(), Some(session_url))
+                    .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
                     .await?;
 
                 Ok(MultiPartUploader::Google(uploader))
@@ -356,7 +356,7 @@ impl StorageClientEnum {
             StorageClientEnum::AWS(client) => {
                 let uploader = client
                     .client()
-                    .get_multipart_uploader(path.to_str().unwrap(), Some(session_url))
+                    .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
                     .await?;
                 Ok(MultiPartUploader::AWS(uploader))
             }

@@ -1,5 +1,5 @@
 use crate::core::debug::route::debug_info;
-use crate::core::files::route::upload_file;
+use crate::core::files::route::{create_multipart_upload, generate_presigned_url};
 use crate::core::health::route::health_check;
 use crate::core::state::AppState;
 use axum::http::{
@@ -30,7 +30,14 @@ pub async fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route(&format!("{}/healthcheck", ROUTE_PREFIX), get(health_check))
         .route(&format!("{}/debug", ROUTE_PREFIX), get(debug_info))
-        .route(&format!("{}/files", ROUTE_PREFIX), post(upload_file))
+        .route(
+            &format!("{}/files/multipart", ROUTE_PREFIX),
+            get(create_multipart_upload),
+        )
+        .route(
+            &format!("{}/files/presigned", ROUTE_PREFIX),
+            get(generate_presigned_url),
+        )
         .with_state(app_state)
         .layer(cors)
 }

@@ -13,7 +13,7 @@ pub struct MultiPartQuery {
 pub struct PresignedQuery {
     pub path: String,
     pub session_url: Option<String>,
-    pub part_number: Option<u64>,
+    pub part_number: Option<i32>,
     pub for_multi_part: Option<bool>,
 }
 

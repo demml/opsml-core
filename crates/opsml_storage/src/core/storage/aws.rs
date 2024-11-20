@@ -517,7 +517,7 @@ pub mod aws_storage {
             Ok(response.upload_id.unwrap())
         }
 
-        pub async fn get_multipart_uploader(
+        pub async fn create_multipart_uploader(
             &self,
             path: &str,
             session_url: Option<String>,
@@ -658,7 +658,7 @@ pub mod aws_storage {
 
                     let mut uploader = self
                         .client()
-                        .get_multipart_uploader(remote_path.to_str().unwrap(), None)
+                        .create_multipart_uploader(remote_path.to_str().unwrap(), None)
                         .await?;
 
                     self.client()
@@ -670,7 +670,7 @@ pub mod aws_storage {
             } else {
                 let mut uploader = self
                     .client()
-                    .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                    .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                     .await?;
 
                 self.client()
@@ -791,7 +791,7 @@ pub mod aws_storage {
 
                         let mut uploader = self
                             .client
-                            .get_multipart_uploader(remote_path.to_str().unwrap(), None)
+                            .create_multipart_uploader(remote_path.to_str().unwrap(), None)
                             .await?;
 
                         self.client
@@ -803,7 +803,7 @@ pub mod aws_storage {
                 } else {
                     let mut uploader = self
                         .client
-                        .get_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                        .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
                         .await?;
 
                     self.client
