@@ -52,16 +52,19 @@ pub mod aws_storage {
     }
 
     impl AWSMulitPartUpload {
-        pub async fn new(bucket: String, path: String) -> Result<Self, StorageError> {
+        pub async fn new(bucket: &str, path: &str) -> Result<Self, StorageError> {
             // create a resuable runtime for the multipart upload
 
             let creds = AWSCreds::new().await?;
             let client = Client::new(&creds.config);
 
+            let _bucket = bucket.to_string();
+            let _path = path.to_string();
+
             let response = client
                 .create_multipart_upload()
-                .bucket(&bucket)
-                .key(&path)
+                .bucket(&_bucket)
+                .key(&_path)
                 .send()
                 .await
                 .map_err(|e| {
@@ -70,8 +73,8 @@ pub mod aws_storage {
 
             Ok(Self {
                 client,
-                bucket,
-                path,
+                bucket: _bucket,
+                path: _path,
                 upload_id: response.upload_id.unwrap(),
                 upload_parts: Vec::new(),
             })
@@ -460,7 +463,7 @@ pub mod aws_storage {
         }
 
         pub async fn get_uploader(&self, path: &str) -> Result<AWSMulitPartUpload, StorageError> {
-            AWSMulitPartUpload::new(self.bucket.clone(), path.to_string()).await
+            AWSMulitPartUpload::new(&self.bucket, path).await
         }
 
         pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {

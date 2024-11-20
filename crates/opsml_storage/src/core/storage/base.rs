@@ -113,6 +113,7 @@ pub trait StorageClient: Sized {
 pub trait FileSystem<T: StorageClient> {
     fn name(&self) -> &str;
     fn client(&self) -> &T;
+
     async fn new(settings: StorageSettings) -> Self;
 
     async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {

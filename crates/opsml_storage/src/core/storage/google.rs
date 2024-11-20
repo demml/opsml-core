@@ -108,7 +108,7 @@ pub mod google_storage {
             let _filename = path.to_string();
 
             let metadata = Object {
-                name: _filename.clone(),
+                name: _filename,
                 content_type: Some("application/octet-stream".to_string()),
                 ..Default::default()
             };

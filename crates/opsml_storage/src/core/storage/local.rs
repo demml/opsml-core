@@ -12,6 +12,13 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use walkdir::WalkDir;
 
+// left off here
+// removed multiupload part and implemented put on each storage client
+// need to fix up http client
+// - method for creating resumable upload
+// - method for creating uploader from resumable upload
+// - method for uploading part (special handling for local storage, or do we just use the same method?)
+
 pub struct LocalMultiPartUpload {
     pub file: fs::File,
 }

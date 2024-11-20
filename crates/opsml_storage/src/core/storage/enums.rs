@@ -1,17 +1,141 @@
+use crate::core::http_client::client::HttpMultiPartUpload;
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings};
-use crate::core::storage::local::LocalFSStorageClient;
+use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
 use crate::core::utils::error::StorageError;
+use aws_smithy_types::byte_stream::ByteStream;
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "google_storage")]
-use crate::core::storage::google::google_storage::GCSFSStorageClient;
+use crate::core::storage::google::google_storage::{GCSFSStorageClient, GoogleMultipartUpload};
 
 #[cfg(feature = "aws_storage")]
-use crate::core::storage::aws::aws_storage::S3FStorageClient;
+use crate::core::storage::aws::aws_storage::{AWSMulitPartUpload, S3FStorageClient};
+
+pub enum MultiPartUploader {
+    #[cfg(feature = "google_storage")]
+    Google(GoogleMultipartUpload),
+    #[cfg(feature = "aws_storage")]
+    AWS(AWSMulitPartUpload),
+    Local(LocalMultiPartUpload),
+    HTTP(HttpMultiPartUpload),
+}
+
+impl MultiPartUploader {
+    pub async fn new(
+        storage_type: StorageType,
+        settings: StorageSettings,
+        path: &Path,
+    ) -> Result<Self, StorageError> {
+        match storage_type {
+            #[cfg(feature = "google_storage")]
+            StorageType::Google => {
+                let client = GCSFSStorageClient::new(settings).await;
+                let uploader = GoogleMultipartUpload::new(
+                    &client.client().client,
+                    &client.client().bucket,
+                    path.to_str().unwrap(),
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("{:?}", e)))?;
+                Ok(MultiPartUploader::Google(uploader))
+            }
+            #[cfg(feature = "aws_storage")]
+            StorageType::AWS => {
+                let client = S3FStorageClient::new(settings).await;
+                let uploader =
+                    AWSMulitPartUpload::new(&client.client().bucket, path.to_str().unwrap())
+                        .await
+                        .map_err(|e| StorageError::Error(format!("{:?}", e)))?;
+
+                Ok(MultiPartUploader::AWS(uploader))
+            }
+            StorageType::Local => {
+                unimplemented!("Local storage is not supported for multipart uploads")
+            }
+        }
+    }
+    pub async fn upload_part(
+        &mut self,
+        first_byte: &u64,
+        last_byte: &u64,
+        part_number: &i32,
+        total_size: &u64,
+        body: bytes::Bytes,
+    ) -> Result<bool, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => {
+                let stream = ByteStream::from(body);
+                uploader
+                    .upload_part(stream, first_byte, last_byte, total_size)
+                    .await?;
+                Ok(true)
+            }
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => {
+                let stream = ByteStream::from(body);
+                uploader.upload_part(*part_number, stream).await
+            }
+
+            MultiPartUploader::Local(uploader) => uploader.upload_part(body).await,
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+
+                Ok(false)
+            }
+        }
+    }
+
+    pub async fn get_next_chunk(
+        &self,
+        path: &Path,
+        chunk_size: u64,
+        chunk_index: u64,
+        this_chunk_size: u64,
+    ) -> Result<ByteStream, StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            MultiPartUploader::Local(uploader) => {
+                uploader
+                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
+                    .await
+            }
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+                unimplemented!()
+            }
+        }
+    }
+
+    pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
+        match self {
+            #[cfg(feature = "google_storage")]
+            MultiPartUploader::Google(uploader) => uploader.complete_upload().await,
+            #[cfg(feature = "aws_storage")]
+            MultiPartUploader::AWS(uploader) => uploader.complete_upload().await,
+            MultiPartUploader::Local(uploader) => uploader.complete_upload().await,
+            MultiPartUploader::HTTP(_uploader) => {
+                // this should only raise an error
+                Ok(())
+            }
+        }
+    }
+}
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone)]
