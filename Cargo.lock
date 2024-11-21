@@ -2387,6 +2387,7 @@ version = "0.1.0"
 dependencies = [
  "pyo3",
  "rand 0.8.5",
+ "serde",
 ]
 
 [[package]]

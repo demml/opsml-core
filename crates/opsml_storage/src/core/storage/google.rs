@@ -928,7 +928,7 @@ pub mod google_storage {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings};
+        use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings};
         use std::io::Write;
         use tokio;
 

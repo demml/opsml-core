@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tokio::fs::File;
 
 const TIMEOUT_SECS: u64 = 30;
@@ -32,7 +33,7 @@ pub enum Routes {
     ListInfo,
     Files,
     Healthcheck,
-    StorageSettings
+    StorageSettings,
 }
 
 impl Routes {
@@ -44,7 +45,7 @@ impl Routes {
             Routes::List => "files/list",
             Routes::ListInfo => "files/list_info",
             Routes::Healthcheck => "healthcheck",
-            Routes::StorageSettings => "storage/settings"
+            Routes::StorageSettings => "storage/settings",
         }
     }
 }
@@ -248,25 +249,53 @@ impl HttpStorageClient {
         self.storage_client.storage_type()
     }
 
-    async fn new(settings: &OpsmlStorageSettings, client: &Client) -> Result<Self, StorageError> {
+    async fn new(
+        settings: &mut OpsmlStorageSettings,
+        client: &Client,
+    ) -> Result<Self, StorageError> {
         let mut api_client = OpsmlApiClient::new(&settings, &client)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
 
+        // get storage type from opsml_server
+        let storage_type = Self::get_storage_setting(&mut api_client)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to get storage type: {}", e)))?;
 
-        /// get storage type from opsml_server
-        api_client.request_with_retry(Routes::ListInfo, request_type, body_params, query_params, headers)
+        // update settings type
+        settings.storage_type = storage_type;
 
-        let storage_client = StorageClientEnum::new(settings.clone())
+        // get storage client (options are gcs, aws, azure and local)
+        let storage_client = StorageClientEnum::new(settings)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to create storage client: {}", e)))?;
-
-        // if setti
 
         Ok(Self {
             api_client,
             storage_client,
         })
+    }
+
+    /// Function used to get the storage type from the server.
+    /// A storage client is needed for when uploading and downloading files via presigned urls.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The OpsmlApiClient
+    ///
+    /// # Returns
+    ///
+    /// * `StorageType` - The storage type
+    async fn get_storage_setting(client: &mut OpsmlApiClient) -> Result<StorageType, ApiError> {
+        let response = client
+            .request_with_retry(Routes::StorageSettings, RequestType::Get, None, None, None)
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to get storage settings: {}", e)))?;
+
+        let storage_type = response["storage_type"].to_string();
+
+        StorageType::from_str(&storage_type)
+            .map_err(|e| ApiError::Error(format!("Failed to get storage type: {}", e)))
     }
 
     async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {

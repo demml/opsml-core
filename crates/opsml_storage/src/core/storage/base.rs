@@ -3,7 +3,6 @@ use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
-use reqwest::Client;
 use std::path::Path;
 use std::path::PathBuf;
 // take a stream of bytes

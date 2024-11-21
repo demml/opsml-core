@@ -1,8 +1,7 @@
 #[cfg(feature = "aws_storage")]
 pub mod aws_storage {
-    use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, StorageType,
-    };
+    use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt, StorageClient};
+    use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
@@ -198,7 +197,7 @@ pub mod aws_storage {
         async fn bucket(&self) -> &str {
             &self.bucket
         }
-        async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
+        async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
             // create a resuable runtime for client
 
             let creds = AWSCreds::new().await?;
@@ -623,7 +622,7 @@ pub mod aws_storage {
         fn client(&self) -> &AWSStorageClient {
             &self.client
         }
-        async fn new(settings: StorageSettings) -> Self {
+        async fn new(settings: &OpsmlStorageSettings) -> Self {
             let client = AWSStorageClient::new(settings).await.unwrap();
             Self { client }
         }
@@ -701,7 +700,7 @@ pub mod aws_storage {
     #[pymethods]
     impl PyS3FSStorageClient {
         #[new]
-        fn new(settings: StorageSettings) -> Self {
+        fn new(settings: &OpsmlStorageSettings) -> Self {
             let rt = tokio::runtime::Runtime::new().unwrap();
             let client = rt
                 .block_on(async { AWSStorageClient::new(settings).await })
@@ -887,19 +886,21 @@ pub mod aws_storage {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use opsml_settings::config::OpsmlConfig;
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
 
         const CHUNK_SIZE: u64 = 1024 * 256;
 
-        pub fn get_settings() -> StorageSettings {
+        fn get_settings() -> OpsmlStorageSettings {
             let bucket = std::env::var("CLOUD_BUCKET_NAME")
                 .unwrap_or_else(|_| "opsml-integration".to_string());
 
-            StorageSettings {
-                storage_uri: bucket,
-                ..Default::default()
-            }
+            let config = OpsmlConfig::new();
+            let mut settings = config.storage_settings();
+            settings.storage_uri = bucket;
+
+            settings
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
@@ -976,13 +977,13 @@ pub mod aws_storage {
         #[test]
         fn test_aws_storage_client_new() {
             let settings = get_settings();
-            let _client = AWSStorageClient::new(settings);
+            let _client = AWSStorageClient::new(&settings);
         }
 
         #[tokio::test]
         async fn test_aws_storage_client_get_object() {
             let settings = get_settings();
-            let client = AWSStorageClient::new(settings).await.unwrap();
+            let client = AWSStorageClient::new(&settings).await.unwrap();
 
             // should fail since there are no suffixes
             let result = client.get_object("local_path", "remote_path").await;
@@ -992,7 +993,7 @@ pub mod aws_storage {
         #[tokio::test]
         async fn test_s3f_storage_client_put() {
             let settings = get_settings();
-            let client = S3FStorageClient::new(settings).await;
+            let client = S3FStorageClient::new(&settings).await;
 
             //
             let dirname = create_nested_data(&CHUNK_SIZE);
@@ -1049,7 +1050,7 @@ pub mod aws_storage {
         #[tokio::test]
         async fn test_aws_storage_client_generate_presigned_url() {
             let settings = get_settings();
-            let client = S3FStorageClient::new(settings).await;
+            let client = S3FStorageClient::new(&settings).await;
 
             // create file
             let key = create_single_file(&CHUNK_SIZE);
@@ -1070,7 +1071,7 @@ pub mod aws_storage {
         #[tokio::test]
         async fn test_aws_large_file_upload() {
             let settings = get_settings();
-            let client = S3FStorageClient::new(settings).await;
+            let client = S3FStorageClient::new(&settings).await;
 
             // create file
             let chunk_size = 1024 * 1024 * 5; // 5MB

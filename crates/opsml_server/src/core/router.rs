@@ -1,6 +1,7 @@
 use crate::core::debug::route::debug_info;
 use crate::core::files::route::{create_multipart_upload, generate_presigned_url};
 use crate::core::health::route::health_check;
+use crate::core::settings::route::storage_settings;
 use crate::core::state::AppState;
 use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
@@ -27,6 +28,10 @@ pub async fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route(&format!("{}/healthcheck", ROUTE_PREFIX), get(health_check))
         .route(&format!("{}/debug", ROUTE_PREFIX), get(debug_info))
+        .route(
+            &format!("{}/storage/settings", ROUTE_PREFIX),
+            get(storage_settings),
+        )
         .route(
             &format!("{}/files/multipart", ROUTE_PREFIX),
             get(create_multipart_upload),

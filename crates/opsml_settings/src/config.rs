@@ -1,15 +1,30 @@
 use pyo3::prelude::*;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum StorageType {
     Google,
     AWS,
     Local,
+}
+
+impl FromStr for StorageType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "google" => Ok(StorageType::Google),
+            "aws" => Ok(StorageType::AWS),
+            "local" => Ok(StorageType::Local),
+            _ => Err(format!("'{}' is not a valid StorageType", s)),
+        }
+    }
 }
 
 /// ApiSettings for use with ApiClient
