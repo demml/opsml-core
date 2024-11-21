@@ -1,4 +1,6 @@
 if __name__ == "__main__":
+    from pathlib import Path
+    import uuid
     from opsml_storage_local import PyHttpFSStorageClient, StorageType, StorageSettings
 
     kwargs = {
@@ -10,3 +12,9 @@ if __name__ == "__main__":
     settings = StorageSettings(storage_uri, True, storage_type, kwargs)
 
     client = PyHttpFSStorageClient(settings)
+
+    lpath = Path("tests/assets/cats.jpg")
+    rpath_dir = Path(uuid.uuid4().hex)
+    rpath = rpath_dir / "cats.jpg"
+
+    client.put(lpath, rpath)

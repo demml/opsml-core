@@ -1,59 +1,14 @@
 // create pyo3 async iterator
 use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
-use std::collections::HashMap;
+use reqwest::Client;
 use std::path::Path;
 use std::path::PathBuf;
 // take a stream of bytes
 
 // create a method for Path that returns a relative path
-
-#[derive(Debug, Clone)]
-#[pyclass]
-pub struct StorageSettings {
-    #[pyo3(get)]
-    pub storage_uri: String,
-
-    #[pyo3(get)]
-    pub using_client: bool,
-
-    #[pyo3(get)]
-    pub kwargs: HashMap<String, String>,
-
-    #[pyo3(get)]
-    pub storage_type: StorageType,
-}
-
-#[pymethods]
-impl StorageSettings {
-    #[new]
-    pub fn new(
-        storage_uri: String,
-        using_client: bool,
-        storage_type: StorageType,
-        kwargs: HashMap<String, String>,
-    ) -> Self {
-        StorageSettings {
-            storage_uri,
-            using_client,
-            kwargs,
-            storage_type,
-        }
-    }
-}
-
-impl Default for StorageSettings {
-    fn default() -> Self {
-        StorageSettings {
-            storage_uri: "".to_string(),
-            using_client: false,
-            kwargs: HashMap::new(),
-            storage_type: StorageType::Local,
-        }
-    }
-}
-
 pub struct UploadPartArgs {
     pub path: PathBuf,
 }
@@ -105,7 +60,7 @@ pub fn get_files(path: &Path) -> Result<Vec<PathBuf>, StorageError> {
 pub trait StorageClient: Sized {
     fn storage_type(&self) -> StorageType;
     async fn bucket(&self) -> &str;
-    async fn new(settings: StorageSettings) -> Result<Self, StorageError>;
+    async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError>;
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError>;
     async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError>;
@@ -129,7 +84,7 @@ pub trait FileSystem<T: StorageClient> {
         self.client().storage_type()
     }
 
-    async fn new(settings: StorageSettings) -> Self;
+    async fn new(settings: &OpsmlStorageSettings) -> Self;
 
     async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
         let stripped_path = path.strip_path(self.client().bucket().await);
@@ -234,14 +189,6 @@ pub trait FileSystem<T: StorageClient> {
             .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
             .await
     }
-}
-
-#[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone)]
-pub enum StorageType {
-    Google,
-    AWS,
-    Local,
 }
 
 #[derive(Debug)]

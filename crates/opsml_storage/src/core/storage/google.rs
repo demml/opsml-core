@@ -1,9 +1,7 @@
 #[cfg(feature = "google_storage")]
 pub mod google_storage {
 
-    use crate::core::storage::base::{
-        get_files, FileInfo, FileSystem, PathExt, StorageClient, StorageSettings, StorageType,
-    };
+    use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt, StorageClient};
     use crate::core::utils::error::StorageError;
     use async_trait::async_trait;
     use aws_smithy_types::byte_stream::ByteStream;
@@ -25,7 +23,10 @@ pub mod google_storage {
     use google_cloud_storage::http::resumable_upload_client::UploadStatus;
     use google_cloud_storage::sign::SignedURLMethod;
     use google_cloud_storage::sign::SignedURLOptions;
+    use opsml_settings::config::{OpsmlStorageSettings, StorageType};
     use pyo3::prelude::*;
+    use reqwest::header::{CONTENT_LENGTH, CONTENT_RANGE};
+    use reqwest::Client as HttpClient;
 
     use reqwest_middleware::ClientWithMiddleware;
     use serde_json::Value;
@@ -99,18 +100,14 @@ pub mod google_storage {
     }
 
     pub struct GoogleMultipartUpload {
-        pub client: ResumableUploadClient,
+        pub upload_client: ResumableUploadClient,
         pub upload_status: UploadStatus,
     }
 
     impl GoogleMultipartUpload {
-        pub async fn new(
-            http: ClientWithMiddleware,
-            session_url: String,
-        ) -> Result<Self, StorageError> {
-            let client = ResumableUploadClient::new(session_url, http);
+        pub async fn new(upload_client: ResumableUploadClient) -> Result<Self, StorageError> {
             Ok(GoogleMultipartUpload {
-                client,
+                upload_client,
                 upload_status: UploadStatus::NotStarted,
             })
         }
@@ -148,7 +145,7 @@ pub mod google_storage {
                 .into_bytes();
 
             let result = self
-                .client
+                .upload_client
                 .upload_multiple_chunk(data, &size)
                 .await
                 .map_err(|e| {
@@ -161,6 +158,45 @@ pub mod google_storage {
             self.upload_status = result;
 
             Ok(())
+            //let size = ChunkSize::new(*first_byte, *last_byte, Some(*file_size));
+
+            //let data = chunk
+            //    .collect()
+            //    .await
+            //    .map_err(|e| StorageError::Error(format!("Unable to collect chunk data: {}", e)))?
+            //    .into_bytes();
+
+            //let content_range = format!("bytes {}-{}/{}", first_byte, last_byte, file_size);
+            //let chunk_size = if file_size == first_byte {
+            //    0
+            //} else {
+            //    last_byte - first_byte + 1
+            //};
+
+            //let http_client = HttpClient::new();
+            //let url = self.session_url.clone();
+
+            //let response = http_client
+            //    .put(url)
+            //    .header(CONTENT_LENGTH, chunk_size)
+            //    .header(CONTENT_RANGE, content_range)
+            //    .body(data)
+            //    .send()
+            //    .await
+            //    .map_err(|e| StorageError::Error(format!("Unable to send chunk data: {}", e)))?;
+
+            //if response.status().is_success() {
+            //    println!("Chunk uploaded successfully");
+            //} else {
+            //    println!(
+            //        "Failed to upload chunk: {:?}",
+            //        response.text().await.map_err(|e| {
+            //            StorageError::Error(format!("Unable to get response text: {}", e))
+            //        })?
+            //    );
+            //}
+
+            //Ok(())
         }
 
         pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
@@ -179,7 +215,6 @@ pub mod google_storage {
     pub struct GoogleStorageClient {
         pub client: Client,
         pub bucket: String,
-        pub http: ClientWithMiddleware,
     }
 
     #[async_trait]
@@ -190,7 +225,7 @@ pub mod google_storage {
         async fn bucket(&self) -> &str {
             &self.bucket
         }
-        async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
+        async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
             let creds = GcpCreds::new().await?;
             // If no credentials, attempt to create a default client pulling from the environment
             let config = if creds.creds.is_none() {
@@ -222,10 +257,6 @@ pub mod google_storage {
 
             let config = config?;
 
-            let http = config.http.clone().unwrap_or_else(|| {
-                reqwest_middleware::ClientBuilder::new(reqwest::Client::default()).build()
-            });
-
             let client = Client::new(config);
 
             // strip gs:// from the bucket name if exists
@@ -235,11 +266,7 @@ pub mod google_storage {
                 .unwrap_or(&settings.storage_uri)
                 .to_string();
 
-            Ok(GoogleStorageClient {
-                client,
-                bucket,
-                http,
-            })
+            Ok(GoogleStorageClient { client, bucket })
         }
 
         /// Download a remote object as a stream to a local file
@@ -501,7 +528,10 @@ pub mod google_storage {
             Ok(result)
         }
 
-        pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
+        pub async fn create_multipart_upload(
+            &self,
+            path: &str,
+        ) -> Result<ResumableUploadClient, StorageError> {
             let _filename = path.to_string();
 
             let metadata = Object {
@@ -524,7 +554,7 @@ pub mod google_storage {
                     StorageError::Error(format!("Unable to create resumable session: {}", e))
                 })?;
 
-            Ok(result.url().to_string())
+            Ok(result)
         }
 
         /// Will create a google multipart uploader and return the client
@@ -542,12 +572,11 @@ pub mod google_storage {
             path: &str,
             session_url: Option<String>,
         ) -> Result<GoogleMultipartUpload, StorageError> {
-            let session_url = match session_url {
-                Some(url) => url,
+            let resumable_upload_client = match session_url {
+                Some(url) => self.client.get_resumable_upload(url),
                 None => self.create_multipart_upload(path).await?,
             };
-
-            let client = GoogleMultipartUpload::new(self.http.clone(), session_url).await?;
+            let client = GoogleMultipartUpload::new(resumable_upload_client).await?;
             Ok(client)
         }
 
@@ -633,7 +662,7 @@ pub mod google_storage {
         fn client(&self) -> &GoogleStorageClient {
             &self.client
         }
-        async fn new(settings: StorageSettings) -> Self {
+        async fn new(settings: &OpsmlStorageSettings) -> Self {
             GCSFSStorageClient {
                 client: GoogleStorageClient::new(settings).await.unwrap(),
             }
@@ -709,7 +738,7 @@ pub mod google_storage {
     #[pymethods]
     impl PyGCSFSStorageClient {
         #[new]
-        fn new(settings: StorageSettings) -> Self {
+        fn new(settings: &OpsmlStorageSettings) -> Self {
             let rt = tokio::runtime::Runtime::new().unwrap();
 
             let client = rt.block_on(async { GoogleStorageClient::new(settings).await.unwrap() });
@@ -899,6 +928,7 @@ pub mod google_storage {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings};
         use std::io::Write;
         use tokio;
 
@@ -907,14 +937,12 @@ pub mod google_storage {
 
         const CHUNK_SIZE: u64 = 1024 * 256;
 
-        pub fn get_settings() -> StorageSettings {
-            let bucket = std::env::var("CLOUD_BUCKET_NAME")
-                .unwrap_or_else(|_| "opsml-storage-integration".to_string());
+        pub fn get_settings() -> OpsmlStorageSettings {
+            let config = OpsmlConfig::new();
 
-            StorageSettings {
-                storage_uri: bucket,
-                ..Default::default()
-            }
+            let storage_settings = config.storage_settings();
+
+            storage_settings
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {
@@ -991,13 +1019,13 @@ pub mod google_storage {
         #[test]
         fn test_google_client_new() {
             let settings = get_settings();
-            let _client = GoogleStorageClient::new(settings);
+            let _client = GoogleStorageClient::new(&settings);
         }
 
         #[tokio::test]
         async fn test_google_storage_client_get_object() {
             let settings = get_settings();
-            let client = GoogleStorageClient::new(settings).await.unwrap();
+            let client = GoogleStorageClient::new(&settings).await.unwrap();
 
             // should fail since there are no suffixes
             let result = client.get_object("local_path", "remote_path").await;
@@ -1007,7 +1035,7 @@ pub mod google_storage {
         #[tokio::test]
         async fn test_google_storage_client_put() {
             let settings = get_settings();
-            let client = GCSFSStorageClient::new(settings).await;
+            let client = GCSFSStorageClient::new(&settings).await;
 
             //
             let dirname = create_nested_data(&CHUNK_SIZE);
@@ -1065,7 +1093,7 @@ pub mod google_storage {
         #[tokio::test]
         async fn test_google_storage_client_generate_presigned_url() {
             let settings = get_settings();
-            let client = GCSFSStorageClient::new(settings).await;
+            let client = GCSFSStorageClient::new(&settings).await;
 
             // create file
             let key = create_single_file(&CHUNK_SIZE);
@@ -1086,7 +1114,7 @@ pub mod google_storage {
         #[tokio::test]
         async fn test_google_large_file_upload() {
             let settings = get_settings();
-            let client = GCSFSStorageClient::new(settings).await;
+            let client = GCSFSStorageClient::new(&settings).await;
 
             // create file
             let chunk_size = 1024 * 1024 * 5; // 5MB

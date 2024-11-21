@@ -1,8 +1,9 @@
-use crate::core::storage::base::{FileInfo, StorageClient, StorageSettings, StorageType};
+use crate::core::storage::base::{FileInfo, StorageClient};
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use crate::core::utils::error::{ApiError, StorageError};
 use async_trait::async_trait;
 use futures::TryFutureExt;
+use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
@@ -33,92 +34,79 @@ pub enum Routes {
     List,
     ListInfo,
     Files,
+    Healthcheck,
 }
 
 impl Routes {
     pub fn as_str(&self) -> &str {
         match self {
-            Routes::Files => "opsml/files",
-            Routes::Multipart => "opsml/files/multipart",
-            Routes::Presigned => "opsml/files/presigned",
-            Routes::List => "opsml/files/list",
-            Routes::ListInfo => "opsml/files/list_info",
+            Routes::Files => "files",
+            Routes::Multipart => "files/multipart",
+            Routes::Presigned => "files/presigned",
+            Routes::List => "files/list",
+            Routes::ListInfo => "files/list_info",
+            Routes::Healthcheck => "healthcheck",
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ApiClient {
-    client: Client,
-    base_url: String,
-    requires_auth: bool,
-    auth_token: Option<String>,
-    username: Option<String>,
-    password: Option<String>,
+/// Create a new HTTP client that can be shared across different clients
+pub fn build_http_client(settings: &ApiSettings) -> Result<Client, ApiError> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "X-Prod-Token",
+        HeaderValue::from_str(&settings.prod_token)
+            .map_err(|e| ApiError::Error(format!("Failed to create header with error: {}", e)))?,
+    );
+
+    let client_builder = Client::builder().timeout(std::time::Duration::from_secs(TIMEOUT_SECS));
+    let client = client_builder
+        .default_headers(headers)
+        .build()
+        .map_err(|e| ApiError::Error(format!("Failed to create client with error: {}", e)))?;
+    Ok(client)
 }
 
-impl ApiClient {
-    pub async fn new(
-        base_url: String,
-        use_auth: bool,
-        path_prefix: String,
-        username: Option<String>,
-        password: Option<String>,
-        token: Option<String>,
-    ) -> Result<Self, ApiError> {
-        // setup headers
-        let mut headers = HeaderMap::new();
-        let client_builder =
-            Client::builder().timeout(std::time::Duration::from_secs(TIMEOUT_SECS));
-        let base_url = format!("{}/{}", base_url, path_prefix);
+#[derive(Debug, Clone)]
+pub struct OpsmlApiClient {
+    client: Client,
+    settings: OpsmlStorageSettings,
+    base_path: String,
+}
 
-        if let Some(token) = token {
-            headers.insert(
-                "X-Prod-Token",
-                HeaderValue::from_str(&token).map_err(|e| {
-                    ApiError::Error(format!("Failed to create header with error: {}", e))
-                })?,
-            );
-        }
-        let client = client_builder
-            .default_headers(headers)
-            .build()
-            .map_err(|e| ApiError::Error(format!("Failed to create client with error: {}", e)))?;
+impl OpsmlApiClient {
+    pub async fn new(settings: &OpsmlStorageSettings, client: &Client) -> Result<Self, ApiError> {
+        // setup headers
 
         let mut api_client = Self {
-            client,
-            base_url,
-            requires_auth: use_auth,
-            auth_token: None,
-            username: username.clone(),
-            password: password.clone(),
+            client: client.clone(),
+            settings: settings.clone(),
+            base_path: format!(
+                "{}/{}",
+                settings.api_settings.base_url, settings.api_settings.opsml_dir
+            ),
         };
 
-        if use_auth {
-            if username.is_none() || password.is_none() {
-                return Err(ApiError::Error(
-                    "Username and password must be provided for authenticated requests".to_string(),
-                ));
-            }
+        if settings.api_settings.use_auth {
             api_client.refresh_token().await?;
         }
-
         Ok(api_client)
     }
 
     async fn refresh_token(&mut self) -> Result<(), ApiError> {
-        if !self.requires_auth {
+        if !self.settings.api_settings.use_auth {
             return Ok(());
         }
 
         let form = json!({
-            "username": self.username,
-            "password": self.password
+            "username": self.settings.api_settings.username,
+            "password": self.settings.api_settings.password,
         });
 
+        let url = format!("{}/{}", self.base_path, "auth/token");
         let response = self
             .client
-            .post(format!("{}/{}", self.base_url, "auth/token"))
+            .post(url)
             .json(&form)
             .send()
             .await
@@ -132,7 +120,7 @@ impl ApiClient {
             .as_str()
             .ok_or_else(|| ApiError::Error("Failed to get access token".to_string()))?;
 
-        self.auth_token = Some(token.to_string());
+        self.settings.api_settings.auth_token = token.to_string();
 
         Ok(())
     }
@@ -147,15 +135,14 @@ impl ApiClient {
     ) -> Result<Value, ApiError> {
         let headers = headers.unwrap_or_default();
 
-        let token = self.auth_token.unwrap_or("".to_string());
+        let url = format!("{}/{}", self.base_path, route.as_str());
         let response = match request_type {
             RequestType::Get => self
                 .client
-                .get(format!("{}/{}", self.base_url, route.as_str()))
-                // add bearer token if it exists
+                .get(url)
                 .headers(headers)
                 .query(&query_params)
-                .bearer_auth(token)
+                .bearer_auth(self.settings.api_settings.auth_token)
                 .send()
                 .await
                 .map_err(|e| {
@@ -163,9 +150,10 @@ impl ApiClient {
                 })?,
             RequestType::Post => self
                 .client
-                .post(format!("{}/{}", self.base_url, route.as_str()))
+                .post(url)
                 .headers(headers)
                 .json(&body_params)
+                .bearer_auth(self.settings.api_settings.auth_token)
                 .send()
                 .await
                 .map_err(|e| {
@@ -173,9 +161,10 @@ impl ApiClient {
                 })?,
             RequestType::Put => self
                 .client
-                .put(format!("{}/{}", self.base_url, route.as_str()))
+                .put(url)
                 .headers(headers)
                 .json(&body_params)
+                .bearer_auth(self.settings.api_settings.auth_token)
                 .send()
                 .await
                 .map_err(|e| {
@@ -183,9 +172,10 @@ impl ApiClient {
                 })?,
             RequestType::Delete => self
                 .client
-                .delete(format!("{}/{}", self.base_url, route.as_str()))
+                .delete(url)
                 .headers(headers)
                 .query(&query_params)
+                .bearer_auth(self.settings.api_settings.auth_token)
                 .send()
                 .await
                 .map_err(|e| {
@@ -248,46 +238,20 @@ impl ApiClient {
     }
 }
 
-pub struct ApiClientArgs {
-    pub base_url: String,
-    pub use_auth: bool,
-    pub path_prefix: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub token: Option<String>,
-}
-
 pub struct HttpStorageClient {
-    api_client: Arc<Mutex<ApiClient>>,
-    bucket: String,
+    api_client: OpsmlApiClient,
     storage_client: StorageClientEnum,
 }
 
-#[async_trait]
-impl StorageClient for HttpStorageClient {
+impl HttpStorageClient {
     fn storage_type(&self) -> StorageType {
         self.storage_client.storage_type()
     }
-    async fn bucket(&self) -> &str {
-        &self.bucket
-    }
 
-    async fn new(settings: StorageSettings) -> Result<Self, StorageError> {
-        let bucket = settings.storage_uri.clone();
-        let api_kwargs = Self::get_http_kwargs(settings.kwargs.clone())?;
-
-        let api_client = Arc::new(Mutex::new(
-            ApiClient::new(
-                api_kwargs.base_url,
-                api_kwargs.use_auth,
-                api_kwargs.path_prefix,
-                api_kwargs.username,
-                api_kwargs.password,
-                api_kwargs.token,
-            )
+    async fn new(settings: &OpsmlStorageSettings, client: &Client) -> Result<Self, StorageError> {
+        let api_client = OpsmlApiClient::new(&settings, &client)
             .await
-            .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?,
-        ));
+            .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
 
         let storage_client = StorageClientEnum::new(settings.clone())
             .await
@@ -297,20 +261,17 @@ impl StorageClient for HttpStorageClient {
 
         Ok(Self {
             api_client,
-            bucket,
             storage_client,
         })
     }
 
-    async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+    async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
 
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
         // need to clone because self is borrowed
-        let response = api_client
+        let response = self
+            .api_client
             .request_with_retry(Routes::List, RequestType::Get, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
@@ -326,15 +287,12 @@ impl StorageClient for HttpStorageClient {
         Ok(files)
     }
 
-    async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+    async fn find_info(&mut self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
 
-        // need to clone because self is borrowed
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
-        let response = api_client
+        let response = self
+            .api_client
             .request_with_retry(Routes::ListInfo, RequestType::Get, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
@@ -363,12 +321,14 @@ impl StorageClient for HttpStorageClient {
         Ok(files)
     }
 
-    async fn get_object(&self, local_path: &str, remote_path: &str) -> Result<(), StorageError> {
+    async fn get_object(
+        &mut self,
+        local_path: &str,
+        remote_path: &str,
+    ) -> Result<(), StorageError> {
         let _local_path = PathBuf::from(local_path);
         let _remote_path = PathBuf::from(remote_path);
         // Lock the Mutex to get mutable access to the ApiClient
-
-        let mut _api_client = self.api_client.lock().await;
 
         //let _response = api_client
         //    .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
@@ -378,23 +338,13 @@ impl StorageClient for HttpStorageClient {
         Ok(())
     }
 
-    async fn copy_objects(&self, _source: &str, _destination: &str) -> Result<bool, StorageError> {
-        unimplemented!();
-    }
-
-    async fn copy_object(&self, _source: &str, _destination: &str) -> Result<bool, StorageError> {
-        unimplemented!();
-    }
-
-    async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
+    async fn delete_object(&mut self, path: &str) -> Result<bool, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
         params.insert("recursive".to_string(), "false".to_string());
 
-        let _response = api_client
+        let _response = self
+            .api_client
             .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
@@ -402,66 +352,22 @@ impl StorageClient for HttpStorageClient {
         Ok(true)
     }
 
-    async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
+    async fn delete_objects(&mut self, path: &str) -> Result<bool, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
         params.insert("recursive".to_string(), "false".to_string());
 
-        let _response = api_client
+        let _response = self
+            .api_client
             .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
         Ok(true)
-    }
-
-    async fn generate_presigned_url(
-        &self,
-        __path: &str,
-        __expiration: u64,
-    ) -> Result<String, StorageError> {
-        unimplemented!()
-    }
-}
-
-impl HttpStorageClient {
-    fn get_http_kwargs(kwargs: HashMap<String, String>) -> Result<ApiClientArgs, StorageError> {
-        let base_url = kwargs.get("base_url").ok_or(StorageError::Error(
-            "base_url not found in kwargs".to_string(),
-        ))?;
-
-        // check if auth is required (default is false)
-        let auth_auth = if kwargs.get("use_auth").is_some() {
-            kwargs.get("use_auth").unwrap()
-        } else {
-            "false"
-        };
-
-        let path_prefix = if kwargs.get("path_prefix").is_some() {
-            kwargs.get("path_prefix").unwrap()
-        } else {
-            "opsml"
-        };
-
-        let username = kwargs.get("username");
-        let password = kwargs.get("password");
-        let token = kwargs.get("token");
-
-        Ok(ApiClientArgs {
-            base_url: base_url.to_string(),
-            use_auth: auth_auth.parse().unwrap(),
-            path_prefix: path_prefix.to_string(),
-            username: username.map(|s| s.to_string()),
-            password: password.map(|s| s.to_string()),
-            token: token.map(|s| s.to_string()),
-        })
     }
 
     pub async fn generate_presigned_url_for_part(
-        &self,
+        &mut self,
         path: &str,
         session_url: &str,
         part_number: i32,
@@ -472,10 +378,8 @@ impl HttpStorageClient {
         query_params.insert("part_number".to_string(), part_number.to_string());
         query_params.insert("for_multi_part".to_string(), "true".to_string());
 
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
-        let response = api_client
+        let response = self
+            .api_client
             .request_with_retry(
                 Routes::Presigned,
                 RequestType::Get,
@@ -491,14 +395,12 @@ impl HttpStorageClient {
         Ok(url.to_string())
     }
 
-    pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-        // Lock the Mutex to get mutable access to the ApiClient
-        let mut api_client = self.api_client.lock().await;
-
+    pub async fn create_multipart_upload(&mut self, path: &str) -> Result<String, StorageError> {
         let mut query_params = HashMap::new();
         query_params.insert("path".to_string(), path.to_string());
 
-        let response = api_client
+        let response = self
+            .api_client
             .request_with_retry(
                 Routes::Multipart,
                 RequestType::Get,
@@ -511,14 +413,14 @@ impl HttpStorageClient {
                 StorageError::Error(format!("Failed to create multipart upload: {}", e))
             })?;
 
-        let session_uri = &response["session_uri"];
+        let session_url = &response["session_url"];
 
-        Ok(session_uri.to_string())
+        Ok(session_url.to_string())
     }
 
     /// Create a multipart uploader based on configured storage type
     pub async fn create_multipart_uploader(
-        &self,
+        &mut self,
         rpath: &Path,
     ) -> Result<MultiPartUploader, StorageError> {
         let session_url = self
@@ -534,7 +436,7 @@ impl HttpStorageClient {
     }
 
     pub async fn upload_file_in_chunks(
-        &self,
+        &mut self,
         lpath: &Path,
         rpath: &Path,
         uploader: &mut MultiPartUploader,
@@ -616,6 +518,7 @@ impl HttpStorageClient {
 mod tests {
     use super::*;
     use mockito::{Server, ServerGuard};
+    use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings};
     use tokio;
 
     const PATH_PREFIX: &str = "opsml";
@@ -626,20 +529,30 @@ mod tests {
         (server, server_url)
     }
 
+    async fn setup_client(server_url: String, use_auth: Option<bool>) -> OpsmlApiClient {
+        let config = OpsmlConfig::new();
+        let mut settings = config.storage_settings();
+
+        // set up some auth
+        settings.api_settings.username = "username".to_string();
+        settings.api_settings.password = "password".to_string();
+        settings.api_settings.use_auth = use_auth.unwrap_or(false);
+        settings.api_settings.base_url = server_url.to_string();
+
+        let client = build_http_client(&settings.api_settings).unwrap();
+        OpsmlApiClient::new(&settings, &client).await.unwrap()
+    }
+
     #[tokio::test]
     async fn test_api_client_no_auth() {
         let (mut server, server_url) = setup_server().await;
+        let mut api_client = setup_client(server_url, None).await;
 
         let _mock = server
             .mock("GET", "/opsml/files")
             .with_status(200)
             .with_body(r#"{"status": "ok"}"#)
             .create();
-
-        let mut api_client =
-            ApiClient::new(server_url, false, PATH_PREFIX.to_string(), None, None, None)
-                .await
-                .unwrap();
 
         let response = api_client
             .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
@@ -670,16 +583,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let mut api_client = ApiClient::new(
-            server_url,
-            true,
-            PATH_PREFIX.to_string(),
-            Some("username".to_string()),
-            Some("password".to_string()),
-            None,
-        )
-        .await
-        .unwrap();
+        let mut api_client = setup_client(server_url, Some(true)).await;
 
         let response = api_client
             .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
@@ -710,16 +614,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let mut api_client = ApiClient::new(
-            server_url,
-            true,
-            PATH_PREFIX.to_string(),
-            Some("username".to_string()),
-            Some("password".to_string()),
-            None,
-        )
-        .await
-        .unwrap();
+        let mut api_client = setup_client(server_url, Some(true)).await;
 
         let response = api_client
             .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
@@ -749,17 +644,7 @@ mod tests {
             .expect(3)
             .create();
 
-        let mut api_client = ApiClient::new(
-            server_url,
-            true,
-            PATH_PREFIX.to_string(),
-            Some("username".to_string()),
-            Some("password".to_string()),
-            None,
-        )
-        .await
-        .unwrap();
-
+        let mut api_client = setup_client(server_url, Some(true)).await;
         let result = api_client
             .request_with_retry(Routes::Files, RequestType::Get, None, None, None)
             .await;
@@ -804,16 +689,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let mut api_client = ApiClient::new(
-            server_url,
-            true,
-            PATH_PREFIX.to_string(),
-            Some("username".to_string()),
-            Some("password".to_string()),
-            None,
-        )
-        .await
-        .unwrap();
+        let mut api_client = setup_client(server_url, Some(true)).await;
 
         let response = api_client
             .request_with_retry(Routes::Files, RequestType::Get, None, None, None)

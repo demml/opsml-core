@@ -10,13 +10,15 @@ use axum::{
 use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, info};
 
 pub async fn create_multipart_upload(
     State(state): State<Arc<AppState>>,
     params: Query<MultiPartQuery>,
 ) -> Result<MultiPartSession, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
+
+    info!("Creating multipart upload for path: {}", path.display());
 
     let session_url = state
         .storage_client

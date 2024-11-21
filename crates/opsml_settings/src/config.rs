@@ -4,11 +4,45 @@ use std::default::Default;
 use std::env;
 use std::path::PathBuf;
 
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum StorageType {
+    Google,
+    AWS,
+    Local,
+}
+
+/// ApiSettings for use with ApiClient
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct ApiSettings {
+    pub base_url: String,
+    pub use_auth: bool,
+    pub opsml_dir: String,
+    pub scouter_dir: String,
+    pub username: String,
+    pub password: String,
+    pub auth_token: String,
+    pub prod_token: String,
+}
+
+/// StorageSettings for used with all storage clients
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct OpsmlStorageSettings {
+    pub storage_uri: String,
+    pub using_client: bool,
+    pub api_settings: ApiSettings,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct OpsmlAuthSettings {
     pub opsml_auth: bool,
 }
 
+/// OpsmlConfig for use with both server and client implementations
+/// OpsmlConfig is the main primary configuration struct for the Opsml system
+/// Based on provided env variables, it will be used to determine if opsml is running in client or server mode.
 #[derive(Debug, Clone)]
 #[pyclass]
 pub struct OpsmlConfig {
@@ -20,7 +54,6 @@ pub struct OpsmlConfig {
     pub opsml_prod_token: String,
     pub opsml_proxy_root: String,
     pub opsml_registry_path: String,
-    pub opsml_client_path_prefix: String,
     pub opsml_testing: bool,
     pub download_chunk_size: usize,
     pub upload_chunk_size: usize,
@@ -31,7 +64,6 @@ pub struct OpsmlConfig {
     pub scouter_server_uri: Option<String>,
     pub scouter_username: Option<String>,
     pub scouter_password: Option<String>,
-    pub scouter_path_prefix: String,
     pub scouter_auth: bool,
     pub opsml_auth: bool,
 }
@@ -48,15 +80,11 @@ impl Default for OpsmlConfig {
             opsml_storage_uri: OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri),
             opsml_tracking_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "sqlite:///opsml.db".to_string()),
-            opsml_prod_token: env::var("OPSML_PROD_TOKEN")
-                .unwrap_or_else(|_| "staging".to_string()),
+            opsml_prod_token: env::var("OPSML_PROD_TOKEN").unwrap_or_else(|_| "".to_string()),
 
             opsml_proxy_root: "opsml-root:/".to_string(),
             opsml_registry_path: env::var("OPSML_REGISTRY_PATH")
                 .unwrap_or_else(|_| "model_registry".to_string()),
-
-            opsml_client_path_prefix: env::var("OPSML_CLIENT_PATH_PREFIX")
-                .unwrap_or_else(|_| "opsml".to_string()),
 
             opsml_testing: env::var("OPSML_TESTING")
                 .unwrap_or_else(|_| "false".to_string())
@@ -76,7 +104,6 @@ impl Default for OpsmlConfig {
             scouter_server_uri: env::var("SCOUTER_SERVER_URI").ok(),
             scouter_username: env::var("SCOUTER_USERNAME").ok(),
             scouter_password: env::var("SCOUTER_PASSWORD").ok(),
-            scouter_path_prefix: "scouter".to_string(),
             scouter_auth: env::var("SCOUTER_AUTH")
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
@@ -148,6 +175,23 @@ impl OpsmlConfig {
             opsml_auth: self.opsml_auth,
         }
     }
+
+    pub fn storage_settings(&self) -> OpsmlStorageSettings {
+        OpsmlStorageSettings {
+            storage_uri: self.opsml_storage_uri.clone(),
+            using_client: self.is_using_client(),
+            api_settings: ApiSettings {
+                base_url: self.opsml_tracking_uri.clone(),
+                use_auth: self.opsml_auth,
+                opsml_dir: "opsml".to_string(),
+                scouter_dir: "scouter".to_string(),
+                username: self.opsml_username.clone().unwrap_or_default(),
+                password: self.opsml_password.clone().unwrap_or_default(),
+                auth_token: "".to_string(),
+                prod_token: self.opsml_prod_token.clone(),
+            },
+        }
+    }
 }
 
 #[pymethods]
@@ -158,7 +202,7 @@ impl OpsmlConfig {
     ///
     /// `OpsmlConfig`: A new instance of OpsmlConfig
     #[new]
-    fn new() -> Self {
+    pub fn new() -> Self {
         OpsmlConfig::default()
     }
 }
@@ -312,7 +356,6 @@ mod tests {
         assert_eq!(opsml_config.opsml_prod_token, "staging");
         assert_eq!(opsml_config.opsml_proxy_root, "opsml-root:/");
         assert_eq!(opsml_config.opsml_registry_path, "model_registry");
-        assert_eq!(opsml_config.opsml_client_path_prefix, "opsml");
         assert!(!opsml_config.opsml_testing);
         assert_eq!(opsml_config.download_chunk_size, 31457280);
         assert_eq!(opsml_config.upload_chunk_size, 31457280);
@@ -322,7 +365,6 @@ mod tests {
         assert_eq!(opsml_config.scouter_server_uri, None);
         assert_eq!(opsml_config.scouter_username, None);
         assert_eq!(opsml_config.scouter_password, None);
-        assert_eq!(opsml_config.scouter_path_prefix, "scouter");
         assert!(!opsml_config.scouter_auth);
         assert!(!opsml_config.opsml_auth);
 

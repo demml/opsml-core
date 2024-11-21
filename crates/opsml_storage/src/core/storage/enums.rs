@@ -1,3 +1,4 @@
+use crate::core::http_client::client::ApiClient;
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem, StorageSettings, StorageType};
@@ -26,7 +27,7 @@ impl MultiPartUploader {
     pub fn session_url(&self) -> String {
         match self {
             #[cfg(feature = "google_storage")]
-            MultiPartUploader::Google(uploader) => uploader.client.url().to_string(),
+            MultiPartUploader::Google(uploader) => uploader.session_url.clone(),
             #[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => uploader.upload_id.clone(),
             MultiPartUploader::Local(uploader) => uploader.path.clone(),
@@ -358,7 +359,7 @@ impl StorageClientEnum {
                     .client()
                     .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
                     .await?;
-
+                println!("Created Google Multipart Uploader");
                 Ok(MultiPartUploader::Google(uploader))
             }
             #[cfg(feature = "aws_storage")]
