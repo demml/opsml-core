@@ -170,9 +170,13 @@ impl PyHttpFSStorageClient {
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
-    fn find_info(&mut self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-        self.runtime
-            .block_on(async { self.client.find_info(path.to_str().unwrap()).await })
+    fn find_info(&mut self, path: PathBuf) -> AnyhowResult<Vec<FileInfo>> {
+        self.runtime.block_on(async {
+            self.client
+                .find_info(path.to_str().unwrap())
+                .await
+                .context(LogColors::green("Failed to list files"))
+        })
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]

@@ -178,5 +178,5 @@ pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
             get(generate_presigned_url),
         )
         .route(&format!("{}/files/list", prefix), get(list_files))
-        .route(&format!("{}/files/info", prefix), get(list_file_info))
+        .route(&format!("{}/files/list/info", prefix), get(list_file_info))
 }
