@@ -25,10 +25,6 @@ pub mod google_storage {
     use google_cloud_storage::sign::SignedURLOptions;
     use opsml_settings::config::{OpsmlStorageSettings, StorageType};
     use pyo3::prelude::*;
-    use reqwest::header::{CONTENT_LENGTH, CONTENT_RANGE};
-    use reqwest::Client as HttpClient;
-
-    use reqwest_middleware::ClientWithMiddleware;
     use serde_json::Value;
     use std::env;
     use std::fs::File;
