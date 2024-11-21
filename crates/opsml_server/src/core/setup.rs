@@ -6,21 +6,7 @@ use opsml_storage::core::storage::enums::StorageClientEnum;
 
 pub async fn get_storage_system(config: &OpsmlConfig) -> Result<StorageClientEnum, anyhow::Error> {
     // check storage_uri for prefix
-    let storage_type = if config.opsml_storage_uri.starts_with("gs://") {
-        StorageType::Google
-    } else if config.opsml_storage_uri.starts_with("s3://") {
-        StorageType::AWS
-    } else {
-        StorageType::Local
-    };
-
-    // we don't use http
-    let settings = StorageSettings::new(
-        config.opsml_storage_uri.clone(),
-        config.is_using_client(),
-        storage_type,
-        Default::default(),
-    );
+    let storage_settings = config.storage_settings();
 
     StorageClientEnum::new(settings).await.with_context(|| {
         format!(
