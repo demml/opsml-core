@@ -1,20 +1,9 @@
 use crate::core::logging::route::setup_logging;
-use anyhow::Context;
+
 use opsml_settings::config::OpsmlConfig;
-use opsml_storage::core::storage::base::{StorageSettings, StorageType};
+use opsml_storage::core::storage::base::get_storage_system;
 use opsml_storage::core::storage::enums::StorageClientEnum;
-
-pub async fn get_storage_system(config: &OpsmlConfig) -> Result<StorageClientEnum, anyhow::Error> {
-    // check storage_uri for prefix
-    let storage_settings = config.storage_settings();
-
-    StorageClientEnum::new(settings).await.with_context(|| {
-        format!(
-            "Failed to create storage client for uri: {}",
-            config.opsml_storage_uri
-        )
-    })
-}
+use tracing::info;
 
 pub async fn setup_components() -> Result<(OpsmlConfig, StorageClientEnum), anyhow::Error> {
     // setup config
@@ -23,10 +12,12 @@ pub async fn setup_components() -> Result<(OpsmlConfig, StorageClientEnum), anyh
     // start logging
     setup_logging().await?;
 
+    info!("Starting OpsML Server ....");
+
     // setup storage client
     let storage = get_storage_system(&config).await?;
 
-    println!("name: {}", storage.name());
+    info!("Storage client: {}", storage.name());
 
     Ok((config, storage))
 }

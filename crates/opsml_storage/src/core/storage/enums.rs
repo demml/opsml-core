@@ -144,9 +144,9 @@ impl MultiPartUploader {
 }
 
 pub enum StorageClientEnum {
-    #[cfg(feature = "google_storage")]
+    //#[cfg(feature = "google_storage")]
     Google(GCSFSStorageClient),
-    #[cfg(feature = "aws_storage")]
+    //#[cfg(feature = "aws_storage")]
     AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
 }
@@ -154,9 +154,9 @@ pub enum StorageClientEnum {
 impl StorageClientEnum {
     pub fn name(&self) -> &str {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.name(),
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
         }
@@ -164,9 +164,9 @@ impl StorageClientEnum {
 
     pub fn storage_type(&self) -> StorageType {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(_) => StorageType::Google,
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(_) => StorageType::AWS,
             StorageClientEnum::Local(_) => StorageType::Local,
         }

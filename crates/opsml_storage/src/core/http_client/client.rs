@@ -245,11 +245,7 @@ pub struct HttpStorageClient {
 }
 
 impl HttpStorageClient {
-    fn storage_type(&self) -> StorageType {
-        self.storage_client.storage_type()
-    }
-
-    async fn new(
+    pub async fn new(
         settings: &mut OpsmlStorageSettings,
         client: &Client,
     ) -> Result<Self, StorageError> {
@@ -298,7 +294,7 @@ impl HttpStorageClient {
             .map_err(|e| ApiError::Error(format!("Failed to get storage type: {}", e)))
     }
 
-    async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {
+    pub async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
 
@@ -320,7 +316,7 @@ impl HttpStorageClient {
         Ok(files)
     }
 
-    async fn find_info(&mut self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+    pub async fn find_info(&mut self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
 
@@ -354,7 +350,7 @@ impl HttpStorageClient {
         Ok(files)
     }
 
-    async fn get_object(
+    pub async fn get_object(
         &mut self,
         local_path: &str,
         remote_path: &str,
@@ -371,7 +367,7 @@ impl HttpStorageClient {
         Ok(())
     }
 
-    async fn delete_object(&mut self, path: &str) -> Result<bool, StorageError> {
+    pub async fn delete_object(&mut self, path: &str) -> Result<bool, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
         params.insert("recursive".to_string(), "false".to_string());
@@ -385,10 +381,10 @@ impl HttpStorageClient {
         Ok(true)
     }
 
-    async fn delete_objects(&mut self, path: &str) -> Result<bool, StorageError> {
+    pub async fn delete_objects(&mut self, path: &str) -> Result<bool, StorageError> {
         let mut params = HashMap::new();
         params.insert("path".to_string(), path.to_string());
-        params.insert("recursive".to_string(), "false".to_string());
+        params.insert("recursive".to_string(), "true".to_string());
 
         let _response = self
             .api_client
@@ -545,6 +541,27 @@ impl HttpStorageClient {
 
         Ok(())
     }
+
+    pub async fn generate_presigned_url(&mut self, path: &str) -> Result<String, StorageError> {
+        let mut query_params = HashMap::new();
+        query_params.insert("path".to_string(), path.to_string());
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::Presigned,
+                RequestType::Get,
+                None,
+                Some(query_params),
+                None,
+            )
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+        let url = &response["url"];
+
+        Ok(url.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -553,8 +570,6 @@ mod tests {
     use mockito::{Server, ServerGuard};
     use opsml_settings::config::OpsmlConfig;
     use tokio;
-
-    const PATH_PREFIX: &str = "opsml";
 
     async fn setup_server() -> (ServerGuard, String) {
         let server = Server::new_async().await;

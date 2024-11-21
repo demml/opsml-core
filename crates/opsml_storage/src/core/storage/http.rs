@@ -1,10 +1,12 @@
-use crate::core::http_client::client::HttpStorageClient;
+use crate::core::http_client::client::{build_http_client, HttpStorageClient};
+use crate::core::storage::base::get_files;
 use crate::core::storage::base::FileInfo;
 use crate::core::storage::base::PathExt;
-use crate::core::storage::base::StorageClient;
-use crate::core::storage::base::{get_files, FileSystem, StorageSettings};
 use crate::core::utils::error::StorageError;
-use async_trait::async_trait;
+
+use anyhow::Context;
+use anyhow::Result as AnyhowResult;
+use opsml_settings::config::OpsmlStorageSettings;
 use pyo3::prelude::*;
 use std::path::{Path, PathBuf};
 
@@ -12,26 +14,76 @@ pub struct HttpFSStorageClient {
     client: HttpStorageClient,
 }
 
-#[async_trait]
-impl FileSystem<HttpStorageClient> for HttpFSStorageClient {
-    fn name(&self) -> &str {
+impl HttpFSStorageClient {
+    pub fn name(&self) -> &str {
         "HttpFSStorageClient"
     }
 
-    fn client(&self) -> &HttpStorageClient {
-        &self.client
+    pub async fn new(settings: &mut OpsmlStorageSettings) -> AnyhowResult<Self> {
+        let client = build_http_client(&settings.api_settings)
+            .map_err(|e| StorageError::Error(format!("Failed to create http client {}", e)))
+            .context("Error occurred while building HTTP client")?;
+
+        Ok(HttpFSStorageClient {
+            client: HttpStorageClient::new(settings, &client).await.unwrap(),
+        })
     }
 
-    async fn new(settings: StorageSettings) -> Self {
-        HttpFSStorageClient {
-            client: HttpStorageClient::new(settings).await.unwrap(),
+    pub async fn find(&mut self, path: &Path) -> Result<Vec<String>, StorageError> {
+        self.client.find(path.to_str().unwrap()).await
+    }
+
+    pub async fn find_info(&mut self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        self.client.find_info(path.to_str().unwrap()).await
+    }
+
+    pub async fn get(
+        &mut self,
+        lpath: &Path,
+        rpath: &Path,
+        recursive: bool,
+    ) -> Result<(), StorageError> {
+        if recursive {
+            // list all objects in the path
+            let objects = self.client.find(rpath.to_str().unwrap()).await?;
+
+            // iterate over each object and get it
+            for obj in objects {
+                let file_path = Path::new(obj.as_str());
+                let relative_path = file_path.relative_path(&rpath)?;
+                let local_path = lpath.join(relative_path);
+
+                self.client
+                    .get_object(local_path.to_str().unwrap(), file_path.to_str().unwrap())
+                    .await?;
+            }
+        } else {
+            self.client
+                .get_object(lpath.to_str().unwrap(), rpath.to_str().unwrap())
+                .await?;
         }
-    }
-}
 
-impl HttpFSStorageClient {
+        Ok(())
+    }
+
+    pub async fn rm(&mut self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        if recursive {
+            self.client.delete_objects(path.to_str().unwrap()).await?;
+        } else {
+            self.client.delete_object(path.to_str().unwrap()).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn exists(&mut self, path: &Path) -> Result<bool, StorageError> {
+        let objects = self.client.find(path.to_str().unwrap()).await?;
+
+        Ok(!objects.is_empty())
+    }
+
     pub async fn put(
-        &self,
+        &mut self,
         lpath: &Path,
         rpath: &Path,
         recursive: bool,
@@ -71,6 +123,12 @@ impl HttpFSStorageClient {
             Ok(())
         }
     }
+
+    pub async fn generate_presigned_url(&mut self, path: &Path) -> Result<String, StorageError> {
+        self.client
+            .generate_presigned_url(path.to_str().unwrap())
+            .await
+    }
 }
 
 #[pyclass]
@@ -82,31 +140,36 @@ pub struct PyHttpFSStorageClient {
 #[pymethods]
 impl PyHttpFSStorageClient {
     #[new]
-    fn new(settings: StorageSettings) -> Self {
+    fn new(settings: &mut OpsmlStorageSettings) -> Result<Self, StorageError> {
         let rt = tokio::runtime::Runtime::new().unwrap();
 
-        let client = rt.block_on(async { HttpStorageClient::new(settings).await.unwrap() });
+        let client = rt.block_on(async {
+            let client = build_http_client(&settings.api_settings)
+                .map_err(|e| StorageError::Error(format!("Failed to create http client {}", e)))?;
 
-        Self {
+            Ok(HttpStorageClient::new(settings, &client).await.unwrap())
+        })?;
+
+        Ok(Self {
             client,
             runtime: rt,
-        }
+        })
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
-    fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
+    fn find_info(&mut self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
         self.runtime
             .block_on(async { self.client.find_info(path.to_str().unwrap()).await })
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
-    fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
+    fn find(&mut self, path: PathBuf) -> Result<Vec<String>, StorageError> {
         self.runtime
             .block_on(async { self.client.find(path.to_str().unwrap()).await })
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
-    fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
+    fn get(&mut self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
         self.runtime.block_on(async {
             if recursive {
                 let stripped_lpath_clone = lpath.clone();
@@ -140,7 +203,7 @@ impl PyHttpFSStorageClient {
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
-    fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
+    fn put(&mut self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
         self.runtime.block_on(async {
             if recursive {
                 if !lpath.is_dir() {
@@ -178,24 +241,8 @@ impl PyHttpFSStorageClient {
         })
     }
 
-    #[pyo3(signature = (src, dest, recursive = false))]
-    fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> Result<(), StorageError> {
-        self.runtime.block_on(async {
-            if recursive {
-                self.client
-                    .copy_objects(src.to_str().unwrap(), dest.to_str().unwrap())
-                    .await?;
-            } else {
-                self.client
-                    .copy_object(src.to_str().unwrap(), dest.to_str().unwrap())
-                    .await?;
-            }
-
-            Ok(())
-        })
-    }
     #[pyo3(signature = (path, recursive = false))]
-    fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
+    fn rm(&mut self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
         self.runtime.block_on(async {
             if recursive {
                 self.client.delete_objects(path.to_str().unwrap()).await?;
@@ -207,7 +254,7 @@ impl PyHttpFSStorageClient {
         })
     }
 
-    fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
+    fn exists(&mut self, path: PathBuf) -> Result<bool, StorageError> {
         let objects = self
             .runtime
             .block_on(async { self.client.find(path.to_str().unwrap()).await })?;
@@ -215,15 +262,10 @@ impl PyHttpFSStorageClient {
         Ok(!objects.is_empty())
     }
 
-    #[pyo3(signature = (path, expiration = 600))]
-    fn generate_presigned_url(
-        &self,
-        path: PathBuf,
-        expiration: u64,
-    ) -> Result<String, StorageError> {
+    fn generate_presigned_url(&mut self, path: PathBuf) -> Result<String, StorageError> {
         self.runtime.block_on(async {
             self.client
-                .generate_presigned_url(path.to_str().unwrap(), expiration)
+                .generate_presigned_url(path.to_str().unwrap())
                 .await
         })
     }

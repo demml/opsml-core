@@ -4,6 +4,7 @@ use crate::core::state::AppState;
 use anyhow::Ok;
 use axum::Router;
 use std::sync::Arc;
+use tracing::info;
 
 mod core;
 
@@ -17,8 +18,12 @@ async fn create_app() -> Result<Router, anyhow::Error> {
         config: Arc::new(config),
     });
 
+    info!("Application state created");
+
     // create the router
     let app = create_router(app_state).await;
+
+    info!("Router created");
 
     Ok(app)
 }
@@ -33,6 +38,6 @@ async fn main() {
         .await
         .unwrap();
 
-    println!("listening on {}", listener.local_addr().unwrap());
+    info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }

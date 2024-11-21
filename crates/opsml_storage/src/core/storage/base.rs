@@ -1,7 +1,10 @@
 // create pyo3 async iterator
+use crate::core::storage::enums::StorageClientEnum;
 use crate::core::utils::error::StorageError;
+use anyhow::Context;
+use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
-use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -203,4 +206,18 @@ pub struct FileInfo {
     pub created: String,
     #[pyo3(get)]
     pub suffix: String,
+}
+
+pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
+    // check storage_uri for prefix
+    let storage_settings = config.storage_settings();
+
+    StorageClientEnum::new(&storage_settings)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create storage client for storage type: {:?}",
+                storage_settings.storage_type
+            )
+        })
 }
