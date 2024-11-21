@@ -3,6 +3,7 @@ use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
 // take a stream of bytes
@@ -190,7 +191,7 @@ pub trait FileSystem<T: StorageClient> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[pyclass]
 pub struct FileInfo {
     #[pyo3(get)]

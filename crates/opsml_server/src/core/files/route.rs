@@ -1,11 +1,15 @@
 use crate::core::error::ServerError;
-use crate::core::files::schema::{MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl};
+use crate::core::files::schema::{
+    ListFileInfoResponse, ListFileQuery, ListFileResponse, MultiPartQuery, MultiPartSession,
+    PresignedQuery, PresignedUrl,
+};
 use crate::core::state::AppState;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     Json,
 };
+use axum::{routing::get, Router};
 /// Route for debugging information
 use serde_json::json;
 use std::path::Path;
@@ -105,4 +109,74 @@ pub async fn generate_presigned_url(
     };
 
     Ok(PresignedUrl { url })
+}
+
+pub async fn list_files(
+    State(state): State<Arc<AppState>>,
+    params: Query<ListFileQuery>,
+) -> Result<ListFileResponse, (StatusCode, Json<serde_json::Value>)> {
+    let path = Path::new(&params.path);
+
+    info!("Listing files for: {}", path.display());
+
+    let files = state
+        .storage_client
+        .find(path)
+        .await
+        .map_err(|e| ServerError::Error(format!("Failed to list files: {}", e)));
+
+    let files = match files {
+        Ok(files) => files,
+        Err(e) => {
+            error!("Failed to list files: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e })),
+            ));
+        }
+    };
+
+    Ok(ListFileResponse { files })
+}
+
+pub async fn list_file_info(
+    State(state): State<Arc<AppState>>,
+    params: Query<ListFileQuery>,
+) -> Result<ListFileInfoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let path = Path::new(&params.path);
+
+    info!("Getting file info for: {}", path.display());
+
+    let files = state
+        .storage_client
+        .find_info(path)
+        .await
+        .map_err(|e| ServerError::Error(format!("Failed to list files: {}", e)));
+
+    let files = match files {
+        Ok(files) => files,
+        Err(e) => {
+            error!("Failed to list files: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e })),
+            ));
+        }
+    };
+
+    Ok(ListFileInfoResponse { files })
+}
+
+pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
+    Router::new()
+        .route(
+            &format!("{}/files/multipart", prefix),
+            get(create_multipart_upload),
+        )
+        .route(
+            &format!("{}/files/presigned", prefix),
+            get(generate_presigned_url),
+        )
+        .route(&format!("{}/files/list", prefix), get(list_files))
+        .route(&format!("{}/files/info", prefix), get(list_file_info))
 }

@@ -44,7 +44,7 @@ impl Routes {
             Routes::Multipart => "files/multipart",
             Routes::Presigned => "files/presigned",
             Routes::List => "files/list",
-            Routes::ListInfo => "files/list_info",
+            Routes::ListInfo => "files/list/info",
             Routes::Healthcheck => "healthcheck",
             Routes::StorageSettings => "storage/settings",
         }

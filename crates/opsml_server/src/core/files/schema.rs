@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::{http::HeaderMap, response::IntoResponse};
-use opsml_storage::core::storage::base::UploadPartArgs;
+use opsml_storage::core::storage::base::{FileInfo, UploadPartArgs};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -54,5 +54,34 @@ impl UploadPartArgParser {
             .to_path_buf();
 
         UploadPartArgs { path }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListFileQuery {
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListFileResponse {
+    pub files: Vec<String>,
+}
+
+// Implement IntoResponse for Alive
+impl IntoResponse for ListFileResponse {
+    fn into_response(self) -> axum::response::Response {
+        Json(self).into_response()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListFileInfoResponse {
+    pub files: Vec<FileInfo>,
+}
+
+// Implement IntoResponse for Alive
+impl IntoResponse for ListFileInfoResponse {
+    fn into_response(self) -> axum::response::Response {
+        Json(self).into_response()
     }
 }
