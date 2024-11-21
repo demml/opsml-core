@@ -3,22 +3,24 @@
 use crate::core::storage::base::{FileInfo, FileSystem};
 use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
 use crate::core::utils::error::StorageError;
+use anyhow::Context;
+use anyhow::Result as AnyhowResult;
 use aws_smithy_types::byte_stream::ByteStream;
-use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[cfg(feature = "google_storage")]
+//#[cfg(feature = "google_storage")]
 use crate::core::storage::google::google_storage::{GCSFSStorageClient, GoogleMultipartUpload};
 
-#[cfg(feature = "aws_storage")]
+//#[cfg(feature = "aws_storage")]
 use crate::core::storage::aws::aws_storage::{AWSMulitPartUpload, S3FStorageClient};
 
 pub enum MultiPartUploader {
-    #[cfg(feature = "google_storage")]
+    //#[cfg(feature = "google_storage")]
     Google(GoogleMultipartUpload),
-    #[cfg(feature = "aws_storage")]
+    //#[cfg(feature = "aws_storage")]
     AWS(AWSMulitPartUpload),
     Local(LocalMultiPartUpload),
 }
@@ -42,14 +44,14 @@ impl MultiPartUploader {
         body: ByteStream,
     ) -> Result<bool, StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .upload_part(body, first_byte, last_byte, total_size)
                     .await?;
                 Ok(true)
             }
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => uploader.upload_part(*part_number, body).await,
 
             MultiPartUploader::Local(uploader) => {
@@ -76,14 +78,14 @@ impl MultiPartUploader {
         presigned_url: &str,
     ) -> Result<bool, StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .upload_part(body, first_byte, last_byte, file_size)
                     .await?;
                 Ok(true)
             }
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => {
                 uploader
                     .upload_part_with_presigned_url(part_number, body, presigned_url)
@@ -112,13 +114,13 @@ impl MultiPartUploader {
         this_chunk_size: u64,
     ) -> Result<ByteStream, StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
                     .await
             }
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => {
                 uploader
                     .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
@@ -134,9 +136,9 @@ impl MultiPartUploader {
 
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => uploader.complete_upload().await,
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => uploader.complete_upload().await,
             MultiPartUploader::Local(uploader) => uploader.complete_upload().await,
         }
@@ -144,9 +146,7 @@ impl MultiPartUploader {
 }
 
 pub enum StorageClientEnum {
-    //#[cfg(feature = "google_storage")]
     Google(GCSFSStorageClient),
-    //#[cfg(feature = "aws_storage")]
     AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
 }
@@ -162,13 +162,13 @@ impl StorageClientEnum {
         }
     }
 
-    pub fn storage_type(&self) -> StorageType {
+    pub fn storage_type(&self) -> String {
         match self {
             //#[cfg(feature = "google_storage")]
-            StorageClientEnum::Google(_) => StorageType::Google,
+            StorageClientEnum::Google(_) => StorageType::Google.to_string(),
             //#[cfg(feature = "aws_storage")]
-            StorageClientEnum::AWS(_) => StorageType::AWS,
-            StorageClientEnum::Local(_) => StorageType::Local,
+            StorageClientEnum::AWS(_) => StorageType::AWS.to_string(),
+            StorageClientEnum::Local(_) => StorageType::Local.to_string(),
         }
     }
 
@@ -313,7 +313,7 @@ impl StorageClientEnum {
 
     pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
                 // google returns the session uri
                 let result = client
@@ -323,7 +323,7 @@ impl StorageClientEnum {
 
                 Ok(result.url().to_string())
             }
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => {
                 // aws returns the session uri
                 client
@@ -347,7 +347,7 @@ impl StorageClientEnum {
         session_url: String,
     ) -> Result<MultiPartUploader, StorageError> {
         match self {
-            #[cfg(feature = "google_storage")]
+            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
                 let uploader = client
                     .client()
@@ -356,7 +356,7 @@ impl StorageClientEnum {
                 println!("Created Google Multipart Uploader");
                 Ok(MultiPartUploader::Google(uploader))
             }
-            #[cfg(feature = "aws_storage")]
+            //#[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => {
                 let uploader = client
                     .client()
@@ -380,19 +380,16 @@ pub struct PyStorageClient {
 #[pymethods]
 impl PyStorageClient {
     #[new]
-    fn new(settings: &OpsmlStorageSettings) -> PyResult<Self> {
+    pub fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = rt
             .block_on(StorageClientEnum::new(settings))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+            .map_err(|e| StorageError::Error(format!("{:?}", e)))?;
+
         Ok(PyStorageClient {
             inner: client,
             runtime: rt,
         })
-    }
-
-    fn name(&self) -> String {
-        self.inner.name().to_string()
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
@@ -460,7 +457,29 @@ impl PyStorageClient {
     }
 }
 
+pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
+    // check storage_uri for prefix
+    let storage_settings = config.storage_settings();
+
+    StorageClientEnum::new(&storage_settings)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create storage client for storage type: {:?}",
+                storage_settings.storage_type
+            )
+        })
+}
+
 #[pyfunction]
-pub fn get_storage_client(settings: &OpsmlStorageSettings) -> PyResult<PyStorageClient> {
-    PyStorageClient::new(settings)
+pub fn get_opsml_storage_system(config: &OpsmlConfig) -> AnyhowResult<PyStorageClient> {
+    // check storage_uri for prefix
+    let storage_settings = config.storage_settings();
+
+    PyStorageClient::new(&storage_settings).with_context(|| {
+        format!(
+            "Failed to create storage client for storage type: {:?}",
+            storage_settings.storage_type
+        )
+    })
 }

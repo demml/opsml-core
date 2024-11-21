@@ -4,7 +4,10 @@ from ._opsml_storage_local import (
     PyHttpFSStorageClient,
     PyS3FSStorageClient,
     StorageType,
-    StorageSettings,
+    OpsmlStorageSettings,
+    OpsmlConfig,
+    ApiSettings,
+    PyStorageClient,
 )
 
 __all__ = [
@@ -14,4 +17,8 @@ __all__ = [
     "PyS3FSStorageClient",
     "StorageType",
     "StorageSettings",
+    "OpsmlStorageSettings",
+    "OpsmlConfig",
+    "ApiSettings",
+    "PyStorageClient",
 ]

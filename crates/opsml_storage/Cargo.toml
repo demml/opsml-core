@@ -12,12 +12,13 @@ license = "MIT"
 description = "Core rust library for the opsml project"
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["experimental-async"] }
+pyo3 = { version = "0.22", features = ["experimental-async", "anyhow"] }
 serde = { version = "1.*", features = ["derive"] }
 reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }
 tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "macros"] }
 opsml-settings = { workspace = true }
-thiserror = "2.*"
+thiserror = { workspace = true }
+anyhow = { workspace = true }
 serde_json = "1.*"
 futures = "0.*"
 tokio-util = { version = "0.*",  features = ["codec"]}
@@ -38,7 +39,7 @@ azure_storage = { version = "0.21.0", optional = true }
 azure_storage_blobs = { version = "0.21.0", optional = true }
 aws-config = { version = "1.5.10", optional = true }
 aws-smithy-types = { version = "1.2.9", features = ["rt-tokio", "http-body-0-4-x"] }
-anyhow = "1.0.93"
+
 
 
 [features]

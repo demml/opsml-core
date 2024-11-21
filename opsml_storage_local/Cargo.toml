@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 bytes = "1.*"
 futures-core = "0.*"
 opsml-storage = { workspace = true, features = ["google_storage", "aws_storage"] }
+opsml-settings = { workspace = true }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 tokio = "1.*"
 

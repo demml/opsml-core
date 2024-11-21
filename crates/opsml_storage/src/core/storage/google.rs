@@ -936,9 +936,7 @@ pub mod google_storage {
         pub fn get_settings() -> OpsmlStorageSettings {
             let config = OpsmlConfig::new();
 
-            let storage_settings = config.storage_settings();
-
-            storage_settings
+            config.storage_settings()
         }
 
         pub fn create_file(name: &str, chunk_size: &u64) {

@@ -1,8 +1,7 @@
 use crate::core::logging::route::setup_logging;
 
 use opsml_settings::config::OpsmlConfig;
-use opsml_storage::core::storage::base::get_storage_system;
-use opsml_storage::core::storage::enums::StorageClientEnum;
+use opsml_storage::core::storage::enums::{get_storage_system, StorageClientEnum};
 use tracing::info;
 
 pub async fn setup_components() -> Result<(OpsmlConfig, StorageClientEnum), anyhow::Error> {

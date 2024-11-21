@@ -1,10 +1,10 @@
+use crate::error::SettingsError;
 use pyo3::prelude::*;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -14,15 +14,28 @@ pub enum StorageType {
     Local,
 }
 
-impl FromStr for StorageType {
-    type Err = String;
+// implement to string for StorageType
+impl ToString for StorageType {
+    fn to_string(&self) -> String {
+        match self {
+            StorageType::Google => "google".to_string(),
+            StorageType::AWS => "aws".to_string(),
+            StorageType::Local => "local".to_string(),
+        }
+    }
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+impl StorageType {
+    pub fn from_str(s: &str) -> Result<StorageType, SettingsError> {
+        let trimmed_lowercase = s.trim().trim_matches('"').to_lowercase();
+        match trimmed_lowercase.as_str() {
             "google" => Ok(StorageType::Google),
             "aws" => Ok(StorageType::AWS),
             "local" => Ok(StorageType::Local),
-            _ => Err(format!("'{}' is not a valid StorageType", s)),
+            _ => Err(SettingsError::Error(format!(
+                "Unsupported storage type: {}",
+                s
+            ))),
         }
     }
 }
@@ -202,7 +215,21 @@ impl OpsmlConfig {
             StorageType::Local
         }
     }
+}
 
+#[pymethods]
+impl OpsmlConfig {
+    /// Create a new OpsmlConfig instance
+    ///
+    /// # Returns
+    ///
+    /// `OpsmlConfig`: A new instance of OpsmlConfig
+    #[new]
+    pub fn new() -> Self {
+        OpsmlConfig::default()
+    }
+
+    /// Get the storage settings for the OpsmlConfig
     pub fn storage_settings(&self) -> OpsmlStorageSettings {
         OpsmlStorageSettings {
             storage_uri: self.opsml_storage_uri.clone(),
@@ -219,19 +246,6 @@ impl OpsmlConfig {
                 prod_token: self.opsml_prod_token.clone(),
             },
         }
-    }
-}
-
-#[pymethods]
-impl OpsmlConfig {
-    /// Create a new OpsmlConfig instance
-    ///
-    /// # Returns
-    ///
-    /// `OpsmlConfig`: A new instance of OpsmlConfig
-    #[new]
-    pub fn new() -> Self {
-        OpsmlConfig::default()
     }
 }
 

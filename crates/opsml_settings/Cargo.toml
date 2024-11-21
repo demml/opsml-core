@@ -12,7 +12,9 @@ license = "MIT"
 description = "Opsml settings rust and python bindings"
 
 [dependencies]
+colored = "2.1.0"
 pyo3 = { workspace = true }
+thiserror = { workspace = true }
 rand = "0.8.5"
 serde = "1.0.215"
 

@@ -25,6 +25,8 @@ pyo3 = { version = "0.22", features = ["extension-module"] }
 opsml-storage = { path = "crates/opsml_storage" }
 opsml-server = { path = "crates/opsml_server" }
 opsml-settings = { path = "crates/opsml_settings" }
+thiserror = "2.*"
+anyhow = "1.0.93"
 
 [profile.release]
 lto = "fat"

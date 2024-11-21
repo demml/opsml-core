@@ -1,7 +1,9 @@
 use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use crate::core::utils::error::{ApiError, StorageError};
+use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
+use opsml_settings::color::LogColors;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -11,7 +13,6 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 use tokio::fs::File;
 
 const TIMEOUT_SECS: u64 = 30;
@@ -245,18 +246,21 @@ pub struct HttpStorageClient {
 }
 
 impl HttpStorageClient {
-    pub async fn new(
-        settings: &mut OpsmlStorageSettings,
-        client: &Client,
-    ) -> Result<Self, StorageError> {
-        let mut api_client = OpsmlApiClient::new(&settings, &client)
+    pub async fn new(settings: &mut OpsmlStorageSettings, client: &Client) -> AnyhowResult<Self> {
+        let mut api_client = OpsmlApiClient::new(settings, client)
             .await
-            .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
+            .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))
+            .context(LogColors::purple(
+                "Error occurred while creating api client",
+            ))?;
 
         // get storage type from opsml_server
-        let storage_type = Self::get_storage_setting(&mut api_client)
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to get storage type: {}", e)))?;
+        let storage_type =
+            Self::get_storage_setting(&mut api_client)
+                .await
+                .context(LogColors::purple(
+                    "Error occurred while getting storage type",
+                ))?;
 
         // update settings type
         settings.storage_type = storage_type;
@@ -264,7 +268,10 @@ impl HttpStorageClient {
         // get storage client (options are gcs, aws, azure and local)
         let storage_client = StorageClientEnum::new(settings)
             .await
-            .map_err(|e| StorageError::Error(format!("Failed to create storage client: {}", e)))?;
+            .map_err(|e| StorageError::Error(format!("Failed to create storage client: {}", e)))
+            .context(LogColors::green(
+                "Error occurred while creating storage client",
+            ))?;
 
         Ok(Self {
             api_client,
@@ -286,12 +293,21 @@ impl HttpStorageClient {
         let response = client
             .request_with_retry(Routes::StorageSettings, RequestType::Get, None, None, None)
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to get storage settings: {}", e)))?;
+            .map_err(|e| {
+                ApiError::Error(LogColors::alert(&format!(
+                    "Failed to get storage settings: {}",
+                    e
+                )))
+            })?;
 
         let storage_type = response["storage_type"].to_string();
 
-        StorageType::from_str(&storage_type)
-            .map_err(|e| ApiError::Error(format!("Failed to get storage type: {}", e)))
+        StorageType::from_str(&storage_type).map_err(|e| {
+            ApiError::Error(LogColors::alert(&format!(
+                "Failed to get storage type: {}",
+                e
+            )))
+        })
     }
 
     pub async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {

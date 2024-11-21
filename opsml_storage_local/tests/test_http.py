@@ -1,20 +1,26 @@
 if __name__ == "__main__":
     from pathlib import Path
+    import os
     import uuid
-    from opsml_storage_local import PyHttpFSStorageClient, StorageType, StorageSettings
+    from opsml_storage_local import PyHttpFSStorageClient, OpsmlConfig
 
-    kwargs = {
-        "base_url": "http://localhost:3000",
-        "path_prefix": "opsml",
-    }
-    storage_uri = "http://localhost:3000"
-    storage_type = StorageType.Google
-    settings = StorageSettings(storage_uri, True, storage_type, kwargs)
+    os.environ["OPSML_TRACKING_URI"] = "http://localhost:3000"
 
-    client = PyHttpFSStorageClient(settings)
+    config = OpsmlConfig()
+    storage_client = PyHttpFSStorageClient(config.storage_settings())
 
-    lpath = Path("tests/assets/cats.jpg")
-    rpath_dir = Path(uuid.uuid4().hex)
-    rpath = rpath_dir / "cats.jpg"
-
-    client.put(lpath, rpath)
+    # kwargs = {
+    #    "base_url": "http://localhost:3000",
+    #    "path_prefix": "opsml",
+    # }
+    # storage_uri = "http://localhost:3000"
+    # storage_type = StorageType.Google
+    # settings = StorageSettings(storage_uri, True, storage_type, kwargs)
+#
+# client = PyHttpFSStorageClient(settings)
+#
+# lpath = Path("tests/assets/cats.jpg")
+# rpath_dir = Path(uuid.uuid4().hex)
+# rpath = rpath_dir / "cats.jpg"
+#
+# client.put(lpath, rpath)

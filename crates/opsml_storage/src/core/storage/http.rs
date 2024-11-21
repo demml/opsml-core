@@ -6,6 +6,7 @@ use crate::core::utils::error::StorageError;
 
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
+use opsml_settings::color::LogColors;
 use opsml_settings::config::OpsmlStorageSettings;
 use pyo3::prelude::*;
 use std::path::{Path, PathBuf};
@@ -50,7 +51,7 @@ impl HttpFSStorageClient {
             // iterate over each object and get it
             for obj in objects {
                 let file_path = Path::new(obj.as_str());
-                let relative_path = file_path.relative_path(&rpath)?;
+                let relative_path = file_path.relative_path(rpath)?;
                 let local_path = lpath.join(relative_path);
 
                 self.client
@@ -95,14 +96,14 @@ impl HttpFSStorageClient {
                 ));
             }
 
-            let files: Vec<PathBuf> = get_files(&lpath)?;
+            let files: Vec<PathBuf> = get_files(lpath)?;
 
             for file in files {
                 let stripped_lpath_clone = lpath;
                 let stripped_rpath_clone = rpath;
                 let stripped_file_path = file.clone();
 
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                let relative_path = file.relative_path(stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
                 let mut uploader = self.client.create_multipart_uploader(rpath).await?;
@@ -114,10 +115,10 @@ impl HttpFSStorageClient {
 
             Ok(())
         } else {
-            let mut uploader = self.client.create_multipart_uploader(&rpath).await?;
+            let mut uploader = self.client.create_multipart_uploader(rpath).await?;
 
             self.client
-                .upload_file_in_chunks(&lpath, &rpath, &mut uploader)
+                .upload_file_in_chunks(lpath, rpath, &mut uploader)
                 .await?;
 
             Ok(())
@@ -140,15 +141,27 @@ pub struct PyHttpFSStorageClient {
 #[pymethods]
 impl PyHttpFSStorageClient {
     #[new]
-    fn new(settings: &mut OpsmlStorageSettings) -> Result<Self, StorageError> {
+    fn new(settings: &mut OpsmlStorageSettings) -> AnyhowResult<Self> {
         let rt = tokio::runtime::Runtime::new().unwrap();
 
-        let client = rt.block_on(async {
-            let client = build_http_client(&settings.api_settings)
-                .map_err(|e| StorageError::Error(format!("Failed to create http client {}", e)))?;
+        let client = rt
+            .block_on(async {
+                let client = build_http_client(&settings.api_settings).context(
+                    LogColors::green("Error occurred while building HTTP client"),
+                )?;
 
-            Ok(HttpStorageClient::new(settings, &client).await.unwrap())
-        })?;
+                let client =
+                    HttpStorageClient::new(settings, &client)
+                        .await
+                        .context(LogColors::green(
+                            "Error occurred while creating HTTP storage client",
+                        ));
+
+                client
+            })
+            .context(LogColors::green(
+                "Error occurred while creating HTTP storage client",
+            ))?;
 
         Ok(Self {
             client,

@@ -1,12 +1,11 @@
 use axum::response::IntoResponse;
 use axum::Json;
-use opsml_settings::config::StorageType;
 /// file containing schema for health module
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StorageSettings {
-    pub storage_type: StorageType,
+    pub storage_type: String,
 }
 
 // Implement IntoResponse for Alive
