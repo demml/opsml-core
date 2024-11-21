@@ -33,6 +33,7 @@ pub struct OpsmlStorageSettings {
     pub storage_uri: String,
     pub using_client: bool,
     pub api_settings: ApiSettings,
+    pub storage_type: StorageType,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -176,10 +177,22 @@ impl OpsmlConfig {
         }
     }
 
+    fn get_storage_type(&self) -> StorageType {
+        let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
+        if storage_uri_lower.starts_with("gs://") {
+            StorageType::Google
+        } else if storage_uri_lower.starts_with("s3://") {
+            StorageType::AWS
+        } else {
+            StorageType::Local
+        }
+    }
+
     pub fn storage_settings(&self) -> OpsmlStorageSettings {
         OpsmlStorageSettings {
             storage_uri: self.opsml_storage_uri.clone(),
             using_client: self.is_using_client(),
+            storage_type: self.get_storage_type(),
             api_settings: ApiSettings {
                 base_url: self.opsml_tracking_uri.clone(),
                 use_auth: self.opsml_auth,

@@ -1,7 +1,6 @@
-use crate::core::storage::base::{FileInfo, StorageClient};
+use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use crate::core::utils::error::{ApiError, StorageError};
-use async_trait::async_trait;
 use futures::TryFutureExt;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use reqwest::{
@@ -12,9 +11,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::fs::File;
-use tokio::sync::Mutex;
 
 const TIMEOUT_SECS: u64 = 30;
 const MAX_CHUNKS: u64 = 10000;
@@ -35,6 +32,7 @@ pub enum Routes {
     ListInfo,
     Files,
     Healthcheck,
+    StorageSettings
 }
 
 impl Routes {
@@ -46,6 +44,7 @@ impl Routes {
             Routes::List => "files/list",
             Routes::ListInfo => "files/list_info",
             Routes::Healthcheck => "healthcheck",
+            Routes::StorageSettings => "storage/settings"
         }
     }
 }
@@ -90,6 +89,7 @@ impl OpsmlApiClient {
         if settings.api_settings.use_auth {
             api_client.refresh_token().await?;
         }
+
         Ok(api_client)
     }
 
@@ -249,9 +249,13 @@ impl HttpStorageClient {
     }
 
     async fn new(settings: &OpsmlStorageSettings, client: &Client) -> Result<Self, StorageError> {
-        let api_client = OpsmlApiClient::new(&settings, &client)
+        let mut api_client = OpsmlApiClient::new(&settings, &client)
             .await
             .map_err(|e| StorageError::Error(format!("Failed to create api client: {}", e)))?;
+
+
+        /// get storage type from opsml_server
+        api_client.request_with_retry(Routes::ListInfo, request_type, body_params, query_params, headers)
 
         let storage_client = StorageClientEnum::new(settings.clone())
             .await
@@ -518,7 +522,7 @@ impl HttpStorageClient {
 mod tests {
     use super::*;
     use mockito::{Server, ServerGuard};
-    use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings};
+    use opsml_settings::config::OpsmlConfig;
     use tokio;
 
     const PATH_PREFIX: &str = "opsml";
