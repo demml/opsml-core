@@ -12,27 +12,21 @@ license = "MIT"
 description = "Core rust library for the opsml project"
 
 [dependencies]
-serde = { workspace = true }
-tokio = { workspace = true }
-serde_json = { workspace = true }
-tower-http = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
 axum = { version = "0.7.7", features = ["multipart"] }
+bytes = { workspace = true }
+opsml-logging = { workspace = true }
 opsml-settings = { workspace = true }
 opsml-storage = { workspace = true }
-
-# Conditional dependencies
-async-trait = "0.1.83"
-anyhow = "1.0.93"
-time = "0.3.36"
-thiserror = "2.0.3"
-bytes = "1.8.0"
-
-[features]
-#google_storage = ["opsml-storage/google_storage"]
-#aws_storage = ["opsml-storage/aws_storage"]
-
+opsml-utils = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.*"

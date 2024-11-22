@@ -1,0 +1,25 @@
+[package]
+name = "opsml-logging"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+
+[lib]
+doctest = false
+
+authors = [
+  "Steven Forrester <sjforrester32@gmail.com>"
+]
+
+license = "MIT"
+description = "Logging crate for opsml"
+
+[dependencies]
+opsml-error = { workspace = true }
+time = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+
+[profile.release]
+workspace = true

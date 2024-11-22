@@ -2387,6 +2387,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "opsml-logging"
+version = "0.1.0"
+dependencies = [
+ "opsml-error",
+ "time",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "opsml-server"
 version = "0.1.0"
 dependencies = [
@@ -2396,8 +2406,10 @@ dependencies = [
  "bytes 1.8.0",
  "mockall",
  "mockito",
+ "opsml-logging",
  "opsml-settings",
  "opsml-storage",
+ "opsml-utils",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -2407,7 +2419,6 @@ dependencies = [
  "tower 0.4.13",
  "tower-http",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

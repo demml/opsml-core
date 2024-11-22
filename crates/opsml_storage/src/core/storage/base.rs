@@ -2,6 +2,7 @@
 use async_trait::async_trait;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -204,4 +205,12 @@ pub struct FileInfo {
     pub created: String,
     #[pyo3(get)]
     pub suffix: String,
+}
+
+#[pymethods]
+impl FileInfo {
+    pub fn __str__(&self) -> String {
+        // serialize the struct to a string
+        PyHelperFuncs::__str__(self)
+    }
 }

@@ -148,14 +148,11 @@ impl PyHttpFSStorageClient {
                     LogColors::green("Error occurred while building HTTP client"),
                 )?;
 
-                let client =
-                    HttpStorageClient::new(settings, &client)
-                        .await
-                        .context(LogColors::green(
-                            "Error occurred while creating HTTP storage client",
-                        ));
-
-                client
+                HttpStorageClient::new(settings, &client)
+                    .await
+                    .context(LogColors::green(
+                        "Error occurred while creating HTTP storage client",
+                    ))
             })
             .context(LogColors::green(
                 "Error occurred while creating HTTP storage client",

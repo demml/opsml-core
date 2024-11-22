@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -14,19 +15,10 @@ pub enum StorageType {
     Local,
 }
 
-// implement to string for StorageType
-impl ToString for StorageType {
-    fn to_string(&self) -> String {
-        match self {
-            StorageType::Google => "google".to_string(),
-            StorageType::AWS => "aws".to_string(),
-            StorageType::Local => "local".to_string(),
-        }
-    }
-}
+impl FromStr for StorageType {
+    type Err = SettingsError;
 
-impl StorageType {
-    pub fn from_str(s: &str) -> Result<StorageType, SettingsError> {
+    fn from_str(s: &str) -> Result<StorageType, SettingsError> {
         let trimmed_lowercase = s.trim().trim_matches('"').to_lowercase();
         match trimmed_lowercase.as_str() {
             "google" => Ok(StorageType::Google),

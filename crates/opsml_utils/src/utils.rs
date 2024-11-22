@@ -12,12 +12,12 @@ impl PyHelperFuncs {
         match ColoredFormatter::with_styler(
             PrettyFormatter::default(),
             Styler {
-                key: Color::Rgb(245, 77, 85).bold(),
-                string_value: Color::Rgb(249, 179, 93).foreground(),
-                float_value: Color::Rgb(249, 179, 93).foreground(),
-                integer_value: Color::Rgb(249, 179, 93).foreground(),
-                bool_value: Color::Rgb(249, 179, 93).foreground(),
-                nil_value: Color::Rgb(249, 179, 93).foreground(),
+                key: Color::Rgb(75, 57, 120).bold(),
+                string_value: Color::Rgb(4, 205, 155).foreground(),
+                float_value: Color::Rgb(4, 205, 155).foreground(),
+                integer_value: Color::Rgb(4, 205, 155).foreground(),
+                bool_value: Color::Rgb(4, 205, 155).foreground(),
+                nil_value: Color::Rgb(4, 205, 155).foreground(),
                 ..Default::default()
             },
         )

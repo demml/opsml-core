@@ -15,9 +15,7 @@ use crate::core::storage::aws::{AWSMulitPartUpload, S3FStorageClient};
 use crate::core::storage::google::{GCSFSStorageClient, GoogleMultipartUpload};
 
 pub enum MultiPartUploader {
-    //#[cfg(feature = "google_storage")]
     Google(GoogleMultipartUpload),
-    //#[cfg(feature = "aws_storage")]
     AWS(AWSMulitPartUpload),
     Local(LocalMultiPartUpload),
 }
@@ -39,7 +37,6 @@ impl MultiPartUploader {
         body: ByteStream,
     ) -> Result<bool, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .upload_part(body, first_byte, last_byte, total_size)
@@ -73,14 +70,12 @@ impl MultiPartUploader {
         presigned_url: &str,
     ) -> Result<bool, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .upload_part(body, first_byte, last_byte, file_size)
                     .await?;
                 Ok(true)
             }
-            //#[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => {
                 uploader
                     .upload_part_with_presigned_url(part_number, body, presigned_url)
@@ -109,13 +104,12 @@ impl MultiPartUploader {
         this_chunk_size: u64,
     ) -> Result<ByteStream, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => {
                 uploader
                     .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
                     .await
             }
-            //#[cfg(feature = "aws_storage")]
+
             MultiPartUploader::AWS(uploader) => {
                 uploader
                     .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
@@ -131,9 +125,8 @@ impl MultiPartUploader {
 
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => uploader.complete_upload().await,
-            //#[cfg(feature = "aws_storage")]
+
             MultiPartUploader::AWS(uploader) => uploader.complete_upload().await,
             MultiPartUploader::Local(uploader) => uploader.complete_upload().await,
         }
@@ -149,34 +142,30 @@ pub enum StorageClientEnum {
 impl StorageClientEnum {
     pub fn name(&self) -> &str {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.name(),
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
         }
     }
 
-    pub fn storage_type(&self) -> String {
+    pub fn storage_type(&self) -> StorageType {
         match self {
-            //#[cfg(feature = "google_storage")]
-            StorageClientEnum::Google(_) => StorageType::Google.to_string(),
-            //#[cfg(feature = "aws_storage")]
-            StorageClientEnum::AWS(_) => StorageType::AWS.to_string(),
-            StorageClientEnum::Local(_) => StorageType::Local.to_string(),
+            StorageClientEnum::Google(_) => StorageType::Google,
+
+            StorageClientEnum::AWS(_) => StorageType::AWS,
+            StorageClientEnum::Local(_) => StorageType::Local,
         }
     }
 
     pub async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         match settings.storage_type {
-            //#[cfg(feature = "google_storage")]
             StorageType::Google => {
                 // strip the gs:// prefix
                 let client = GCSFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Google(client))
             }
 
-            //#[cfg(feature = "aws_storage")]
             StorageType::AWS => {
                 // strip the s3:// prefix
                 let client = S3FStorageClient::new(settings).await;
@@ -191,9 +180,8 @@ impl StorageClientEnum {
 
     pub async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.find(path).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
         }
@@ -201,9 +189,7 @@ impl StorageClientEnum {
 
     pub async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
         match self {
-            // #[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.find_info(path).await,
-            //#[cfg(feature = "aws_storage")]
             StorageClientEnum::AWS(client) => client.find_info(path).await,
             StorageClientEnum::Local(client) => client.find_info(path).await,
         }
@@ -216,9 +202,8 @@ impl StorageClientEnum {
         recursive: bool,
     ) -> Result<(), StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.get(lpath, rpath, recursive).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
         }
@@ -231,9 +216,8 @@ impl StorageClientEnum {
         recursive: bool,
     ) -> Result<(), StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.put(lpath, rpath, recursive).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
         }
@@ -241,9 +225,8 @@ impl StorageClientEnum {
 
     pub async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.copy(src, dest, recursive).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
         }
@@ -251,9 +234,8 @@ impl StorageClientEnum {
 
     pub async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.rm(path, recursive).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
         }
@@ -261,9 +243,8 @@ impl StorageClientEnum {
 
     pub async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => client.exists(path).await,
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
         }
@@ -275,11 +256,10 @@ impl StorageClientEnum {
         expiration: u64,
     ) -> Result<String, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => client.generate_presigned_url(path, expiration).await,
             StorageClientEnum::Local(client) => {
                 client.generate_presigned_url(path, expiration).await
@@ -294,9 +274,8 @@ impl StorageClientEnum {
         session_url: String,
     ) -> Result<String, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(_client) => Ok(session_url),
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => {
                 client
                     .generate_presigned_url_for_part(part_number, path, &session_url)
@@ -308,7 +287,6 @@ impl StorageClientEnum {
 
     pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
                 // google returns the session uri
                 let result = client
@@ -318,7 +296,7 @@ impl StorageClientEnum {
 
                 Ok(result.url().to_string())
             }
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => {
                 // aws returns the session uri
                 client
@@ -342,7 +320,6 @@ impl StorageClientEnum {
         session_url: String,
     ) -> Result<MultiPartUploader, StorageError> {
         match self {
-            //#[cfg(feature = "google_storage")]
             StorageClientEnum::Google(client) => {
                 let uploader = client
                     .client()
@@ -351,7 +328,7 @@ impl StorageClientEnum {
                 println!("Created Google Multipart Uploader");
                 Ok(MultiPartUploader::Google(uploader))
             }
-            //#[cfg(feature = "aws_storage")]
+
             StorageClientEnum::AWS(client) => {
                 let uploader = client
                     .client()

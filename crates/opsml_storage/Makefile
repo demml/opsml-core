@@ -5,15 +5,15 @@ format:
 
 .PHONY: lint
 lints:
-	cargo clippy --workspace --all-targets --features "google_storage, aws_storage" -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
 .PHONY: test.aws
 test.aws:
-	cargo test aws --features "aws_storage" -- --nocapture 
+	cargo test aws -- --nocapture 
 
 .PHONY: test.gcs
 test.gcs:
-	cargo test google --features "google_storage" -- --nocapture 
+	cargo test google -- --nocapture 
 
 .PHONY: test.local
 test.local:

@@ -5,7 +5,7 @@ format:
 
 .PHONY: lint
 lints:
-	cargo clippy --workspace --all-targets --features "google_storage, aws_storage" -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
 .PHONY: test.file
 test.file:

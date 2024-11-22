@@ -1,8 +1,8 @@
 use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
-use crate::core::utils::error::ApiError;
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
+use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use opsml_utils::color::LogColors;
@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tokio::fs::File;
 
 const TIMEOUT_SECS: u64 = 30;

@@ -63,3 +63,9 @@ impl From<UtilError> for PyErr {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
     }
 }
+
+#[derive(Error, Debug)]
+pub enum LoggingError {
+    #[error("Logging Error: {0}")]
+    Error(String),
+}
