@@ -25,11 +25,13 @@ if __name__ == "__main__":
 
     # info = storage_client.find_info(path)
 
-    # lpath = Path("tests/assets/blah.so")
-    # rpath_dir = Path(uuid.uuid4().hex)
-    # rpath = rpath_dir / "blah.so"
+    lpath = Path("tests/assets/blah.so")
+    rpath_dir = Path(uuid.uuid4().hex)
+    rpath = rpath_dir / "blah.so"
 
-    # storage_client.put(lpath, rpath)
+    storage_client.put(lpath, rpath)
+    # storage_client.rm(rpath)
+    # print(storage_client.exists(rpath))
 
     # kwargs = {
     #    "base_url": "http://localhost:3000",

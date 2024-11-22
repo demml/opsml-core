@@ -31,4 +31,16 @@ impl LogColors {
 
         text.color(red).to_string()
     }
+
+    pub fn purple_style() -> String {
+        format!("\x1b[38;2;75;57;120m")
+    }
+
+    pub fn green_style() -> String {
+        format!("\x1b[38;2;4;205;155m")
+    }
+
+    pub fn reset_style() -> String {
+        format!("\x1b[0m")
+    }
 }

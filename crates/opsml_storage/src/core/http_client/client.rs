@@ -529,9 +529,8 @@ impl HttpStorageClient {
 
         let bar = ProgressBar::new(chunk_count);
         let style =
-            ProgressStyle::with_template("{msg} [{bar:40.green/purple}] {pos}/{len} ({eta})")
-                .unwrap()
-                .progress_chars("##-");
+            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
+                .unwrap();
         bar.set_style(style);
         bar.set_message(LogColors::green("Uploading file"));
 
