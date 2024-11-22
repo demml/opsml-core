@@ -2,20 +2,17 @@
 /// This enum is meant to provide a common interface to use in the server
 use crate::core::storage::base::{FileInfo, FileSystem};
 use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
-use crate::core::utils::error::StorageError;
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use aws_smithy_types::byte_stream::ByteStream;
+use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
-//#[cfg(feature = "google_storage")]
-use crate::core::storage::google::google_storage::{GCSFSStorageClient, GoogleMultipartUpload};
-
-//#[cfg(feature = "aws_storage")]
-use crate::core::storage::aws::aws_storage::{AWSMulitPartUpload, S3FStorageClient};
+use crate::core::storage::aws::{AWSMulitPartUpload, S3FStorageClient};
+use crate::core::storage::google::{GCSFSStorageClient, GoogleMultipartUpload};
 
 pub enum MultiPartUploader {
     //#[cfg(feature = "google_storage")]
@@ -28,9 +25,7 @@ pub enum MultiPartUploader {
 impl MultiPartUploader {
     pub fn session_url(&self) -> String {
         match self {
-            #[cfg(feature = "google_storage")]
             MultiPartUploader::Google(uploader) => uploader.upload_client.url().to_string().clone(),
-            #[cfg(feature = "aws_storage")]
             MultiPartUploader::AWS(uploader) => uploader.upload_id.clone(),
             MultiPartUploader::Local(uploader) => uploader.path.clone(),
         }

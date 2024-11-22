@@ -1,4 +1,4 @@
-use crate::error::SettingsError;
+use opsml_error::error::SettingsError;
 use pyo3::prelude::*;
 use rand::Rng;
 use serde::{Deserialize, Serialize};

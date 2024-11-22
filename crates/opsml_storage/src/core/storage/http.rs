@@ -1,13 +1,11 @@
 use crate::core::http_client::client::{build_http_client, HttpStorageClient};
-use crate::core::storage::base::get_files;
-use crate::core::storage::base::FileInfo;
-use crate::core::storage::base::PathExt;
-use crate::core::utils::error::StorageError;
+use crate::core::storage::base::{get_files, FileInfo, PathExt};
+use opsml_error::error::StorageError;
 
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
-use opsml_settings::color::LogColors;
 use opsml_settings::config::OpsmlStorageSettings;
+use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
 use std::path::{Path, PathBuf};
 

@@ -1,10 +1,11 @@
 use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
-use crate::core::utils::error::{ApiError, StorageError};
+use crate::core::utils::error::ApiError;
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
-use opsml_settings::color::LogColors;
+use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
+use opsml_utils::color::LogColors;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,

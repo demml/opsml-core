@@ -12,42 +12,33 @@ license = "MIT"
 description = "Core rust library for the opsml project"
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["experimental-async", "anyhow"] }
-serde = { version = "1.*", features = ["derive"] }
-reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }
-tokio = { version = "1.*", features = ["rt", "rt-multi-thread", "macros"] }
-opsml-settings = { workspace = true }
-thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde_json = "1.*"
-futures = "0.*"
-tokio-util = { version = "0.*",  features = ["codec"]}
+async-trait = { workspace = true }
+aws-config = { workspace = true }
+aws-sdk-s3 = { workspace = true }
+aws-smithy-types = { workspace = true }
+azure_core = { workspace = true }
+azure_storage = { workspace = true }
+azure_storage_blobs = { workspace = true }
+base64 = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+google-cloud-auth = { workspace = true }
+google-cloud-storage = { workspace = true }
+google-cloud-token = { workspace = true }
+opsml-error = { workspace = true }
+opsml-settings = { workspace = true }
+opsml-utils = { workspace = true }
+pyo3 = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+walkdir = { workspace = true }
 
-# storage dependencies
-google-cloud-storage = { version = "0.*", features  = ["auth"], optional = true }
-google-cloud-auth = { version ="0.*", optional = true }
-google-cloud-token = { version = "0.*", optional = true }
-reqwest-middleware = { version = "0.*", optional = true }
-base64 = "0.*"
-bytes = "1.*"
-mockall = "0.*"
-async-trait = "0.*"
-walkdir = "2.*"
-aws-sdk-s3 = { version = "1.*", optional = true }
-azure_core = { version = "0.21.0", optional = true }
-azure_storage = { version = "0.21.0", optional = true }
-azure_storage_blobs = { version = "0.21.0", optional = true }
-aws-config = { version = "1.5.10", optional = true }
-aws-smithy-types = { version = "1.2.9", features = ["rt-tokio", "http-body-0-4-x"] }
-
-
-
-[features]
-default = []
-google_storage = ["google-cloud-storage", "google-cloud-auth", "google-cloud-token" ,"reqwest-middleware"]
-aws_storage = ["aws-sdk-s3", "aws-config"]
-azure = ["azure_core", "azure_storage", "azure_storage_blobs"]
-full = ["google_storage", "aws_storage", "azure"]
 
 [dev-dependencies]
 mockall = "0.*"

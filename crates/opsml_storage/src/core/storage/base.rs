@@ -1,6 +1,6 @@
 // create pyo3 async iterator
-use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
+use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};

@@ -1,9 +1,9 @@
 use crate::core::storage::base::get_files;
 use crate::core::storage::base::PathExt;
 use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
-use crate::core::utils::error::StorageError;
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::{ByteStream, Length};
+use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use std::fs::{self};

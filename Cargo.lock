@@ -810,6 +810,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored_json"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35980a1b846f8e3e359fd18099172a0857140ba9230affc4f71348081e039b6"
+dependencies = [
+ "serde",
+ "serde_json",
+ "yansi",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2358,6 +2369,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "opsml-core"
+version = "0.1.0"
+dependencies = [
+ "opsml-settings",
+ "opsml-storage",
+ "pyo3",
+ "tokio 1.41.1",
+]
+
+[[package]]
+name = "opsml-error"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "thiserror 2.0.3",
+]
+
+[[package]]
 name = "opsml-server"
 version = "0.1.0"
 dependencies = [
@@ -2386,6 +2415,7 @@ name = "opsml-settings"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "opsml-error",
  "pyo3",
  "rand 0.8.5",
  "serde",
@@ -2412,7 +2442,9 @@ dependencies = [
  "google-cloud-token",
  "mockall",
  "mockito",
+ "opsml-error",
  "opsml-settings",
+ "opsml-utils",
  "pyo3",
  "rand 0.8.5",
  "reqwest 0.12.9",
@@ -2429,37 +2461,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "opsml-storage-gcs"
+name = "opsml-utils"
 version = "0.1.0"
 dependencies = [
- "bytes 1.8.0",
- "futures-core",
- "opsml-storage",
+ "colored",
+ "colored_json",
+ "opsml-error",
  "pyo3",
- "tokio 1.41.1",
-]
-
-[[package]]
-name = "opsml-storage-local"
-version = "0.1.0"
-dependencies = [
- "bytes 1.8.0",
- "futures-core",
- "opsml-settings",
- "opsml-storage",
- "pyo3",
- "tokio 1.41.1",
-]
-
-[[package]]
-name = "opsml-storage-s3"
-version = "0.1.0"
-dependencies = [
- "bytes 1.8.0",
- "futures-core",
- "opsml-storage",
- "pyo3",
- "tokio 1.41.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4426,6 +4436,12 @@ name = "xmlparser"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yoke"

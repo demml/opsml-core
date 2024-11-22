@@ -1,0 +1,23 @@
+[package]
+name = "opsml-error"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+
+[lib]
+doctest = false
+
+authors = [
+  "Steven Forrester <sjforrester32@gmail.com>"
+]
+
+license = "MIT"
+description = "Core rust library for the opsml project"
+
+[dependencies]
+thiserror = { workspace = true }
+pyo3 = { workspace = true }
+
+
+[profile.release]
+workspace = true

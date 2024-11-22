@@ -1,0 +1,25 @@
+[package]
+name = "opsml-core"
+version = { workspace = true }
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "opsml_core"
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+opsml-storage = { workspace = true}
+opsml-settings = { workspace = true }
+pyo3 = { workspace = true }
+tokio = { workspace = true }
+
+[features]
+default = []
+
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
