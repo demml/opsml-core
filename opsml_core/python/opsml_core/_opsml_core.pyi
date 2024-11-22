@@ -28,6 +28,9 @@ class FileInfo:
     def suffix(self) -> str:
         """The suffix of the file."""
 
+    def __str__(self) -> str:
+        """Return a string representation of the FileInfo object."""
+
 class PyLocalFSStorageClient:
     def __init__(self, settings: OpsmlStorageSettings):
         """Initialize the storage client.
@@ -452,7 +455,7 @@ class OpsmlStorageSettings:
         """The storage URI."""
 
     @property
-    def using_client(self) -> bool:
+    def client_mode(self) -> bool:
         """Whether to use the client."""
 
     @property

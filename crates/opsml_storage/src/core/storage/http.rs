@@ -132,7 +132,7 @@ impl HttpFSStorageClient {
 
 #[pyclass]
 pub struct PyHttpFSStorageClient {
-    client: HttpStorageClient,
+    pub client: HttpStorageClient,
     runtime: tokio::runtime::Runtime,
 }
 

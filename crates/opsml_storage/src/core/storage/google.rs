@@ -29,7 +29,6 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[derive(Clone)]
 pub struct GcpCreds {
     pub creds: Option<CredentialsFile>,
     pub project: Option<String>,
@@ -153,45 +152,6 @@ impl GoogleMultipartUpload {
         self.upload_status = result;
 
         Ok(())
-        //let size = ChunkSize::new(*first_byte, *last_byte, Some(*file_size));
-
-        //let data = chunk
-        //    .collect()
-        //    .await
-        //    .map_err(|e| StorageError::Error(format!("Unable to collect chunk data: {}", e)))?
-        //    .into_bytes();
-
-        //let content_range = format!("bytes {}-{}/{}", first_byte, last_byte, file_size);
-        //let chunk_size = if file_size == first_byte {
-        //    0
-        //} else {
-        //    last_byte - first_byte + 1
-        //};
-
-        //let http_client = HttpClient::new();
-        //let url = self.session_url.clone();
-
-        //let response = http_client
-        //    .put(url)
-        //    .header(CONTENT_LENGTH, chunk_size)
-        //    .header(CONTENT_RANGE, content_range)
-        //    .body(data)
-        //    .send()
-        //    .await
-        //    .map_err(|e| StorageError::Error(format!("Unable to send chunk data: {}", e)))?;
-
-        //if response.status().is_success() {
-        //    println!("Chunk uploaded successfully");
-        //} else {
-        //    println!(
-        //        "Failed to upload chunk: {:?}",
-        //        response.text().await.map_err(|e| {
-        //            StorageError::Error(format!("Unable to get response text: {}", e))
-        //        })?
-        //    );
-        //}
-
-        //Ok(())
     }
 
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
@@ -223,13 +183,19 @@ impl StorageClient for GoogleStorageClient {
     async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         let creds = GcpCreds::new().await?;
         // If no credentials, attempt to create a default client pulling from the environment
-        let config = if creds.creds.is_none() {
-            let config = ClientConfig::default().with_auth().await;
 
-            // if error, use ClientConfig::default().anonymous();
-            let config = match config {
-                Ok(config) => config,
-                Err(_) => ClientConfig::default().anonymous(),
+        let config = if creds.creds.is_none() {
+            // if using in client_mode, default to anonymous
+            let config = if settings.client_mode {
+                ClientConfig::default().anonymous()
+            } else {
+                let config = ClientConfig::default().with_auth().await;
+
+                // default to anonymous if unable to create client with auth
+                match config {
+                    Ok(config) => config,
+                    Err(_) => ClientConfig::default().anonymous(),
+                }
             };
 
             Ok(config)

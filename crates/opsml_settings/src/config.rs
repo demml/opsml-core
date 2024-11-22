@@ -51,7 +51,7 @@ pub struct ApiSettings {
 #[pyclass]
 pub struct OpsmlStorageSettings {
     pub storage_uri: String,
-    pub using_client: bool,
+    pub client_mode: bool,
     pub api_settings: ApiSettings,
     pub storage_type: StorageType,
 }
@@ -87,6 +87,7 @@ pub struct OpsmlConfig {
     pub scouter_password: Option<String>,
     pub scouter_auth: bool,
     pub opsml_auth: bool,
+    pub client_mode: bool,
 }
 
 impl Default for OpsmlConfig {
@@ -94,13 +95,17 @@ impl Default for OpsmlConfig {
         let opsml_storage_uri =
             env::var("OPSML_STORAGE_URI").unwrap_or_else(|_| "./opsml_registries".to_string());
 
+        let opsml_tracking_uri =
+            env::var("OPSML_TRACKING_URI").unwrap_or_else(|_| "sqlite:///opsml.db".to_string());
+
+        let using_client = OpsmlConfig::is_using_client(&opsml_tracking_uri);
+
         OpsmlConfig {
             app_name: "opsml".to_string(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             app_version: env!("CARGO_PKG_VERSION").to_string(),
-            opsml_storage_uri: OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri),
-            opsml_tracking_uri: env::var("OPSML_TRACKING_URI")
-                .unwrap_or_else(|_| "sqlite:///opsml.db".to_string()),
+            opsml_storage_uri: OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, using_client),
+            opsml_tracking_uri: opsml_tracking_uri,
             opsml_prod_token: env::var("OPSML_PROD_TOKEN").unwrap_or_else(|_| "".to_string()),
 
             opsml_proxy_root: "opsml-root:/".to_string(),
@@ -133,6 +138,7 @@ impl Default for OpsmlConfig {
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
                 .unwrap_or(false),
+            client_mode: using_client,
         }
     }
 }
@@ -145,12 +151,16 @@ fn generate_jwt_secret() -> String {
 }
 
 impl OpsmlConfig {
-    pub fn set_opsml_storage_uri(opsml_storage_uri: String) -> String {
+    pub fn set_opsml_storage_uri(opsml_storage_uri: String, using_client: bool) -> String {
+        if using_client {
+            return opsml_storage_uri;
+        }
+
         if opsml_storage_uri.starts_with("gs://")
             || opsml_storage_uri.starts_with("s3://")
             || opsml_storage_uri.starts_with("az://")
         {
-            opsml_storage_uri
+            return opsml_storage_uri;
         } else {
             let path = PathBuf::from(opsml_storage_uri);
 
@@ -159,20 +169,16 @@ impl OpsmlConfig {
                 std::fs::create_dir_all(&path).unwrap();
             }
 
-            path.canonicalize().unwrap().to_str().unwrap().to_string()
+            return path.canonicalize().unwrap().to_str().unwrap().to_string();
         }
     }
 
-    pub fn is_using_client(&self) -> bool {
-        !self
-            .opsml_tracking_uri
-            .to_lowercase()
-            .trim()
-            .starts_with("http")
+    pub fn is_using_client(opsml_tracking_uri: &str) -> bool {
+        opsml_tracking_uri.to_lowercase().trim().starts_with("http")
     }
 
     pub fn storage_root(&self) -> String {
-        if self.is_using_client() {
+        if !self.client_mode {
             let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
             if storage_uri_lower.starts_with("gs://") {
                 // strip the gs:// prefix
@@ -225,7 +231,7 @@ impl OpsmlConfig {
     pub fn storage_settings(&self) -> OpsmlStorageSettings {
         OpsmlStorageSettings {
             storage_uri: self.opsml_storage_uri.clone(),
-            using_client: self.is_using_client(),
+            client_mode: self.client_mode,
             storage_type: self.get_storage_type(),
             api_settings: ApiSettings {
                 base_url: self.opsml_tracking_uri.clone(),
@@ -263,19 +269,19 @@ mod tests {
     #[test]
     fn test_set_opsml_storage_uri() {
         let opsml_storage_uri = "gs://test-bucket".to_string();
-        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri);
+        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, false);
         assert_eq!(result, "gs://test-bucket");
 
         let opsml_storage_uri = "s3://test-bucket".to_string();
-        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri);
+        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, false);
         assert_eq!(result, "s3://test-bucket");
 
         let opsml_storage_uri = "az://test-bucket".to_string();
-        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri);
+        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, false);
         assert_eq!(result, "az://test-bucket");
 
         let opsml_storage_uri = "./test-bucket".to_string();
-        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri);
+        let result = OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, false);
         assert_eq!(
             result,
             Path::new("./test-bucket")
@@ -295,13 +301,13 @@ mod tests {
             opsml_tracking_uri: "sqlite:///opsml.db".to_string(),
             ..Default::default()
         };
-        assert!(opsml_config.is_using_client());
+        assert!(opsml_config.client_mode);
 
         let opsml_config = OpsmlConfig {
             opsml_tracking_uri: "http://localhost:5000".to_string(),
             ..Default::default()
         };
-        assert!(!opsml_config.is_using_client());
+        assert!(!opsml_config.client_mode);
 
         cleanup();
     }

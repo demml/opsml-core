@@ -1,4 +1,4 @@
-from ._opsml_storage_local import (
+from ._opsml_core import (
     PyLocalFSStorageClient,
     PyGCSFSStorageClient,
     PyHttpFSStorageClient,

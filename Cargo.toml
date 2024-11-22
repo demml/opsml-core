@@ -43,6 +43,7 @@ futures = "0.*"
 google-cloud-storage = { version = "0.*", features  = ["auth"] }
 google-cloud-auth = "0.*"
 google-cloud-token = "0.*"
+indicatif = "0.*"
 pyo3 = { version = "0.22", features = ["extension-module", "anyhow", "gil-refs"] }
 rand = "0.8.5"
 reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }

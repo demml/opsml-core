@@ -1,24 +1,35 @@
+import os
+
+# Unset the environment variables
+os.environ.pop("GOOGLE_ACCOUNT_JSON_BASE64", None)
+os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS_JSON", None)
+os.environ["OPSML_TRACKING_URI"] = "http://localhost:3000"
+
+
 if __name__ == "__main__":
     from pathlib import Path
     import os
     import uuid
 
-    from opsml_storage_local import PyHttpFSStorageClient, OpsmlConfig
-
-    os.environ["OPSML_TRACKING_URI"] = "http://localhost:3000"
+    from opsml_core import PyHttpFSStorageClient, OpsmlConfig
 
     config = OpsmlConfig()
+
     storage_client = PyHttpFSStorageClient(config.storage_settings())
+    # print("client loaded")
 
-    path = Path("inkscape")
+    # path = Path("inkscape")
 
-    files = storage_client.find(path)
+    # files = storage_client.find(path)
 
-    print(files)
+    # info = storage_client.find_info(path)
 
-    info = storage_client.find_info(path)
+    # lpath = Path("tests/assets/blah.so")
+    # rpath_dir = Path(uuid.uuid4().hex)
+    # rpath = rpath_dir / "blah.so"
 
-    print(info)
+    # storage_client.put(lpath, rpath)
 
     # kwargs = {
     #    "base_url": "http://localhost:3000",

@@ -325,7 +325,6 @@ impl StorageClientEnum {
                     .client()
                     .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
                     .await?;
-                println!("Created Google Multipart Uploader");
                 Ok(MultiPartUploader::Google(uploader))
             }
 

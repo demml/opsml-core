@@ -28,7 +28,6 @@ const MAX_CHUNKS: u64 = 10000;
 /// Thus, some structs and functions will need to spawn a new runtime to run async functions from a sync context.
 /// This is handled at the 3rd-party abstraction level, so the user does not need to worry about it.
 
-#[derive(Clone)]
 pub struct AWSCreds {
     pub config: SdkConfig,
 }

@@ -1,7 +1,9 @@
+use crate::core::http_client::contracts::MultiPartSession;
 use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
@@ -16,6 +18,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::fs::File;
+
+use super::contracts::PresignedUrl;
 
 const TIMEOUT_SECS: u64 = 30;
 const MAX_CHUNKS: u64 = 10000;
@@ -243,7 +247,7 @@ impl OpsmlApiClient {
 }
 
 pub struct HttpStorageClient {
-    api_client: OpsmlApiClient,
+    pub api_client: OpsmlApiClient,
     storage_client: StorageClientEnum,
 }
 
@@ -257,6 +261,7 @@ impl HttpStorageClient {
             ))?;
 
         // get storage type from opsml_server
+
         let storage_type =
             Self::get_storage_setting(&mut api_client)
                 .await
@@ -437,9 +442,10 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
 
-        let url = &response["url"];
+        let response = serde_json::from_value::<PresignedUrl>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
-        Ok(url.to_string())
+        Ok(response.url)
     }
 
     pub async fn create_multipart_upload(&mut self, path: &str) -> Result<String, StorageError> {
@@ -460,7 +466,12 @@ impl HttpStorageClient {
                 StorageError::Error(format!("Failed to create multipart upload: {}", e))
             })?;
 
-        let session_url = &response["session_url"];
+        // deserialize response into MultiPartSession
+
+        let session = serde_json::from_value::<MultiPartSession>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
+
+        let session_url = session.session_url;
 
         Ok(session_url.to_string())
     }
@@ -491,7 +502,6 @@ impl HttpStorageClient {
         let file = File::open(lpath)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))
             .await?;
-
         // get file size
         let metadata = file
             .metadata()
@@ -499,7 +509,7 @@ impl HttpStorageClient {
             .await?;
 
         let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 15);
 
         // calculate the number of parts
         let mut chunk_count = (file_size / chunk_size) + 1;
@@ -516,6 +526,14 @@ impl HttpStorageClient {
             size_of_last_chunk = chunk_size;
             chunk_count -= 1;
         }
+
+        let bar = ProgressBar::new(chunk_count);
+        let style =
+            ProgressStyle::with_template("{msg} [{bar:40.green/purple}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("##-");
+        bar.set_style(style);
+        bar.set_message(LogColors::green("Uploading file"));
 
         for chunk_index in 0..chunk_count {
             let this_chunk = if chunk_count - 1 == chunk_index {
@@ -553,6 +571,8 @@ impl HttpStorageClient {
                     &presigned_url,
                 )
                 .await?;
+
+            bar.inc(1);
         }
 
         uploader.complete_upload().await?;
