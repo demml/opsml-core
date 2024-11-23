@@ -1,10 +1,11 @@
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
-use crate::core::storage::base::{FileInfo, FileSystem};
+use crate::core::storage::base::FileSystem;
 use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use aws_smithy_types::byte_stream::ByteStream;
+use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;

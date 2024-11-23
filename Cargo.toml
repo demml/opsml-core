@@ -18,6 +18,7 @@ repository = "https://github.com/demml/opsml-core"
 
 [workspace.dependencies]
 
+opsml-contracts = { path = "crates/opsml_contracts" }
 opsml-error = { path = "crates/opsml_error" }
 opsml-logging = { path = "crates/opsml_logging" }
 opsml-server = { path = "crates/opsml_server" }

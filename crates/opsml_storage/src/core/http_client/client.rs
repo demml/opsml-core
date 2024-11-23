@@ -1,9 +1,9 @@
 use crate::core::http_client::contracts::MultiPartSession;
-use crate::core::storage::base::FileInfo;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use opsml_contracts::FileInfo;
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
@@ -629,7 +629,7 @@ mod tests {
     }
 
     async fn setup_client(server_url: String, use_auth: Option<bool>) -> OpsmlApiClient {
-        let config = OpsmlConfig::new();
+        let config = OpsmlConfig::new(None);
         let mut settings = config.storage_settings();
 
         // set up some auth

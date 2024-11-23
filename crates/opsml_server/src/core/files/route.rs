@@ -1,8 +1,5 @@
 use crate::core::error::internal_server_error;
-use crate::core::files::schema::{
-    DeleteFileQuery, DeleteFileResponse, ListFileInfoResponse, ListFileQuery, ListFileResponse,
-    MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl,
-};
+use crate::core::files::schema::{DeleteFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery};
 use crate::core::state::AppState;
 use axum::{
     extract::{Query, State},
@@ -13,6 +10,10 @@ use axum::{
     routing::{delete, get},
     Router,
 };
+use opsml_contracts::{
+    DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
+};
+
 use opsml_error::error::ServerError;
 /// Route for debugging information
 use serde_json::json;
@@ -23,7 +24,7 @@ use tracing::{error, info};
 pub async fn create_multipart_upload(
     State(state): State<Arc<AppState>>,
     params: Query<MultiPartQuery>,
-) -> Result<MultiPartSession, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<MultiPartSession>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
 
     info!("Creating multipart upload for path: {}", path.display());
@@ -42,13 +43,13 @@ pub async fn create_multipart_upload(
         }
     };
 
-    Ok(MultiPartSession { session_url })
+    Ok(Json(MultiPartSession { session_url }))
 }
 
 pub async fn generate_presigned_url(
     State(state): State<Arc<AppState>>,
     params: Query<PresignedQuery>,
-) -> Result<PresignedUrl, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<PresignedUrl>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
     let for_multi_part = params.for_multi_part.unwrap_or(false);
 
@@ -86,7 +87,7 @@ pub async fn generate_presigned_url(
             }
         };
 
-        return Ok(PresignedUrl { url });
+        return Ok(Json(PresignedUrl { url }));
     }
 
     let url = state
@@ -103,13 +104,13 @@ pub async fn generate_presigned_url(
         }
     };
 
-    Ok(PresignedUrl { url })
+    Ok(Json(PresignedUrl { url }))
 }
 
 pub async fn list_files(
     State(state): State<Arc<AppState>>,
     params: Query<ListFileQuery>,
-) -> Result<ListFileResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<ListFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
 
     info!("Listing files for: {}", path.display());
@@ -128,13 +129,13 @@ pub async fn list_files(
         }
     };
 
-    Ok(ListFileResponse { files })
+    Ok(Json(ListFileResponse { files }))
 }
 
 pub async fn list_file_info(
     State(state): State<Arc<AppState>>,
     params: Query<ListFileQuery>,
-) -> Result<ListFileInfoResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<ListFileInfoResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
 
     info!("Getting file info for: {}", path.display());
@@ -153,13 +154,13 @@ pub async fn list_file_info(
         }
     };
 
-    Ok(ListFileInfoResponse { files })
+    Ok(Json(ListFileInfoResponse { files }))
 }
 
 pub async fn delete_file(
     State(state): State<Arc<AppState>>,
     params: Query<DeleteFileQuery>,
-) -> Result<DeleteFileResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<DeleteFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
     let recursive = params.recursive;
 
@@ -183,7 +184,7 @@ pub async fn delete_file(
             if exists {
                 return Err(internal_server_error("Failed to delete file"));
             } else {
-                return Ok(DeleteFileResponse { deleted: true });
+                return Ok(Json(DeleteFileResponse { deleted: true }));
             }
         }
         Err(e) => {

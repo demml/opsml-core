@@ -223,8 +223,15 @@ impl OpsmlConfig {
     ///
     /// `OpsmlConfig`: A new instance of OpsmlConfig
     #[new]
-    pub fn new() -> Self {
-        OpsmlConfig::default()
+    #[pyo3(signature = (client_mode=None))]
+    pub fn new(client_mode: Option<bool>) -> Self {
+        let mut config = OpsmlConfig::default();
+
+        if let Some(client_mode) = client_mode {
+            config.client_mode = client_mode;
+        }
+
+        config
     }
 
     /// Get the storage settings for the OpsmlConfig

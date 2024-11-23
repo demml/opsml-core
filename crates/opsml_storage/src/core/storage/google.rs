@@ -1,4 +1,4 @@
-use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt, StorageClient};
+use crate::core::storage::base::{get_files, FileSystem, PathExt, StorageClient};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::ByteStream;
 use aws_smithy_types::byte_stream::Length;
@@ -19,6 +19,7 @@ use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
 use google_cloud_storage::http::resumable_upload_client::UploadStatus;
 use google_cloud_storage::sign::SignedURLMethod;
 use google_cloud_storage::sign::SignedURLOptions;
+use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
@@ -893,7 +894,7 @@ mod tests {
     const CHUNK_SIZE: u64 = 1024 * 256;
 
     pub fn get_settings() -> OpsmlStorageSettings {
-        let config = OpsmlConfig::new();
+        let config = OpsmlConfig::new(None);
 
         config.storage_settings()
     }

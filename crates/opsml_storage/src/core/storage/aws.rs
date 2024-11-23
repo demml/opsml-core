@@ -1,4 +1,5 @@
-use crate::core::storage::base::{get_files, FileInfo, FileSystem, PathExt, StorageClient};
+use crate::core::storage::base::{get_files, FileSystem, PathExt, StorageClient};
+use opsml_contracts::FileInfo;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 
 use async_trait::async_trait;
@@ -885,7 +886,7 @@ mod tests {
         let bucket =
             std::env::var("CLOUD_BUCKET_NAME").unwrap_or_else(|_| "opsml-integration".to_string());
 
-        let config = OpsmlConfig::new();
+        let config = OpsmlConfig::new(None);
         let mut settings = config.storage_settings();
         settings.storage_uri = bucket;
 

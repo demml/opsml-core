@@ -1,6 +1,5 @@
-use axum::Json;
-use axum::{http::HeaderMap, response::IntoResponse};
-use opsml_storage::core::storage::base::{FileInfo, UploadPartArgs};
+use axum::http::HeaderMap;
+use opsml_storage::core::storage::base::UploadPartArgs;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -15,30 +14,6 @@ pub struct PresignedQuery {
     pub session_url: Option<String>,
     pub part_number: Option<i32>,
     pub for_multi_part: Option<bool>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MultiPartSession {
-    pub session_url: String,
-}
-
-// Implement IntoResponse for Alive
-impl IntoResponse for MultiPartSession {
-    fn into_response(self) -> axum::response::Response {
-        Json(self).into_response()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct PresignedUrl {
-    pub url: String,
-}
-
-// Implement IntoResponse for Alive
-impl IntoResponse for PresignedUrl {
-    fn into_response(self) -> axum::response::Response {
-        Json(self).into_response()
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -63,43 +38,7 @@ pub struct ListFileQuery {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ListFileResponse {
-    pub files: Vec<String>,
-}
-
-// Implement IntoResponse for Alive
-impl IntoResponse for ListFileResponse {
-    fn into_response(self) -> axum::response::Response {
-        Json(self).into_response()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ListFileInfoResponse {
-    pub files: Vec<FileInfo>,
-}
-
-// Implement IntoResponse for Alive
-impl IntoResponse for ListFileInfoResponse {
-    fn into_response(self) -> axum::response::Response {
-        Json(self).into_response()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct DeleteFileQuery {
     pub path: String,
     pub recursive: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeleteFileResponse {
-    pub deleted: bool,
-}
-
-// Implement IntoResponse for Alive
-impl IntoResponse for DeleteFileResponse {
-    fn into_response(self) -> axum::response::Response {
-        Json(self).into_response()
-    }
 }

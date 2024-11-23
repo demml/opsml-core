@@ -1,8 +1,9 @@
 use crate::core::storage::base::get_files;
 use crate::core::storage::base::PathExt;
-use crate::core::storage::base::{FileInfo, FileSystem, StorageClient};
+use crate::core::storage::base::{FileSystem, StorageClient};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::{ByteStream, Length};
+use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
@@ -619,7 +620,7 @@ mod tests {
         let bucket = std::env::var("CLOUD_BUCKET_NAME")
             .unwrap_or_else(|_| "opsml-storage-integration".to_string());
 
-        let config = OpsmlConfig::new();
+        let config = OpsmlConfig::new(None);
         let mut settings = config.storage_settings();
         settings.storage_uri = bucket;
 

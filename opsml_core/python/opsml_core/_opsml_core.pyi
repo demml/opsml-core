@@ -567,8 +567,15 @@ class PyStorageClient:
         """
 
 class OpsmlConfig:
-    def __init__(self) -> None:
-        """Initialize the OpsmlConfig."""
+    def __init__(self, client_mode: Optional[bool] = None) -> None:
+        """Initialize the OpsmlConfig.
+
+        Args:
+            client_mode:
+                Whether to use the client. By default, OpsML will determine whether
+                to run in client mode based on the provided OPSML_TRACKING_URI. This attribute
+                will override that behavior. Default is None.
+        """
 
     @property
     def app_name(self) -> str:

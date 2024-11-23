@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     from opsml_core import PyHttpFSStorageClient, OpsmlConfig
 
-    config = OpsmlConfig()
+    config = OpsmlConfig(client_mode=True)
 
     storage_client = PyHttpFSStorageClient(config.storage_settings())
     # print("client loaded")
@@ -30,8 +30,8 @@ if __name__ == "__main__":
     rpath = rpath_dir / "blah.so"
 
     storage_client.put(lpath, rpath)
-    # storage_client.rm(rpath)
-    # print(storage_client.exists(rpath))
+    storage_client.rm(rpath)
+    print(storage_client.exists(rpath))
 
     # kwargs = {
     #    "base_url": "http://localhost:3000",
