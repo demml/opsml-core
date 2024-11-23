@@ -17,6 +17,7 @@ description = "Core rust library for the opsml project"
 [dependencies]
 thiserror = { workspace = true }
 pyo3 = { workspace = true }
+serde = { workspace = true }
 
 
 [profile.release]

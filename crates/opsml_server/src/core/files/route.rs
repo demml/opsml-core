@@ -1,7 +1,7 @@
-use crate::core::error::ServerError;
+use crate::core::error::internal_server_error;
 use crate::core::files::schema::{
-    ListFileInfoResponse, ListFileQuery, ListFileResponse, MultiPartQuery, MultiPartSession,
-    PresignedQuery, PresignedUrl,
+    DeleteFileQuery, DeleteFileResponse, ListFileInfoResponse, ListFileQuery, ListFileResponse,
+    MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl,
 };
 use crate::core::state::AppState;
 use axum::{
@@ -10,6 +10,7 @@ use axum::{
     Json,
 };
 use axum::{routing::get, Router};
+use opsml_error::error::ServerError;
 /// Route for debugging information
 use serde_json::json;
 use std::path::Path;
@@ -28,16 +29,13 @@ pub async fn create_multipart_upload(
         .storage_client
         .create_multipart_upload(path)
         .await
-        .map_err(|e| ServerError::Error(format!("Failed to create multipart upload: {}", e)));
+        .map_err(|e| ServerError::MultipartError(e.to_string()));
 
     let session_url = match session_url {
         Ok(session_url) => session_url,
         Err(e) => {
             error!("Failed to create multipart upload: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e })),
-            ));
+            return Err(internal_server_error(e));
         }
     };
 
@@ -75,16 +73,13 @@ pub async fn generate_presigned_url(
             .storage_client
             .generate_presigned_url_for_part(part_number, &params.path, session_url)
             .await
-            .map_err(|e| ServerError::Error(format!("Failed to generate presigned url: {}", e)));
+            .map_err(|e| ServerError::PresignedError(e.to_string()));
 
         let url = match url {
             Ok(url) => url,
             Err(e) => {
                 error!("Failed to generate presigned url: {}", e);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": e })),
-                ));
+                return Err(internal_server_error(e));
             }
         };
 
@@ -95,16 +90,13 @@ pub async fn generate_presigned_url(
         .storage_client
         .generate_presigned_url(path, 600)
         .await
-        .map_err(|e| ServerError::Error(format!("Failed to generate presigned url: {}", e)));
+        .map_err(|e| ServerError::PresignedError(e.to_string()));
 
     let url = match url {
         Ok(url) => url,
         Err(e) => {
             error!("Failed to generate presigned url: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e })),
-            ));
+            return Err(internal_server_error(e));
         }
     };
 
@@ -123,16 +115,13 @@ pub async fn list_files(
         .storage_client
         .find(path)
         .await
-        .map_err(|e| ServerError::Error(format!("Failed to list files: {}", e)));
+        .map_err(|e| ServerError::ListFileError(e.to_string()));
 
     let files = match files {
         Ok(files) => files,
         Err(e) => {
             error!("Failed to list files: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e })),
-            ));
+            return Err(internal_server_error(e));
         }
     };
 
@@ -151,20 +140,54 @@ pub async fn list_file_info(
         .storage_client
         .find_info(path)
         .await
-        .map_err(|e| ServerError::Error(format!("Failed to list files: {}", e)));
+        .map_err(|e| ServerError::ListFileError(e.to_string()));
 
     let files = match files {
         Ok(files) => files,
         Err(e) => {
             error!("Failed to list files: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e })),
-            ));
+            return Err(internal_server_error(e));
         }
     };
 
     Ok(ListFileInfoResponse { files })
+}
+
+pub async fn delete_file(
+    State(state): State<Arc<AppState>>,
+    params: Query<DeleteFileQuery>,
+) -> Result<DeleteFileResponse, (StatusCode, Json<serde_json::Value>)> {
+    let path = Path::new(&params.path);
+    let recursive = params.recursive;
+
+    info!("Deleting path: {}", path.display());
+
+    let files = state.storage_client.rm(path, recursive).await.map_err(|e| {
+        error!("Failed to delete files: {}", e);
+        ServerError::DeleteError(e.to_string())
+    });
+
+    //
+    if let Err(e) = files {
+        return Err(internal_server_error(e));
+    }
+
+    // check if file exists
+    let exists = state.storage_client.exists(path).await;
+
+    match exists {
+        Ok(exists) => {
+            if exists {
+                return Err(internal_server_error("Failed to delete file"));
+            } else {
+                return Ok(DeleteFileResponse { deleted: true });
+            }
+        }
+        Err(e) => {
+            error!("Failed to check if file exists: {}", e);
+            return Err(internal_server_error(e));
+        }
+    }
 }
 
 pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
@@ -179,4 +202,5 @@ pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
         )
         .route(&format!("{}/files/list", prefix), get(list_files))
         .route(&format!("{}/files/list/info", prefix), get(list_file_info))
+        .route(&format!("{}/files/delete", prefix), get(delete_file))
 }

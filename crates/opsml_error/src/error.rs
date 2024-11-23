@@ -1,4 +1,5 @@
 use pyo3::PyErr;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -68,4 +69,19 @@ impl From<UtilError> for PyErr {
 pub enum LoggingError {
     #[error("Logging Error: {0}")]
     Error(String),
+}
+
+#[derive(Error, Debug, Serialize, Deserialize)]
+pub enum ServerError {
+    #[error("Failed to delete file: {0}")]
+    DeleteError(String),
+
+    #[error("Failed to create multipart: {0}")]
+    MultipartError(String),
+
+    #[error("Failed to presign: {0}")]
+    PresignedError(String),
+
+    #[error("Failed to list files: {0}")]
+    ListFileError(String),
 }

@@ -2421,6 +2421,7 @@ name = "opsml-error"
 version = "0.1.0"
 dependencies = [
  "pyo3",
+ "serde",
  "thiserror 2.0.3",
 ]
 
@@ -2444,6 +2445,7 @@ dependencies = [
  "bytes 1.8.0",
  "mockall",
  "mockito",
+ "opsml-error",
  "opsml-logging",
  "opsml-settings",
  "opsml-storage",

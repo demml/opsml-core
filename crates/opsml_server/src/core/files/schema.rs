@@ -85,3 +85,21 @@ impl IntoResponse for ListFileInfoResponse {
         Json(self).into_response()
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteFileQuery {
+    pub path: String,
+    pub recursive: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteFileResponse {
+    pub deleted: bool,
+}
+
+// Implement IntoResponse for Alive
+impl IntoResponse for DeleteFileResponse {
+    fn into_response(self) -> axum::response::Response {
+        Json(self).into_response()
+    }
+}

@@ -20,6 +20,7 @@ opsml-logging = { workspace = true }
 opsml-settings = { workspace = true }
 opsml-storage = { workspace = true }
 opsml-utils = { workspace = true }
+opsml-error = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
