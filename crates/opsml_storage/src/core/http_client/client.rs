@@ -2,10 +2,10 @@ use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
 use indicatif::{ProgressBar, ProgressStyle};
-use opsml_contracts::FileInfo;
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
 };
+use opsml_contracts::{FileInfo, StorageSettings};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
@@ -18,7 +18,6 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 use tokio::fs::File;
 
 const TIMEOUT_SECS: u64 = 30;
@@ -309,14 +308,15 @@ impl HttpStorageClient {
                 )))
             })?;
 
-        let storage_type = response["storage_type"].to_string();
-
-        StorageType::from_str(&storage_type).map_err(|e| {
+        // convert Value to Vec<String>
+        let settings = serde_json::from_value::<StorageSettings>(response).map_err(|e| {
             ApiError::Error(LogColors::alert(&format!(
-                "Failed to get storage type: {}",
+                "Failed to deserialize response: {}",
                 e
             )))
-        })
+        })?;
+
+        Ok(settings.storage_type)
     }
 
     pub async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {

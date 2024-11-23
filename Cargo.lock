@@ -2410,6 +2410,7 @@ dependencies = [
 name = "opsml-contracts"
 version = "0.1.0"
 dependencies = [
+ "opsml-settings",
  "opsml-utils",
  "pyo3",
  "serde",

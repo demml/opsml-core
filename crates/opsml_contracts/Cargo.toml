@@ -15,6 +15,7 @@ license = "MIT"
 description = "Server and client contracts for the opsml"
 
 [dependencies]
+opsml-settings = { workspace = true }
 opsml-utils = { workspace = true }
 pyo3 = { workspace = true }
 serde = { workspace = true }

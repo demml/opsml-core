@@ -1,3 +1,4 @@
+use opsml_settings::config::StorageType;
 use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -48,4 +49,9 @@ pub struct DeleteFileResponse {
 #[derive(Serialize, Deserialize)]
 pub struct MultiPartSession {
     pub session_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageSettings {
+    pub storage_type: StorageType,
 }
