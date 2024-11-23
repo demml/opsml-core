@@ -1,9 +1,11 @@
-use crate::core::http_client::contracts::MultiPartSession;
 use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use opsml_contracts::FileInfo;
+use opsml_contracts::{
+    DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
+};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
@@ -18,8 +20,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::fs::File;
-
-use super::contracts::PresignedUrl;
 
 const TIMEOUT_SECS: u64 = 30;
 const MAX_CHUNKS: u64 = 10000;
@@ -331,14 +331,10 @@ impl HttpStorageClient {
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
         // convert Value to Vec<String>
-        let files = response["files"]
-            .as_array()
-            .ok_or_else(|| StorageError::Error("Failed to get files".to_string()))?
-            .iter()
-            .map(|f| f.as_str().unwrap().to_string())
-            .collect();
+        let response = serde_json::from_value::<ListFileResponse>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
-        Ok(files)
+        Ok(response.files)
     }
 
     pub async fn find_info(&mut self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
@@ -352,27 +348,11 @@ impl HttpStorageClient {
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
         // convert Value to Vec<FileInfo>
-        let files = response["files"]
-            .as_array()
-            .ok_or_else(|| StorageError::Error("Failed to get files".to_string()))?
-            .iter()
-            .map(|f| {
-                let name = f["name"].as_str().unwrap().to_string();
-                let size = f["size"].as_i64().unwrap();
-                let object_type = f["object_type"].as_str().unwrap().to_string();
-                let created = f["created"].as_str().unwrap().to_string();
-                let suffix = f["suffix"].as_str().unwrap().to_string();
-                FileInfo {
-                    name,
-                    size,
-                    object_type,
-                    created,
-                    suffix,
-                }
-            })
-            .collect();
+        // convert Value to Vec<String>
+        let response = serde_json::from_value::<ListFileInfoResponse>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
-        Ok(files)
+        Ok(response.files)
     }
 
     pub async fn get_object(
@@ -397,7 +377,7 @@ impl HttpStorageClient {
         params.insert("path".to_string(), path.to_string());
         params.insert("recursive".to_string(), "false".to_string());
 
-        let _response = self
+        let response = self
             .api_client
             .request_with_retry(
                 Routes::DeleteFiles,
@@ -409,7 +389,11 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
-        Ok(true)
+        // load DeleteFileResponse from response
+        let response = serde_json::from_value::<DeleteFileResponse>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
+
+        Ok(response.deleted)
     }
 
     pub async fn delete_objects(&mut self, path: &str) -> Result<bool, StorageError> {
@@ -417,7 +401,7 @@ impl HttpStorageClient {
         params.insert("path".to_string(), path.to_string());
         params.insert("recursive".to_string(), "true".to_string());
 
-        let _response = self
+        let response = self
             .api_client
             .request_with_retry(
                 Routes::DeleteFiles,
@@ -429,7 +413,10 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
-        Ok(true)
+        let response = serde_json::from_value::<DeleteFileResponse>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
+
+        Ok(response.deleted)
     }
 
     pub async fn generate_presigned_url_for_part(
