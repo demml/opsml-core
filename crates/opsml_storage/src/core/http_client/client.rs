@@ -39,6 +39,7 @@ pub enum Routes {
     List,
     ListInfo,
     Files,
+    DeleteFiles,
     Healthcheck,
     StorageSettings,
 }
@@ -53,6 +54,7 @@ impl Routes {
             Routes::ListInfo => "files/list/info",
             Routes::Healthcheck => "healthcheck",
             Routes::StorageSettings => "storage/settings",
+            Routes::DeleteFiles => "files/delete",
         }
     }
 }
@@ -397,7 +399,13 @@ impl HttpStorageClient {
 
         let _response = self
             .api_client
-            .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
+            .request_with_retry(
+                Routes::DeleteFiles,
+                RequestType::Delete,
+                None,
+                Some(params),
+                None,
+            )
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
@@ -411,7 +419,13 @@ impl HttpStorageClient {
 
         let _response = self
             .api_client
-            .request_with_retry(Routes::Files, RequestType::Delete, None, Some(params), None)
+            .request_with_retry(
+                Routes::DeleteFiles,
+                RequestType::Delete,
+                None,
+                Some(params),
+                None,
+            )
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 

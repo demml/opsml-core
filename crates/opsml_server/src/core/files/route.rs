@@ -9,7 +9,10 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use axum::{routing::get, Router};
+use axum::{
+    routing::{delete, get},
+    Router,
+};
 use opsml_error::error::ServerError;
 /// Route for debugging information
 use serde_json::json;
@@ -202,5 +205,5 @@ pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
         )
         .route(&format!("{}/files/list", prefix), get(list_files))
         .route(&format!("{}/files/list/info", prefix), get(list_file_info))
-        .route(&format!("{}/files/delete", prefix), get(delete_file))
+        .route(&format!("{}/files/delete", prefix), delete(delete_file))
 }
