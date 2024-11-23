@@ -31,7 +31,6 @@ if __name__ == "__main__":
 
     storage_client.put(lpath, rpath)
     storage_client.rm(rpath)
-    print(storage_client.exists(rpath))
 
     # kwargs = {
     #    "base_url": "http://localhost:3000",

@@ -1,6 +1,6 @@
+use opsml_contracts::FileInfo;
 use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings, StorageType};
 use opsml_storage::core::storage::aws::PyS3FSStorageClient;
-use opsml_storage::core::storage::base::FileInfo;
 use opsml_storage::core::storage::enums::{get_opsml_storage_system, PyStorageClient};
 use opsml_storage::core::storage::google::PyGCSFSStorageClient;
 use opsml_storage::core::storage::http::PyHttpFSStorageClient;
