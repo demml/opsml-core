@@ -606,65 +606,6 @@ impl AWSStorageClient {
         AWSMulitPartUpload::new(&self.bucket, lpath, rpath, &upload_id).await
     }
 
-    async fn upload_file_in_chunks(
-        &self,
-        lpath: &Path,
-        uploader: &mut AWSMulitPartUpload,
-    ) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-        // get file size
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
-
-        // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
-
-        if chunk_count > MAX_CHUNKS {
-            return Err(StorageError::Error(
-                "File size is too large for multipart upload".to_string(),
-            ));
-        }
-
-        // if the last chunk is empty, reduce the number of parts
-        if size_of_last_chunk == 0 {
-            size_of_last_chunk = chunk_size;
-            chunk_count -= 1;
-        }
-
-        for chunk_index in 0..chunk_count {
-            let this_chunk = if chunk_count - 1 == chunk_index {
-                size_of_last_chunk
-            } else {
-                chunk_size
-            };
-
-            let part_number = (chunk_index as i32) + 1;
-            let upload_args = UploadPartArgs {
-                first_byte: chunk_index * chunk_size,
-                last_byte: (chunk_index * chunk_size) + this_chunk,
-                part_number,
-                file_size,
-                presigned_url: None,
-                chunk_size,
-                chunk_index,
-                this_chunk_size: this_chunk,
-            };
-
-            uploader.upload_next_chunk(&upload_args).await?;
-        }
-
-        uploader.complete_upload().await?;
-
-        Ok(())
-    }
-
     /// Generate a presigned url for a part in the multipart upload
     /// This needs to be a non-self method because it is called from both client or server
     pub async fn generate_presigned_url_for_part(
@@ -698,28 +639,122 @@ pub struct S3FStorageClient {
 }
 
 #[async_trait]
-impl FileSystem<AWSStorageClient> for S3FStorageClient {
-    fn name(&self) -> &str {
-        "S3FStorageClient"
-    }
-    fn client(&self) -> &AWSStorageClient {
-        &self.client
-    }
+impl FileSystem for S3FStorageClient {
     async fn new(settings: &OpsmlStorageSettings) -> Self {
         let client = AWSStorageClient::new(settings).await.unwrap();
         Self { client }
     }
-}
 
-impl S3FStorageClient {
-    pub async fn put(
+    fn storage_type(&self) -> StorageType {
+        StorageType::AWS
+    }
+
+    async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find_info(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        // strip the paths
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+
+        if recursive {
+            let stripped_lpath_clone = stripped_lpath.clone();
+
+            // list all objects in the path
+            let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
+
+            // iterate over each object and get it
+            for obj in objects {
+                let file_path = Path::new(obj.as_str());
+                let stripped_path = file_path.strip_path(self.client.bucket().await);
+                let relative_path = file_path.relative_path(&stripped_rpath)?;
+                let local_path = stripped_lpath_clone.join(relative_path);
+
+                self.client
+                    .get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )
+                    .await?;
+            }
+        } else {
+            self.client
+                .get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_src = src.strip_path(self.client.bucket().await);
+        let stripped_dest = dest.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        } else {
+            self.client
+                .copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .delete_objects(stripped_path.to_str().unwrap())
+                .await?;
+        } else {
+            self.client
+                .delete_object(stripped_path.to_str().unwrap())
+                .await?;
+        }
+
+        Ok(())
+    }
+    async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        let objects = self.client.find(stripped_path.to_str().unwrap()).await?;
+
+        Ok(!objects.is_empty())
+    }
+
+    async fn generate_presigned_url(
         &self,
-        lpath: &Path,
-        rpath: &Path,
-        recursive: bool,
-    ) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
-        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+        path: &Path,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client
+            .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            .await
+    }
+
+    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
 
         if recursive {
             if !stripped_lpath.is_dir() {
@@ -733,56 +768,43 @@ impl S3FStorageClient {
             for file in files {
                 let stripped_lpath_clone = stripped_lpath.clone();
                 let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket().await);
+                let stripped_file_path = file.strip_path(self.client.bucket().await);
 
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
                 let mut uploader = self
-                    .client()
+                    .client
                     .create_multipart_uploader(
+                        stripped_lpath_clone.to_str().unwrap(),
                         remote_path.to_str().unwrap(),
-                        stripped_file_path.to_str().unwrap(),
                         None,
                     )
                     .await?;
 
-                // shouldnt this be uploader upload_file_in_chunks?
-
-                self.client()
-                    .upload_file_in_chunks(&stripped_file_path, &mut uploader)
-                    .await?;
+                uploader.upload_file_in_chunks(&stripped_file_path).await?;
             }
 
             Ok(())
         } else {
             let mut uploader = self
-                .client()
-                .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                .client
+                .create_multipart_uploader(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                    None,
+                )
                 .await?;
 
-            self.client()
-                .upload_file_in_chunks(&stripped_lpath, &mut uploader)
-                .await?;
+            uploader.upload_file_in_chunks(&stripped_lpath).await?;
             Ok(())
         }
-    }
-
-    pub async fn generate_presigned_url_for_part(
-        &self,
-        part_number: i32,
-        path: &str,
-        upload_id: &str,
-    ) -> Result<String, StorageError> {
-        self.client()
-            .generate_presigned_url_for_part(part_number, path, upload_id)
-            .await
     }
 }
 
 #[pyclass]
 pub struct PyS3FSStorageClient {
-    client: AWSStorageClient,
+    client: S3FStorageClient,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -791,9 +813,7 @@ impl PyS3FSStorageClient {
     #[new]
     fn new(settings: &OpsmlStorageSettings) -> Self {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let client = rt
-            .block_on(async { AWSStorageClient::new(settings).await })
-            .unwrap();
+        let client = rt.block_on(async { S3FStorageClient::new(settings).await });
 
         Self {
             client,
@@ -803,158 +823,43 @@ impl PyS3FSStorageClient {
 
     #[pyo3(signature = (path=PathBuf::new()))]
     fn find_info(&self, path: PathBuf) -> Result<Vec<FileInfo>, StorageError> {
-        let stripped_path = path.strip_path(&self.client.bucket);
         self.runtime
-            .block_on(async { self.client.find_info(stripped_path.to_str().unwrap()).await })
+            .block_on(async { self.client.find_info(&path).await })
     }
 
     #[pyo3(signature = (path=PathBuf::new()))]
     fn find(&self, path: PathBuf) -> Result<Vec<String>, StorageError> {
-        let stripped_path = path.strip_path(&self.client.bucket);
         self.runtime
-            .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })
+            .block_on(async { self.client.find(&path).await })
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
     fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
-        // strip the paths
-        let stripped_rpath = rpath.strip_path(&self.client.bucket);
-        let stripped_lpath = lpath.strip_path(&self.client.bucket);
-
-        self.runtime.block_on(async {
-            if recursive {
-                let stripped_lpath_clone = stripped_lpath.clone();
-
-                // list all objects in the path
-                let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
-
-                // iterate over each object and get it
-                for obj in objects {
-                    let file_path = Path::new(obj.as_str());
-                    let stripped_path = file_path.strip_path(&self.client.bucket);
-                    let relative_path = file_path.relative_path(&stripped_rpath)?;
-                    let local_path = stripped_lpath_clone.join(relative_path);
-
-                    self.client
-                        .get_object(
-                            local_path.to_str().unwrap(),
-                            stripped_path.to_str().unwrap(),
-                        )
-                        .await?;
-                }
-            } else {
-                self.client
-                    .get_object(
-                        stripped_lpath.to_str().unwrap(),
-                        stripped_rpath.to_str().unwrap(),
-                    )
-                    .await?;
-            }
-
-            Ok(())
-        })
+        self.runtime
+            .block_on(async { self.client.get(&lpath, &rpath, recursive).await })
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
     fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(&self.client.bucket);
-        let stripped_rpath = rpath.strip_path(&self.client.bucket);
-
-        self.runtime.block_on(async {
-            if recursive {
-                if !stripped_lpath.is_dir() {
-                    return Err(StorageError::Error(
-                        "Local path must be a directory for recursive put".to_string(),
-                    ));
-                }
-
-                let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
-
-                for file in files {
-                    let stripped_lpath_clone = stripped_lpath.clone();
-                    let stripped_rpath_clone = stripped_rpath.clone();
-                    let stripped_file_path = file.strip_path(&self.client.bucket);
-
-                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                    let remote_path = stripped_rpath_clone.join(relative_path);
-
-                    let mut uploader = self
-                        .client
-                        .create_multipart_uploader(remote_path.to_str().unwrap(), None)
-                        .await?;
-
-                    self.client
-                        .upload_file_in_chunks(&stripped_file_path, &mut uploader)
-                        .await?;
-                }
-
-                Ok(())
-            } else {
-                let mut uploader = self
-                    .client
-                    .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
-                    .await?;
-
-                self.client
-                    .upload_file_in_chunks(&stripped_lpath, &mut uploader)
-                    .await?;
-                Ok(())
-            }
-        })
+        self.runtime
+            .block_on(async { self.client.put(&lpath, &rpath, recursive).await })
     }
 
     #[pyo3(signature = (src, dest, recursive = false))]
     fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> Result<(), StorageError> {
-        let stripped_src = src.strip_path(&self.client.bucket);
-        let stripped_dest = dest.strip_path(&self.client.bucket);
-
-        self.runtime.block_on(async {
-            if recursive {
-                self.client
-                    .copy_objects(
-                        stripped_src.to_str().unwrap(),
-                        stripped_dest.to_str().unwrap(),
-                    )
-                    .await?;
-            } else {
-                self.client
-                    .copy_object(
-                        stripped_src.to_str().unwrap(),
-                        stripped_dest.to_str().unwrap(),
-                    )
-                    .await?;
-            }
-
-            Ok(())
-        })
+        self.runtime
+            .block_on(async { self.client.copy(&src, &dest, recursive).await })
     }
 
     #[pyo3(signature = (path, recursive = false))]
     fn rm(&self, path: PathBuf, recursive: bool) -> Result<(), StorageError> {
-        let stripped_path = path.strip_path(&self.client.bucket);
-
-        self.runtime.block_on(async {
-            if recursive {
-                self.client
-                    .delete_objects(stripped_path.to_str().unwrap())
-                    .await?;
-            } else {
-                self.client
-                    .delete_object(stripped_path.to_str().unwrap())
-                    .await?;
-            }
-
-            Ok(())
-        })
+        self.runtime
+            .block_on(async { self.client.rm(&path, recursive).await })
     }
 
     fn exists(&self, path: PathBuf) -> Result<bool, StorageError> {
-        let stripped_path = path.strip_path(&self.client.bucket);
-        let objects = self
-            .runtime
-            .block_on(async { self.client.find(stripped_path.to_str().unwrap()).await })?;
-
-        Ok(!objects.is_empty())
+        self.runtime
+            .block_on(async { self.client.exists(&path).await })
     }
 
     #[pyo3(signature = (path, expiration = 600))]
@@ -963,12 +868,8 @@ impl PyS3FSStorageClient {
         path: PathBuf,
         expiration: u64,
     ) -> Result<String, StorageError> {
-        let stripped_path = path.strip_path(&self.client.bucket);
-        self.runtime.block_on(async {
-            self.client
-                .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
-                .await
-        })
+        self.runtime
+            .block_on(async { self.client.generate_presigned_url(&path, expiration).await })
     }
 }
 
