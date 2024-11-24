@@ -1,5 +1,5 @@
-use crate::core::http_client::client::{build_http_client, HttpStorageClient};
 use crate::core::storage::base::{get_files, PathExt};
+use crate::core::storage::client::base::{build_http_client, HttpStorageClient};
 use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 

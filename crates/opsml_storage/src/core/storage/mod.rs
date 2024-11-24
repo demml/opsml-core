@@ -1,6 +1,7 @@
 pub mod aws;
 pub mod base;
+pub mod client;
 pub mod enums;
-pub mod google;
-pub mod http;
+pub mod filesystem;
+pub mod gcs;
 pub mod local;

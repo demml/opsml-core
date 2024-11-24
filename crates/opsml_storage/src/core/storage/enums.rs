@@ -14,7 +14,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::core::storage::aws::{AWSMulitPartUpload, S3FStorageClient};
-use crate::core::storage::google::{GCSFSStorageClient, GoogleMultipartUpload};
+use crate::core::storage::gcs::{GCSFSStorageClient, GoogleMultipartUpload};
 
 pub enum MultiPartUploader {
     Google(GoogleMultipartUpload),

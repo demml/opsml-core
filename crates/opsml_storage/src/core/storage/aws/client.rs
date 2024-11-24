@@ -1,4 +1,5 @@
-use crate::core::storage::base::{get_files, FileSystem, PathExt, StorageClient};
+use crate::core::storage::base::{get_files, PathExt, StorageClient};
+use crate::core::storage::filesystem::FileSystem;
 use opsml_contracts::FileInfo;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 
@@ -194,6 +195,8 @@ impl AWSMulitPartUpload {
         upload_args: &UploadPartArgs,
     ) -> Result<bool, StorageError> {
         let path = Path::new(&self.lpath);
+        let part_number = (upload_args.chunk_index + 1) as i32;
+
         let body = self
             .get_next_chunk(
                 path,
@@ -205,16 +208,62 @@ impl AWSMulitPartUpload {
 
         if upload_args.presigned_url.is_some() {
             self.upload_part_with_presigned_url(
-                &upload_args.part_number,
+                &part_number,
                 body,
                 upload_args.presigned_url.as_ref().unwrap(),
             )
             .await?;
         } else {
-            self.upload_part(body, upload_args.part_number).await?;
+            self.upload_part(body, part_number).await?;
         }
 
         Ok(true)
+    }
+
+    async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_count - 1 == chunk_index {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let upload_args = UploadPartArgs {
+                file_size,
+                presigned_url: None,
+                chunk_size: chunk_size as u64,
+                chunk_index: chunk_index as u64,
+                this_chunk_size: this_chunk as u64,
+            };
+
+            self.upload_next_chunk(&upload_args).await?;
+        } // extract the range from the result and update the first_byte and last_byte
+
+        self.complete_upload().await?;
+
+        Ok(())
+
+        // check if enum is Ok
     }
 }
 

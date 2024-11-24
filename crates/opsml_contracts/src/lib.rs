@@ -57,9 +57,6 @@ pub struct StorageSettings {
 }
 
 pub struct UploadPartArgs {
-    pub first_byte: u64,
-    pub last_byte: u64,
-    pub part_number: i32,
     pub file_size: u64,
     pub presigned_url: Option<String>,
     pub chunk_size: u64,

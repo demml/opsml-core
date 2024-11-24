@@ -489,7 +489,7 @@ impl HttpStorageClient {
 
         let uploader = self
             .storage_client
-            .create_multipart_uploader(rpath, session_url)
+            .create_multipart_uploader(lpath, rpath, session_url)
             .await?;
 
         Ok(uploader)

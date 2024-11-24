@@ -1,4 +1,5 @@
-use crate::core::storage::base::{get_files, FileSystem, PathExt, StorageClient};
+use crate::core::storage::base::{get_files, PathExt, StorageClient};
+use crate::core::storage::filesystem::FileSystem;
 use async_trait::async_trait;
 use base64::prelude::*;
 use futures::stream::Stream;
@@ -121,11 +122,10 @@ impl GoogleMultipartUpload {
         &mut self,
         upload_args: &UploadPartArgs,
     ) -> Result<(), StorageError> {
-        let size = ChunkSize::new(
-            upload_args.first_byte,
-            upload_args.last_byte,
-            Some(upload_args.file_size),
-        );
+        let first_byte = upload_args.chunk_index * upload_args.chunk_size;
+        let last_byte = first_byte + upload_args.this_chunk_size - 1;
+
+        let size = ChunkSize::new(first_byte, last_byte, Some(upload_args.file_size));
 
         let mut buffer = vec![0; upload_args.this_chunk_size as usize];
         let bytes_read = self
@@ -149,6 +149,58 @@ impl GoogleMultipartUpload {
         self.upload_status = result;
 
         Ok(())
+    }
+
+    async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_count - 1 == chunk_index {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let upload_args = UploadPartArgs {
+                file_size,
+                presigned_url: None,
+                chunk_size: chunk_size as u64,
+                chunk_index: chunk_index as u64,
+                this_chunk_size: this_chunk as u64,
+            };
+
+            self.upload_next_chunk(&upload_args).await?;
+        } // extract the range from the result and update the first_byte and last_byte
+
+        match self.upload_status {
+            UploadStatus::Ok(_) => {
+                // complete the upload
+                Ok(())
+            }
+            _ => Err(StorageError::Error(
+                "Failed to upload file in chunks".to_string(),
+            )),
+        }
+
+        // check if enum is Ok
     }
 
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
@@ -577,13 +629,7 @@ impl GoogleStorageClient {
                 chunk_size
             };
 
-            let first_byte = chunk_index * chunk_size;
-            let last_byte = first_byte + this_chunk - 1;
-
             let upload_args = UploadPartArgs {
-                first_byte,
-                last_byte,
-                part_number: chunk_index as i32,
                 file_size,
                 presigned_url: None,
                 chunk_size: chunk_size as u64,
@@ -613,37 +659,122 @@ pub struct GCSFSStorageClient {
 }
 
 #[async_trait]
-impl FileSystem<GoogleStorageClient> for GCSFSStorageClient {
-    fn name(&self) -> &str {
-        "GCSFSStorageClient"
-    }
-    fn client(&self) -> &GoogleStorageClient {
-        &self.client
-    }
+impl FileSystem for GCSFSStorageClient {
     async fn new(settings: &OpsmlStorageSettings) -> Self {
-        GCSFSStorageClient {
-            client: GoogleStorageClient::new(settings).await.unwrap(),
-        }
+        let client = GoogleStorageClient::new(settings).await.unwrap();
+        GCSFSStorageClient { client }
     }
-}
 
-impl GCSFSStorageClient {
-    /// Server side logic for doing a multipart upload
-    ///
-    /// # Arguments
-    ///
-    /// * `lpath` - The path to the local file
-    /// * `rpath` - The path to the remote file
-    /// * `recursive` - Whether to upload the file recursively
-    ///
-    pub async fn put(
+    fn storage_type(&self) -> StorageType {
+        StorageType::Google
+    }
+
+    async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find_info(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        // strip the paths
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+
+        if recursive {
+            let stripped_lpath_clone = stripped_lpath.clone();
+
+            // list all objects in the path
+            let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
+
+            // iterate over each object and get it
+            for obj in objects {
+                let file_path = Path::new(obj.as_str());
+                let stripped_path = file_path.strip_path(self.client.bucket().await);
+                let relative_path = file_path.relative_path(&stripped_rpath)?;
+                let local_path = stripped_lpath_clone.join(relative_path);
+
+                self.client
+                    .get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )
+                    .await?;
+            }
+        } else {
+            self.client
+                .get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_src = src.strip_path(self.client.bucket().await);
+        let stripped_dest = dest.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        } else {
+            self.client
+                .copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .delete_objects(stripped_path.to_str().unwrap())
+                .await?;
+        } else {
+            self.client
+                .delete_object(stripped_path.to_str().unwrap())
+                .await?;
+        }
+
+        Ok(())
+    }
+    async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        let objects = self.client.find(stripped_path.to_str().unwrap()).await?;
+
+        Ok(!objects.is_empty())
+    }
+
+    async fn generate_presigned_url(
         &self,
-        lpath: &Path,
-        rpath: &Path,
-        recursive: bool,
-    ) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
-        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+        path: &Path,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client
+            .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            .await
+    }
+
+    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
 
         if recursive {
             if !stripped_lpath.is_dir() {
@@ -657,13 +788,13 @@ impl GCSFSStorageClient {
             for file in files {
                 let stripped_lpath_clone = stripped_lpath.clone();
                 let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket().await);
+                let stripped_file_path = file.strip_path(self.client.bucket().await);
 
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
                 let mut uploader = self
-                    .client()
+                    .client
                     .create_multipart_uploader(
                         stripped_lpath_clone.to_str().unwrap(),
                         remote_path.to_str().unwrap(),
@@ -671,7 +802,7 @@ impl GCSFSStorageClient {
                     )
                     .await?;
 
-                self.client()
+                self.client
                     .upload_file_in_chunks(&stripped_file_path, &mut uploader)
                     .await?;
             }
@@ -679,7 +810,7 @@ impl GCSFSStorageClient {
             Ok(())
         } else {
             let mut uploader = self
-                .client()
+                .client
                 .create_multipart_uploader(
                     stripped_lpath.to_str().unwrap(),
                     stripped_rpath.to_str().unwrap(),
@@ -687,7 +818,7 @@ impl GCSFSStorageClient {
                 )
                 .await?;
 
-            self.client()
+            self.client
                 .upload_file_in_chunks(&stripped_lpath, &mut uploader)
                 .await?;
             Ok(())
