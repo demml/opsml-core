@@ -481,6 +481,7 @@ impl HttpStorageClient {
     pub async fn create_multipart_uploader(
         &mut self,
         rpath: &Path,
+        lpath: &Path,
     ) -> Result<MultiPartUploader, StorageError> {
         let session_url = self
             .create_multipart_upload(rpath.to_str().unwrap())

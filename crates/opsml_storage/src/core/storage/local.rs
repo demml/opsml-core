@@ -4,10 +4,14 @@ use crate::core::storage::base::{FileSystem, StorageClient};
 use async_trait::async_trait;
 use aws_smithy_types::byte_stream::{ByteStream, Length};
 use opsml_contracts::FileInfo;
+use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
+use std::fs::File;
 use std::fs::{self};
+use std::io::BufReader;
+use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -21,27 +25,37 @@ use walkdir::WalkDir;
 // - method for uploading part (special handling for local storage, or do we just use the same method?)
 
 pub struct LocalMultiPartUpload {
-    pub file: fs::File,
-    pub path: String,
+    pub rpath: String,
+    file_reader: BufReader<File>,
+    client_mode: bool,
 }
 
 impl LocalMultiPartUpload {
-    pub async fn new(path: &Path) -> Self {
+    pub async fn new(lpath: &Path, rpath: &Path, client_mode: bool) -> Self {
         // check if path parent exists
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))
+
+        if !client_mode {
+            if let Some(parent) = rpath.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))
+                    .unwrap();
+            }
+
+            // create a new file
+            let file = fs::File::create(rpath)
+                .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))
                 .unwrap();
         }
 
-        // create a new file
-        let file = fs::File::create(path)
-            .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))
             .unwrap();
+        let file_reader = BufReader::new(file);
 
         Self {
-            file,
-            path: path.to_str().unwrap().to_string(),
+            rpath: rpath.to_str().unwrap().to_string(),
+            file_reader,
+            client_mode,
         }
     }
 
@@ -64,9 +78,36 @@ impl LocalMultiPartUpload {
     }
 
     pub async fn upload_part(&mut self, chunk: bytes::Bytes) -> Result<bool, StorageError> {
-        self.file
-            .write_all(&chunk)
-            .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+        //self.file
+        //    .write_all(&chunk)
+        //    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
+
+        Ok(true)
+    }
+
+    pub async fn upload_next_chunk(
+        &mut self,
+        upload_args: &UploadPartArgs,
+    ) -> Result<bool, StorageError> {
+        let mut buffer = vec![0; upload_args.this_chunk_size as usize];
+        let bytes_read = self
+            .file_reader
+            .read(&mut buffer)
+            .map_err(|e| StorageError::Error(format!("Failed to read file: {}", e)))?;
+
+        buffer.truncate(bytes_read);
+
+        // if not client mode, append to file
+        if !self.client_mode {
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&self.rpath)
+                .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+            file.write_all(&buffer)
+                .map_err(|e| StorageError::Error(format!("Failed to write to file: {}", e)))?;
+        }
 
         Ok(true)
     }

@@ -13,6 +13,7 @@ use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::primitives::Length;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
+use opsml_contracts::UploadPartArgs;
 use pyo3::prelude::*;
 use reqwest::Client as HttpClient;
 use std::fs::File;
@@ -44,25 +45,32 @@ impl AWSCreds {
 pub struct AWSMulitPartUpload {
     pub client: Client,
     pub bucket: String,
-    pub path: String,
+    pub rpath: String,
+    pub lpath: String,
     pub upload_id: String,
     upload_parts: Vec<aws_sdk_s3::types::CompletedPart>,
 }
 
 impl AWSMulitPartUpload {
-    pub async fn new(bucket: &str, path: &str, upload_id: &str) -> Result<Self, StorageError> {
+    pub async fn new(
+        bucket: &str,
+        lpath: &str,
+        rpath: &str,
+        upload_id: &str,
+    ) -> Result<Self, StorageError> {
         // create a resuable runtime for the multipart upload
 
         let creds = AWSCreds::new().await?;
         let client = Client::new(&creds.config);
 
         let _bucket = bucket.to_string();
-        let _path = path.to_string();
+        let _path = rpath.to_string();
 
         Ok(Self {
             client,
             bucket: _bucket,
-            path: _path,
+            rpath: rpath.to_string(),
+            lpath: lpath.to_string(),
             upload_id: upload_id.to_string(),
             upload_parts: Vec::new(),
         })
@@ -116,14 +124,14 @@ impl AWSMulitPartUpload {
 
     pub async fn upload_part(
         &mut self,
-        part_number: i32,
         body: ByteStream,
+        part_number: i32,
     ) -> Result<bool, StorageError> {
         let response = self
             .client
             .upload_part()
             .bucket(&self.bucket)
-            .key(&self.path)
+            .key(&self.rpath)
             .upload_id(&self.upload_id)
             .body(body)
             .part_number(part_number)
@@ -151,7 +159,7 @@ impl AWSMulitPartUpload {
             .client
             .complete_multipart_upload()
             .bucket(&self.bucket)
-            .key(&self.path)
+            .key(&self.rpath)
             .multipart_upload(completed_multipart_upload)
             .upload_id(&self.upload_id)
             .send()
@@ -179,6 +187,34 @@ impl AWSMulitPartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
 
         Ok(stream)
+    }
+
+    pub async fn upload_next_chunk(
+        &mut self,
+        upload_args: &UploadPartArgs,
+    ) -> Result<bool, StorageError> {
+        let path = Path::new(&self.lpath);
+        let body = self
+            .get_next_chunk(
+                path,
+                upload_args.chunk_size,
+                upload_args.chunk_index,
+                upload_args.this_chunk_size,
+            )
+            .await?;
+
+        if upload_args.presigned_url.is_some() {
+            self.upload_part_with_presigned_url(
+                &upload_args.part_number,
+                body,
+                upload_args.presigned_url.as_ref().unwrap(),
+            )
+            .await?;
+        } else {
+            self.upload_part(body, upload_args.part_number).await?;
+        }
+
+        Ok(true)
     }
 }
 
@@ -510,14 +546,15 @@ impl AWSStorageClient {
 
     pub async fn create_multipart_uploader(
         &self,
-        path: &str,
+        rpath: &str,
+        lpath: &str,
         session_url: Option<String>,
     ) -> Result<AWSMulitPartUpload, StorageError> {
         let upload_id = match session_url {
             Some(session_url) => session_url,
-            None => self.create_multipart_upload(path).await?,
+            None => self.create_multipart_upload(rpath).await?,
         };
-        AWSMulitPartUpload::new(&self.bucket, path, &upload_id).await
+        AWSMulitPartUpload::new(&self.bucket, lpath, rpath, &upload_id).await
     }
 
     async fn upload_file_in_chunks(
@@ -559,12 +596,19 @@ impl AWSStorageClient {
                 chunk_size
             };
 
-            let stream = uploader
-                .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
-                .await?;
-
             let part_number = (chunk_index as i32) + 1;
-            uploader.upload_part(part_number, stream).await?;
+            let upload_args = UploadPartArgs {
+                first_byte: chunk_index * chunk_size,
+                last_byte: (chunk_index * chunk_size) + this_chunk,
+                part_number,
+                file_size,
+                presigned_url: None,
+                chunk_size,
+                chunk_index,
+                this_chunk_size: this_chunk,
+            };
+
+            uploader.upload_next_chunk(&upload_args).await?;
         }
 
         uploader.complete_upload().await?;
@@ -647,8 +691,14 @@ impl S3FStorageClient {
 
                 let mut uploader = self
                     .client()
-                    .create_multipart_uploader(remote_path.to_str().unwrap(), None)
+                    .create_multipart_uploader(
+                        remote_path.to_str().unwrap(),
+                        stripped_file_path.to_str().unwrap(),
+                        None,
+                    )
                     .await?;
+
+                // shouldnt this be uploader upload_file_in_chunks?
 
                 self.client()
                     .upload_file_in_chunks(&stripped_file_path, &mut uploader)

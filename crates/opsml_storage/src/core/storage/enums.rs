@@ -6,6 +6,7 @@ use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use aws_smithy_types::byte_stream::ByteStream;
 use opsml_contracts::FileInfo;
+use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
@@ -26,101 +27,21 @@ impl MultiPartUploader {
         match self {
             MultiPartUploader::Google(uploader) => uploader.upload_client.url().to_string().clone(),
             MultiPartUploader::AWS(uploader) => uploader.upload_id.clone(),
-            MultiPartUploader::Local(uploader) => uploader.path.clone(),
+            MultiPartUploader::Local(uploader) => uploader.rpath.clone(),
         }
     }
     pub async fn upload_part(
         &mut self,
-        first_byte: &u64,
-        last_byte: &u64,
-        part_number: &i32,
-        total_size: &u64,
-        body: ByteStream,
+        upload_args: &UploadPartArgs,
     ) -> Result<bool, StorageError> {
         match self {
             MultiPartUploader::Google(uploader) => {
-                uploader
-                    .upload_part(body, first_byte, last_byte, total_size)
-                    .await?;
+                uploader.upload_next_chunk(upload_args).await?;
                 Ok(true)
             }
             //#[cfg(feature = "aws_storage")]
-            MultiPartUploader::AWS(uploader) => uploader.upload_part(*part_number, body).await,
-
-            MultiPartUploader::Local(uploader) => {
-                let body = body
-                    .collect()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to collect ByteStream: {}", e))
-                    })?
-                    .into_bytes();
-
-                uploader.upload_part(body).await
-            }
-        }
-    }
-
-    pub async fn upload_part_with_presigned_url(
-        &mut self,
-        first_byte: &u64,
-        last_byte: &u64,
-        part_number: &i32,
-        file_size: &u64,
-        body: ByteStream,
-        presigned_url: &str,
-    ) -> Result<bool, StorageError> {
-        match self {
-            MultiPartUploader::Google(uploader) => {
-                uploader
-                    .upload_part(body, first_byte, last_byte, file_size)
-                    .await?;
-                Ok(true)
-            }
-            MultiPartUploader::AWS(uploader) => {
-                uploader
-                    .upload_part_with_presigned_url(part_number, body, presigned_url)
-                    .await
-            }
-
-            MultiPartUploader::Local(uploader) => {
-                let body = body
-                    .collect()
-                    .await
-                    .map_err(|e| {
-                        StorageError::Error(format!("Failed to collect ByteStream: {}", e))
-                    })?
-                    .into_bytes();
-
-                uploader.upload_part(body).await
-            }
-        }
-    }
-
-    pub async fn get_next_chunk(
-        &self,
-        path: &Path,
-        chunk_size: u64,
-        chunk_index: u64,
-        this_chunk_size: u64,
-    ) -> Result<ByteStream, StorageError> {
-        match self {
-            MultiPartUploader::Google(uploader) => {
-                uploader
-                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
-                    .await
-            }
-
-            MultiPartUploader::AWS(uploader) => {
-                uploader
-                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
-                    .await
-            }
-            MultiPartUploader::Local(uploader) => {
-                uploader
-                    .get_next_chunk(path, chunk_size, chunk_index, this_chunk_size)
-                    .await
-            }
+            MultiPartUploader::AWS(uploader) => uploader.upload_next_chunk(upload_args).await,
+            MultiPartUploader::Local(uploader) => uploader.upload_next_chunk(upload_args).await,
         }
     }
 
@@ -317,14 +238,19 @@ impl StorageClientEnum {
 
     pub async fn create_multipart_uploader(
         &self,
-        path: &Path,
+        lpath: &Path,
+        rpath: &Path,
         session_url: String,
     ) -> Result<MultiPartUploader, StorageError> {
         match self {
             StorageClientEnum::Google(client) => {
                 let uploader = client
                     .client()
-                    .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
+                    .create_multipart_uploader(
+                        lpath.to_str().unwrap(),
+                        rpath.to_str().unwrap(),
+                        Some(session_url),
+                    )
                     .await?;
                 Ok(MultiPartUploader::Google(uploader))
             }
@@ -332,7 +258,7 @@ impl StorageClientEnum {
             StorageClientEnum::AWS(client) => {
                 let uploader = client
                     .client()
-                    .create_multipart_uploader(path.to_str().unwrap(), Some(session_url))
+                    .create_multipart_uploader(rpath.to_str().unwrap(), Some(session_url))
                     .await?;
                 Ok(MultiPartUploader::AWS(uploader))
             }

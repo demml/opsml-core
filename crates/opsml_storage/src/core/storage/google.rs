@@ -1,7 +1,5 @@
 use crate::core::storage::base::{get_files, FileSystem, PathExt, StorageClient};
 use async_trait::async_trait;
-use aws_smithy_types::byte_stream::ByteStream;
-use aws_smithy_types::byte_stream::Length;
 use base64::prelude::*;
 use futures::stream::Stream;
 use futures::StreamExt;
@@ -20,12 +18,15 @@ use google_cloud_storage::http::resumable_upload_client::UploadStatus;
 use google_cloud_storage::sign::SignedURLMethod;
 use google_cloud_storage::sign::SignedURLOptions;
 use opsml_contracts::FileInfo;
+use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
 use serde_json::Value;
 use std::env;
 use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -97,51 +98,46 @@ impl GcpCreds {
 pub struct GoogleMultipartUpload {
     pub upload_client: ResumableUploadClient,
     pub upload_status: UploadStatus,
+    file_reader: BufReader<File>,
 }
 
 impl GoogleMultipartUpload {
-    pub async fn new(upload_client: ResumableUploadClient) -> Result<Self, StorageError> {
+    pub async fn new(
+        upload_client: ResumableUploadClient,
+        path: &str,
+    ) -> Result<Self, StorageError> {
+        let file = File::open(path)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+        let file_reader = BufReader::new(file);
+
         Ok(GoogleMultipartUpload {
             upload_client,
             upload_status: UploadStatus::NotStarted,
+            file_reader,
         })
     }
 
-    pub async fn get_next_chunk(
-        &self,
-        path: &Path,
-        chunk_size: u64,
-        chunk_index: u64,
-        this_chunk_size: u64,
-    ) -> Result<ByteStream, StorageError> {
-        let stream = ByteStream::read_from()
-            .path(path)
-            .offset(chunk_index * chunk_size)
-            .length(Length::Exact(this_chunk_size))
-            .build()
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
-
-        Ok(stream)
-    }
-    pub async fn upload_part(
+    pub async fn upload_next_chunk(
         &mut self,
-        chunk: ByteStream,
-        first_byte: &u64,
-        last_byte: &u64,
-        file_size: &u64,
+        upload_args: &UploadPartArgs,
     ) -> Result<(), StorageError> {
-        let size = ChunkSize::new(*first_byte, *last_byte, Some(*file_size));
+        let size = ChunkSize::new(
+            upload_args.first_byte,
+            upload_args.last_byte,
+            Some(upload_args.file_size),
+        );
 
-        let data = chunk
-            .collect()
-            .await
-            .map_err(|e| StorageError::Error(format!("Unable to collect chunk data: {}", e)))?
-            .into_bytes();
+        let mut buffer = vec![0; upload_args.this_chunk_size as usize];
+        let bytes_read = self
+            .file_reader
+            .read(&mut buffer)
+            .map_err(|e| StorageError::Error(format!("Failed to read file: {}", e)))?;
+
+        buffer.truncate(bytes_read);
 
         let result = self
             .upload_client
-            .upload_multiple_chunk(data, &size)
+            .upload_multiple_chunk(buffer, &size)
             .await
             .map_err(|e| {
                 StorageError::Error(format!(
@@ -525,14 +521,15 @@ impl GoogleStorageClient {
     /// A GoogleMultipartUpload client
     pub async fn create_multipart_uploader(
         &self,
-        path: &str,
+        lpath: &str,
+        rpath: &str,
         session_url: Option<String>,
     ) -> Result<GoogleMultipartUpload, StorageError> {
         let resumable_upload_client = match session_url {
             Some(url) => self.client.get_resumable_upload(url),
-            None => self.create_multipart_upload(path).await?,
+            None => self.create_multipart_upload(rpath).await?,
         };
-        let client = GoogleMultipartUpload::new(resumable_upload_client).await?;
+        let client = GoogleMultipartUpload::new(resumable_upload_client, lpath).await?;
         Ok(client)
     }
 
@@ -583,13 +580,18 @@ impl GoogleStorageClient {
             let first_byte = chunk_index * chunk_size;
             let last_byte = first_byte + this_chunk - 1;
 
-            let chunk = uploader
-                .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
-                .await?;
+            let upload_args = UploadPartArgs {
+                first_byte,
+                last_byte,
+                part_number: chunk_index as i32,
+                file_size,
+                presigned_url: None,
+                chunk_size: chunk_size as u64,
+                chunk_index: chunk_index as u64,
+                this_chunk_size: this_chunk as u64,
+            };
 
-            uploader
-                .upload_part(chunk, &first_byte, &last_byte, &file_size)
-                .await?;
+            uploader.upload_next_chunk(&upload_args).await?;
         } // extract the range from the result and update the first_byte and last_byte
 
         match uploader.upload_status {
@@ -662,7 +664,11 @@ impl GCSFSStorageClient {
 
                 let mut uploader = self
                     .client()
-                    .create_multipart_uploader(remote_path.to_str().unwrap(), None)
+                    .create_multipart_uploader(
+                        stripped_lpath_clone.to_str().unwrap(),
+                        remote_path.to_str().unwrap(),
+                        None,
+                    )
                     .await?;
 
                 self.client()
@@ -674,7 +680,11 @@ impl GCSFSStorageClient {
         } else {
             let mut uploader = self
                 .client()
-                .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                .create_multipart_uploader(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                    None,
+                )
                 .await?;
 
             self.client()
@@ -787,7 +797,11 @@ impl PyGCSFSStorageClient {
 
                     let mut uploader = self
                         .client
-                        .create_multipart_uploader(remote_path.to_str().unwrap(), None)
+                        .create_multipart_uploader(
+                            stripped_lpath_clone.to_str().unwrap(),
+                            remote_path.to_str().unwrap(),
+                            None,
+                        )
                         .await?;
 
                     self.client
@@ -799,7 +813,11 @@ impl PyGCSFSStorageClient {
             } else {
                 let mut uploader = self
                     .client
-                    .create_multipart_uploader(stripped_rpath.to_str().unwrap(), None)
+                    .create_multipart_uploader(
+                        stripped_lpath.to_str().unwrap(),
+                        stripped_rpath.to_str().unwrap(),
+                        None,
+                    )
                     .await?;
 
                 self.client
