@@ -325,3 +325,125 @@ impl PyFileSystemStorage {
             .unwrap())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use opsml_settings::config::{OpsmlConfig, StorageType};
+    use rand::distributions::Alphanumeric;
+    use rand::thread_rng;
+    use rand::Rng;
+    use std::fs::File;
+    use std::io::Write;
+
+    pub fn create_file(name: &str, chunk_size: &u64) {
+        let mut file = File::create(name).expect("Could not create sample file.");
+
+        while file.metadata().unwrap().len() <= chunk_size * 2 {
+            let rand_string: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(256)
+                .map(char::from)
+                .collect();
+            let return_string: String = "\n".to_string();
+            file.write_all(rand_string.as_ref())
+                .expect("Error writing to file.");
+            file.write_all(return_string.as_ref())
+                .expect("Error writing to file.");
+        }
+    }
+
+    pub fn create_nested_data() -> String {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+        let chunk_size = (1024 * 1024 * 2) as u64;
+
+        // create a temporary directory
+        let dir_name = format!("temp_test_dir_{}", &rand_name);
+        let dir = Path::new(&dir_name);
+
+        if !dir.exists() {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        // random file name with uuid
+        let key = format!("{}/temp_test_file_{}.txt", &dir_name, &rand_name);
+        create_file(&key, &chunk_size);
+
+        // created nested directories
+        let dir = Path::new(&dir_name);
+        let nested_dir = dir.join("nested_dir");
+        let nested_dir_path = nested_dir.to_str().unwrap();
+
+        if !nested_dir.exists() {
+            std::fs::create_dir_all(nested_dir.clone()).unwrap();
+        }
+
+        // random file name with uuid
+        let key = format!("{}/temp_test_file_{}.txt", &nested_dir_path, &rand_name);
+        create_file(&key, &chunk_size);
+
+        dir_name
+    }
+
+    fn create_single_file(chunk_size: &u64) -> String {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+
+        // create a temporary directory
+        let dir_name = format!("temp_test_dir_{}", &rand_name);
+        let dir = Path::new(&dir_name);
+
+        if !dir.exists() {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+
+        // random file name with uuid
+        let key = format!("{}/temp_test_file_{}.txt", &dir_name, &rand_name);
+        create_file(&key, chunk_size);
+
+        key
+    }
+
+    #[tokio::test]
+    async fn test_filesystemstorage_with_http_google() {
+        let config = OpsmlConfig::new(Some(true));
+
+        let mut client = FileSystemStorage::new(&mut config.storage_settings())
+            .await
+            .unwrap();
+
+        assert_eq!(client.name(), "HttpFSStorageClient");
+        assert_eq!(client.storage_type(), StorageType::Google);
+
+        let dirname = create_nested_data();
+
+        let lpath = Path::new(&dirname);
+        let rpath = Path::new(&dirname);
+
+        // put the file
+        client.put(lpath, rpath, true).await.unwrap();
+
+        // check if the file exists
+        let exists = client.exists(rpath).await.unwrap();
+        assert!(exists);
+
+        // list all files
+        let files = client.find(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+
+        // list files with info
+        let files = client.find_info(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+
+        // download the files
+        let new_path = uuid::Uuid::new_v4().to_string();
+        let new_path = Path::new(&new_path);
+
+        client.get(new_path, rpath, true).await.unwrap();
+
+        // cleanup
+        std::fs::remove_dir_all(&dirname).unwrap();
+        std::fs::remove_dir_all(new_path).unwrap();
+
+        client.rm(rpath, true).await.unwrap();
+    }
+}

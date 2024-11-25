@@ -1,5 +1,7 @@
 use crate::storage::enums::client::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
+use bytes::BytesMut;
+use indicatif::{ProgressBar, ProgressStyle};
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
 };
@@ -15,10 +17,11 @@ use reqwest::{
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
 
 const TIMEOUT_SECS: u64 = 30;
+const DOWNLOAD_CHUNK_SIZE: usize = 1024 * 1024 * 5;
 
 #[derive(Debug, Clone)]
 pub enum RequestType {
@@ -406,16 +409,71 @@ impl HttpStorageClient {
         &mut self,
         local_path: &str,
         remote_path: &str,
+        file_size: i64,
     ) -> Result<(), StorageError> {
-        let _local_path = PathBuf::from(local_path);
-        let _remote_path = PathBuf::from(remote_path);
-        // Lock the Mutex to get mutable access to the ApiClient
+        // check if local path exists, create it if it doesn't
+        let local_path = Path::new(local_path);
+        if !local_path.exists() {
+            std::fs::create_dir_all(local_path.parent().unwrap())
+                .map_err(|e| StorageError::Error(format!("Failed to create directory: {}", e)))?;
+        }
 
-        //let _response = api_client
-        //    .download_to_file_with_retry(Routes::Multipart, local_path, remote_path)
-        //    .await
-        //    .map_err(|e| StorageError::Error(format!("Failed to download file: {}", e)))?;
+        let chunk_count = ((file_size / DOWNLOAD_CHUNK_SIZE as i64) + 1) as u64;
 
+        let bar = ProgressBar::new(chunk_count);
+
+        let msg1 = LogColors::green("Downloading file:");
+        let msg2 = LogColors::purple(local_path.file_name().unwrap().to_string_lossy().as_ref());
+        let msg = format!("{} {}", msg1, msg2);
+        let template = format!(
+            "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
+            msg
+        );
+
+        let style = ProgressStyle::with_template(&template)
+            .unwrap()
+            .progress_chars("#--");
+        bar.set_style(style);
+
+        // create local file
+        let mut file = std::fs::File::create(local_path)
+            .map_err(|e| StorageError::Error(format!("Failed to create file: {}", e)))?;
+
+        // generate presigned url for downloading the object
+        let presigned_url = self.generate_presigned_url(remote_path).await?;
+
+        let url = reqwest::Url::parse(&presigned_url)
+            .map_err(|e| StorageError::Error(format!("Invalid presigned URL: {}", e)))?;
+
+        // download the object
+        let mut response = self.api_client.client.get(url).send().await.unwrap();
+
+        // create buffer to store downloaded data
+        let mut buffer = BytesMut::with_capacity(DOWNLOAD_CHUNK_SIZE);
+
+        // download the object in chunks
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to get chunk from response: {}", e)))?
+        {
+            buffer.extend_from_slice(&chunk);
+            if buffer.len() >= DOWNLOAD_CHUNK_SIZE {
+                file.write_all(&buffer)
+                    .map_err(|e| StorageError::Error(format!("Failed to write chunk: {}", e)))?;
+                buffer.clear();
+                bar.inc(1);
+            }
+        }
+
+        // Write any remaining data in the buffer
+        if !buffer.is_empty() {
+            file.write_all(&buffer).map_err(|e| {
+                StorageError::Error(format!("Failed to write remaining data: {}", e))
+            })?;
+        }
+
+        bar.finish_with_message("Download complete");
         Ok(())
     }
 
@@ -528,9 +586,10 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
 
-        let url = &response["url"];
+        let response = serde_json::from_value::<PresignedUrl>(response)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
-        Ok(url.to_string())
+        Ok(response.url)
     }
 }
 

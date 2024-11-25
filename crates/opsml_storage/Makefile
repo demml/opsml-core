@@ -18,3 +18,7 @@ test.gcs:
 .PHONY: test.local
 test.local:
 	cargo test local -- --nocapture 
+
+.PHONY: test.http
+test.http:
+	./test.sh

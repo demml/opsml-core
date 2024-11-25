@@ -3,7 +3,7 @@ use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[pyclass]
 pub struct FileInfo {
     #[pyo3(get)]
