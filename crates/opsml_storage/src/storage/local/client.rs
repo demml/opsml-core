@@ -363,11 +363,14 @@ impl LocalStorageClient {
 
 pub struct LocalFSStorageClient {
     client: LocalStorageClient,
-    client_mode: bool,
+    pub client_mode: bool,
 }
 
 #[async_trait]
 impl FileSystem for LocalFSStorageClient {
+    fn name(&self) -> &str {
+        "LocalFSStorageClient"
+    }
     async fn new(settings: &OpsmlStorageSettings) -> Self {
         let client = LocalStorageClient::new(settings).await.unwrap();
         LocalFSStorageClient {
@@ -504,9 +507,7 @@ impl FileSystem for LocalFSStorageClient {
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
-                let uploader = self
-                    .create_multipart_uploader(&remote_path, false, None)
-                    .await?;
+                let uploader = self.create_multipart_uploader(&remote_path, None).await?;
 
                 uploader.upload_file_in_chunks(&stripped_file_path).await?;
             }
@@ -514,7 +515,7 @@ impl FileSystem for LocalFSStorageClient {
             Ok(())
         } else {
             let uploader = self
-                .create_multipart_uploader(&stripped_lpath, false, None)
+                .create_multipart_uploader(&stripped_lpath, None)
                 .await?;
 
             uploader.upload_file_in_chunks(&stripped_lpath).await?;
@@ -527,12 +528,15 @@ impl LocalFSStorageClient {
     pub async fn create_multipart_uploader(
         &self,
         path: &Path,
-        client_mode: bool,
         api_client: Option<OpsmlApiClient>,
     ) -> Result<LocalMultiPartUpload, StorageError> {
         self.client
-            .create_multipart_uploader(path.to_str().unwrap(), client_mode, api_client)
+            .create_multipart_uploader(path.to_str().unwrap(), self.client_mode, api_client)
             .await
+    }
+
+    pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+        Ok(path.to_str().unwrap().to_string())
     }
 }
 

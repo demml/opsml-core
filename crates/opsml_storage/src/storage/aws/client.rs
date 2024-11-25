@@ -1,5 +1,7 @@
 use crate::storage::base::{get_files, PathExt, StorageClient};
 use crate::storage::filesystem::FileSystem;
+use crate::storage::http::base::{OpsmlApiClient, RequestType, Routes};
+use aws_config::imds::client;
 use opsml_contracts::FileInfo;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 
@@ -43,12 +45,39 @@ impl AWSCreds {
     }
 }
 
+// standalone function for creating a presigned url for a part
+pub async fn generate_presigned_url_for_part(
+    bucket: &str,
+    part_number: i32,
+    path: &str,
+    upload_id: &str,
+    client: &Client,
+) -> Result<String, StorageError> {
+    let expires_in = Duration::from_secs(600); // Set expiration time for presigned URL
+
+    let presigned_request =
+        client
+            .upload_part()
+            .bucket(bucket)
+            .key(path)
+            .upload_id(upload_id)
+            .part_number(part_number)
+            .presigned(PresigningConfig::expires_in(expires_in).map_err(|e| {
+                StorageError::Error(format!("Failed to set presigned config: {}", e))
+            })?)
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+    Ok(presigned_request.uri().to_string())
+}
+
 pub struct AWSMulitPartUpload {
-    pub client: Client,
     pub bucket: String,
+    pub client: Client,
     pub rpath: String,
     pub lpath: String,
     pub upload_id: String,
+    pub api_client: Option<OpsmlApiClient>,
     upload_parts: Vec<aws_sdk_s3::types::CompletedPart>,
 }
 
@@ -58,6 +87,7 @@ impl AWSMulitPartUpload {
         lpath: &str,
         rpath: &str,
         upload_id: &str,
+        api_client: Option<OpsmlApiClient>,
     ) -> Result<Self, StorageError> {
         // create a resuable runtime for the multipart upload
 
@@ -71,8 +101,12 @@ impl AWSMulitPartUpload {
             lpath: lpath.to_string(),
             upload_id: upload_id.to_string(),
             upload_parts: Vec::new(),
+            api_client,
         })
     }
+
+    /// Generate a presigned url for a part in the multipart upload
+    /// This needs to be a non-self method because it is called from both client or server
 
     pub async fn upload_part_with_presigned_url(
         &mut self,
@@ -87,7 +121,6 @@ impl AWSMulitPartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to collect ByteStream: {}", e)))?;
 
         // convert to bytes::Bytes
-
         let http_client = HttpClient::new();
         let response = http_client
             .put(presigned_url)
@@ -118,33 +151,6 @@ impl AWSMulitPartUpload {
                 response.status()
             )))
         }
-    }
-
-    pub async fn upload_part(
-        &mut self,
-        body: ByteStream,
-        part_number: i32,
-    ) -> Result<bool, StorageError> {
-        let response = self
-            .client
-            .upload_part()
-            .bucket(&self.bucket)
-            .key(&self.rpath)
-            .upload_id(&self.upload_id)
-            .body(body)
-            .part_number(part_number)
-            .send()
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to upload part: {}", e)))?;
-
-        self.upload_parts.push(
-            CompletedPart::builder()
-                .e_tag(response.e_tag.unwrap_or_default())
-                .part_number(part_number)
-                .build(),
-        );
-
-        Ok(true)
     }
 
     pub async fn complete_upload(&self) -> Result<(), StorageError> {
@@ -203,16 +209,9 @@ impl AWSMulitPartUpload {
             )
             .await?;
 
-        if upload_args.presigned_url.is_some() {
-            self.upload_part_with_presigned_url(
-                &part_number,
-                body,
-                upload_args.presigned_url.as_ref().unwrap(),
-            )
+        let presigned_url = upload_args.presigned_url.as_ref().unwrap();
+        self.upload_part_with_presigned_url(&part_number, body, presigned_url)
             .await?;
-        } else {
-            self.upload_part(body, part_number).await?;
-        }
 
         Ok(true)
     }
@@ -245,9 +244,33 @@ impl AWSMulitPartUpload {
                 chunk_size
             };
 
+            let part_number = (chunk_index + 1) as i32;
+
+            // get presigned url for the part
+            // if client mode is enabled, use the api client to generate the presigned url
+            // else use the storage client to generate the presigned url
+            let presigned_url = if self.api_client.is_some() {
+                let mut client = self.api_client.as_ref().unwrap().clone();
+                client
+                    .generate_presigned_url_for_part(&self.rpath, &self.upload_id, part_number)
+                    .await
+                    .map_err(|e| {
+                        StorageError::Error(format!("Failed to generate presigned url: {}", e))
+                    })?
+            } else {
+                generate_presigned_url_for_part(
+                    &self.bucket,
+                    (chunk_index + 1) as i32,
+                    &self.rpath,
+                    &self.upload_id,
+                    &self.client,
+                )
+                .await?
+            };
+
             let upload_args = UploadPartArgs {
                 file_size,
-                presigned_url: None,
+                presigned_url: Some(presigned_url),
                 chunk_size: chunk_size as u64,
                 chunk_index: chunk_index as u64,
                 this_chunk_size: this_chunk as u64,
@@ -637,6 +660,9 @@ pub struct S3FStorageClient {
 
 #[async_trait]
 impl FileSystem for S3FStorageClient {
+    fn name(&self) -> &str {
+        "S3FStorageClient"
+    }
     async fn new(settings: &OpsmlStorageSettings) -> Self {
         let client = AWSStorageClient::new(settings).await.unwrap();
         Self { client }
@@ -800,6 +826,12 @@ impl FileSystem for S3FStorageClient {
 }
 
 impl S3FStorageClient {
+    pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
+        self.client
+            .create_multipart_upload(path.to_str().unwrap())
+            .await
+    }
+
     pub async fn create_multipart_uploader(
         &self,
         rpath: &Path,
@@ -821,6 +853,17 @@ impl S3FStorageClient {
             &upload_id,
         )
         .await
+    }
+
+    pub async fn generate_presigned_url_for_part(
+        &self,
+        part_number: i32,
+        path: &Path,
+        upload_id: &str,
+    ) -> Result<String, StorageError> {
+        self.client
+            .generate_presigned_url_for_part(part_number, path.to_str().unwrap(), upload_id)
+            .await
     }
 }
 

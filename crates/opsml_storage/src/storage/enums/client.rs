@@ -1,8 +1,8 @@
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
-use crate::storage::base::FileSystem;
+use crate::storage::filesystem::FileSystem;
+use crate::storage::http::base::OpsmlApiClient;
 use crate::storage::local::client::{LocalFSStorageClient, LocalMultiPartUpload};
-
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use opsml_contracts::FileInfo;
@@ -91,7 +91,6 @@ impl StorageClientEnum {
     pub async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.find(path).await,
-
             StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
         }
@@ -113,7 +112,6 @@ impl StorageClientEnum {
     ) -> Result<(), StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.get(lpath, rpath, recursive).await,
-
             StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
         }
@@ -127,7 +125,6 @@ impl StorageClientEnum {
     ) -> Result<(), StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.put(lpath, rpath, recursive).await,
-
             StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
         }
@@ -145,7 +142,6 @@ impl StorageClientEnum {
     pub async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.rm(path, recursive).await,
-
             StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
         }
@@ -154,7 +150,6 @@ impl StorageClientEnum {
     pub async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.exists(path).await,
-
             StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
         }
@@ -169,7 +164,6 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
-
             StorageClientEnum::AWS(client) => client.generate_presigned_url(path, expiration).await,
             StorageClientEnum::Local(client) => {
                 client.generate_presigned_url(path, expiration).await
@@ -180,7 +174,7 @@ impl StorageClientEnum {
     pub async fn generate_presigned_url_for_part(
         &self,
         part_number: i32,
-        path: &str,
+        path: &Path,
         session_url: String,
     ) -> Result<String, StorageError> {
         match self {
@@ -199,27 +193,17 @@ impl StorageClientEnum {
         match self {
             StorageClientEnum::Google(client) => {
                 // google returns the session uri
-                let result = client
-                    .client()
-                    .create_multipart_upload(path.to_str().unwrap())
-                    .await?;
-
+                let result = client.create_multipart_upload(path).await?;
                 Ok(result.url().to_string())
             }
 
             StorageClientEnum::AWS(client) => {
                 // aws returns the session uri
-                client
-                    .client()
-                    .create_multipart_upload(path.to_str().unwrap())
-                    .await
+                client.create_multipart_upload(path).await
             }
             StorageClientEnum::Local(client) => {
                 // local returns the path
-                client
-                    .client()
-                    .create_multipart_upload(path.to_str().unwrap())
-                    .await
+                client.create_multipart_upload(path).await
             }
         }
     }
@@ -229,6 +213,7 @@ impl StorageClientEnum {
         lpath: &Path,
         rpath: &Path,
         session_url: String,
+        api_client: Option<OpsmlApiClient>,
     ) -> Result<MultiPartUploader, StorageError> {
         match self {
             StorageClientEnum::Google(client) => {
@@ -244,9 +229,11 @@ impl StorageClientEnum {
                     .await?;
                 Ok(MultiPartUploader::AWS(uploader))
             }
-            StorageClientEnum::Local(client) => LocalMultiPartUpload::new(rpath, session_url)
-                .await
-                .map(|uploader| MultiPartUploader::Local(uploader)),
+            StorageClientEnum::Local(client) => {
+                let uploader = client.create_multipart_uploader(rpath, api_client).await?;
+
+                Ok(MultiPartUploader::Local(uploader))
+            }
         }
     }
 }

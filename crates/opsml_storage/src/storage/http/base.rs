@@ -262,6 +262,41 @@ impl OpsmlApiClient {
 
         Ok(response)
     }
+
+    pub async fn generate_presigned_url_for_part(
+        &mut self,
+        path: &str,
+        session_url: &str,
+        part_number: i32,
+    ) -> Result<String, ApiError> {
+        let mut query_params = HashMap::new();
+        query_params.insert("path".to_string(), path.to_string());
+        query_params.insert("session_url".to_string(), session_url.to_string());
+        query_params.insert("part_number".to_string(), part_number.to_string());
+        query_params.insert("for_multi_part".to_string(), "true".to_string());
+
+        let response = self
+            .request_with_retry(
+                Routes::Presigned,
+                RequestType::Get,
+                None,
+                Some(query_params),
+                None,
+            )
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+        let response = serde_json::from_value::<PresignedUrl>(response)
+            .map_err(|e| ApiError::Error(format!("Failed to deserialize response: {}", e)))?;
+
+        Ok(response.url)
+    }
+}
+
+pub struct HttpMultiPartUpload {
+    session_url: String,
+    part_number: i32,
+    uploader: MultiPartUploader,
 }
 
 pub struct HttpStorageClient {
@@ -436,36 +471,6 @@ impl HttpStorageClient {
         Ok(response.deleted)
     }
 
-    pub async fn generate_presigned_url_for_part(
-        &mut self,
-        path: &str,
-        session_url: &str,
-        part_number: i32,
-    ) -> Result<String, StorageError> {
-        let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), path.to_string());
-        query_params.insert("session_url".to_string(), session_url.to_string());
-        query_params.insert("part_number".to_string(), part_number.to_string());
-        query_params.insert("for_multi_part".to_string(), "true".to_string());
-
-        let response = self
-            .api_client
-            .request_with_retry(
-                Routes::Presigned,
-                RequestType::Get,
-                None,
-                Some(query_params),
-                None,
-            )
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
-
-        let response = serde_json::from_value::<PresignedUrl>(response)
-            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
-
-        Ok(response.url)
-    }
-
     pub async fn create_multipart_upload(&mut self, path: &str) -> Result<String, StorageError> {
         let mut query_params = HashMap::new();
         query_params.insert("path".to_string(), path.to_string());
@@ -506,7 +511,7 @@ impl HttpStorageClient {
 
         let uploader = self
             .storage_client
-            .create_multipart_uploader(lpath, rpath, session_url)
+            .create_multipart_uploader(lpath, rpath, session_url, Some(self.api_client.clone()))
             .await?;
 
         Ok(uploader)
@@ -516,7 +521,6 @@ impl HttpStorageClient {
         &mut self,
         lpath: &Path,
         rpath: &Path,
-        uploader: &mut MultiPartUploader,
     ) -> Result<(), StorageError> {
         let file = File::open(lpath)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))

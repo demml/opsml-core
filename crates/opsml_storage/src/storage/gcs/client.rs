@@ -584,74 +584,6 @@ impl GoogleStorageClient {
         let client = GoogleMultipartUpload::new(resumable_upload_client, lpath).await?;
         Ok(client)
     }
-
-    /// Upload file in chunks. This method will take a file path, open the file, read it in chunks and upload each chunk to the object
-    ///
-    /// # Arguments
-    ///
-    /// * `lpath` - The path to the file to upload
-    /// * `rpath` - The path to the remote file
-    /// * `chunk_size` - The size of each chunk
-    ///
-    /// # Returns
-    ///
-    /// A Result with the object name if successful
-    ///
-    async fn upload_file_in_chunks(
-        &self,
-        lpath: &Path,
-        uploader: &mut GoogleMultipartUpload,
-    ) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
-
-        // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
-
-        // if the last chunk is empty, reduce the number of parts
-        if size_of_last_chunk == 0 {
-            size_of_last_chunk = chunk_size;
-            chunk_count -= 1;
-        }
-
-        for chunk_index in 0..chunk_count {
-            let this_chunk = if chunk_count - 1 == chunk_index {
-                size_of_last_chunk
-            } else {
-                chunk_size
-            };
-
-            let upload_args = UploadPartArgs {
-                file_size,
-                presigned_url: None,
-                chunk_size: chunk_size as u64,
-                chunk_index: chunk_index as u64,
-                this_chunk_size: this_chunk as u64,
-            };
-
-            uploader.upload_next_chunk(&upload_args).await?;
-        } // extract the range from the result and update the first_byte and last_byte
-
-        match uploader.upload_status {
-            UploadStatus::Ok(_) => {
-                // complete the upload
-                Ok(())
-            }
-            _ => Err(StorageError::Error(
-                "Failed to upload file in chunks".to_string(),
-            )),
-        }
-
-        // check if enum is Ok
-    }
 }
 
 pub struct GCSFSStorageClient {
@@ -660,6 +592,10 @@ pub struct GCSFSStorageClient {
 
 #[async_trait]
 impl FileSystem for GCSFSStorageClient {
+    fn name(&self) -> &str {
+        "GCSFSStorageClient"
+    }
+
     async fn new(settings: &OpsmlStorageSettings) -> Self {
         let client = GoogleStorageClient::new(settings).await.unwrap();
         GCSFSStorageClient { client }
@@ -802,9 +738,7 @@ impl FileSystem for GCSFSStorageClient {
                     )
                     .await?;
 
-                self.client
-                    .upload_file_in_chunks(&stripped_file_path, &mut uploader)
-                    .await?;
+                uploader.upload_file_in_chunks(&stripped_file_path).await?;
             }
 
             Ok(())
@@ -818,9 +752,7 @@ impl FileSystem for GCSFSStorageClient {
                 )
                 .await?;
 
-            self.client
-                .upload_file_in_chunks(&stripped_lpath, &mut uploader)
-                .await?;
+            uploader.upload_file_in_chunks(&stripped_lpath).await?;
             Ok(())
         }
     }
@@ -839,6 +771,15 @@ impl GCSFSStorageClient {
                 rpath.to_str().unwrap(),
                 session_url,
             )
+            .await
+    }
+
+    pub async fn create_multipart_upload(
+        &self,
+        path: &Path,
+    ) -> Result<ResumableUploadClient, StorageError> {
+        self.client
+            .create_multipart_upload(path.to_str().unwrap())
             .await
     }
 }
@@ -952,9 +893,7 @@ impl PyGCSFSStorageClient {
                         )
                         .await?;
 
-                    self.client
-                        .upload_file_in_chunks(&stripped_file_path, &mut uploader)
-                        .await?;
+                    uploader.upload_file_in_chunks(&stripped_file_path).await?;
                 }
 
                 Ok(())
@@ -968,9 +907,7 @@ impl PyGCSFSStorageClient {
                     )
                     .await?;
 
-                self.client
-                    .upload_file_in_chunks(&stripped_lpath, &mut uploader)
-                    .await?;
+                uploader.upload_file_in_chunks(&stripped_lpath).await?;
                 Ok(())
             }
         })

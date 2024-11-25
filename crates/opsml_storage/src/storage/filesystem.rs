@@ -1,5 +1,4 @@
-use crate::core::storage::enums::StorageClientEnum;
-use crate::core::storage::gcs::client::GCSFSStorageClient;
+use crate::storage::enums::client::StorageClientEnum;
 use async_trait::async_trait;
 use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
@@ -8,8 +7,9 @@ use std::path::Path;
 
 #[async_trait]
 pub trait FileSystem {
-    async fn new(settings: &OpsmlStorageSettings) -> Self;
+    fn name(&self) -> &str;
     fn storage_type(&self) -> StorageType;
+    async fn new(settings: &OpsmlStorageSettings) -> Self;
     async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError>;
     async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError>;
     async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError>;

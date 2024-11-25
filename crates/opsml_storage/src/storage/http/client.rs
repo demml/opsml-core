@@ -1,10 +1,10 @@
-use crate::core::storage::base::{get_files, PathExt};
-use crate::core::storage::client::base::{build_http_client, HttpStorageClient};
-use opsml_contracts::FileInfo;
-use opsml_error::error::StorageError;
-
+use crate::storage::base::PathExt;
+use crate::storage::base::{get_files, PathExt};
+use crate::storage::http::base::{build_http_client, HttpStorageClient};
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
+use opsml_contracts::FileInfo;
+use opsml_error::error::StorageError;
 use opsml_settings::config::OpsmlStorageSettings;
 use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
@@ -105,9 +105,12 @@ impl HttpFSStorageClient {
                 let relative_path = file.relative_path(stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
-                let mut uploader = self.client.create_multipart_uploader(rpath).await?;
+                let mut uploader = self
+                    .client
+                    .create_multipart_uploader(&remote_path, stripped_lpath_clone)
+                    .await?;
 
-                self.client
+                uploader
                     .upload_file_in_chunks(&stripped_file_path, &remote_path, &mut uploader)
                     .await?;
             }
