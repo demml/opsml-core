@@ -1,5 +1,5 @@
 use axum::http::HeaderMap;
-use opsml_storage::core::storage::base::UploadPartArgs;
+use opsml_storage::storage::base::UploadPartArgs;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

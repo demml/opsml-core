@@ -277,7 +277,7 @@ impl AWSMulitPartUpload {
                 file_size,
                 presigned_url: Some(presigned_url),
                 chunk_size: chunk_size as u64,
-                chunk_index: chunk_index as u64,
+                chunk_index,
                 this_chunk_size: this_chunk as u64,
             };
 

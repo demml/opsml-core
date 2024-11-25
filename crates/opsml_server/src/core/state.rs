@@ -1,5 +1,5 @@
 use opsml_settings::config::OpsmlConfig;
-use opsml_storage::core::storage::enums::StorageClientEnum;
+use opsml_storage::storage::enums::client::StorageClientEnum;
 use std::sync::Arc;
 
 pub struct AppState {

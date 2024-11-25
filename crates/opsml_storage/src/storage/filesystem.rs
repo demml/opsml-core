@@ -241,60 +241,54 @@ impl PyFileSystemStorage {
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
     pub fn get(&mut self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
-        Ok(self
-            .runtime
-            .block_on(async {
-                if self.client_mode {
-                    self.http
-                        .as_mut()
-                        .unwrap()
-                        .get(&lpath, &rpath, recursive)
-                        .await
-                } else {
-                    self.fs
-                        .as_ref()
-                        .unwrap()
-                        .get(&lpath, &rpath, recursive)
-                        .await
-                }
-            })
-            .unwrap())
+        self.runtime.block_on(async {
+            if self.client_mode {
+                self.http
+                    .as_mut()
+                    .unwrap()
+                    .get(&lpath, &rpath, recursive)
+                    .await
+            } else {
+                self.fs
+                    .as_ref()
+                    .unwrap()
+                    .get(&lpath, &rpath, recursive)
+                    .await
+            }
+        })?;
+        Ok(())
     }
 
     #[pyo3(signature = (lpath, rpath, recursive = false))]
     pub fn put(&mut self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
-        Ok(self
-            .runtime
-            .block_on(async {
-                if self.client_mode {
-                    self.http
-                        .as_mut()
-                        .unwrap()
-                        .put(&lpath, &rpath, recursive)
-                        .await
-                } else {
-                    self.fs
-                        .as_ref()
-                        .unwrap()
-                        .put(&lpath, &rpath, recursive)
-                        .await
-                }
-            })
-            .unwrap())
+        self.runtime.block_on(async {
+            if self.client_mode {
+                self.http
+                    .as_mut()
+                    .unwrap()
+                    .put(&lpath, &rpath, recursive)
+                    .await
+            } else {
+                self.fs
+                    .as_ref()
+                    .unwrap()
+                    .put(&lpath, &rpath, recursive)
+                    .await
+            }
+        })?;
+        Ok(())
     }
 
     #[pyo3(signature = (path, recursive = false))]
     pub fn rm(&mut self, path: PathBuf, recursive: bool) -> PyResult<()> {
-        Ok(self
-            .runtime
-            .block_on(async {
-                if self.client_mode {
-                    self.http.as_mut().unwrap().rm(&path, recursive).await
-                } else {
-                    self.fs.as_ref().unwrap().rm(&path, recursive).await
-                }
-            })
-            .unwrap())
+        self.runtime.block_on(async {
+            if self.client_mode {
+                self.http.as_mut().unwrap().rm(&path, recursive).await
+            } else {
+                self.fs.as_ref().unwrap().rm(&path, recursive).await
+            }
+        })?;
+        Ok(())
     }
 
     pub fn exists(&mut self, path: PathBuf) -> PyResult<bool> {

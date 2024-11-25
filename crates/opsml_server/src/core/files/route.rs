@@ -1,19 +1,22 @@
 use crate::core::error::internal_server_error;
 use crate::core::files::schema::{DeleteFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery};
 use crate::core::state::AppState;
+use axum::extract::Multipart;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     Json,
 };
 use axum::{
-    routing::{delete, get},
+    routing::{delete, get, post},
     Router,
 };
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 use opsml_error::error::ServerError;
 /// Route for debugging information
@@ -74,9 +77,10 @@ pub async fn generate_presigned_url(
             )
         })?;
 
+        let path = Path::new(&params.path);
         let url = state
             .storage_client
-            .generate_presigned_url_for_part(part_number, &params.path, session_url)
+            .generate_presigned_url_for_part(part_number, path, session_url)
             .await
             .map_err(|e| ServerError::PresignedError(e.to_string()));
 
@@ -111,7 +115,7 @@ pub async fn generate_presigned_url(
 // this is for local storage only
 pub async fn upload_multipart(
     mut multipart: Multipart,
-) -> Result<UploadResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<UploadResponse>, (StatusCode, Json<serde_json::Value>)> {
     while let Some(field) = multipart.next_field().await.unwrap() {
         let name = field.name().unwrap().to_string();
         let data = field.bytes().await.unwrap();
@@ -198,14 +202,14 @@ pub async fn delete_file(
     match exists {
         Ok(exists) => {
             if exists {
-                return Err(internal_server_error("Failed to delete file"));
+                Err(internal_server_error("Failed to delete file"))
             } else {
-                return Ok(Json(DeleteFileResponse { deleted: true }));
+                Ok(Json(DeleteFileResponse { deleted: true }))
             }
         }
         Err(e) => {
             error!("Failed to check if file exists: {}", e);
-            return Err(internal_server_error(e));
+            Err(internal_server_error(e))
         }
     }
 }

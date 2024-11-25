@@ -1,7 +1,7 @@
 use anyhow::{Context, Result as AnyhowResult};
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlConfig;
-use opsml_storage::core::storage::enums::{get_storage_system, StorageClientEnum};
+use opsml_storage::storage::enums::client::{get_storage_system, StorageClientEnum};
 use opsml_utils::color::LogColors;
 use tracing::info;
 

@@ -86,7 +86,7 @@ impl Default for OpsmlConfig {
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             app_version: env!("CARGO_PKG_VERSION").to_string(),
             opsml_storage_uri: OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, using_client),
-            opsml_tracking_uri: opsml_tracking_uri,
+            opsml_tracking_uri,
             opsml_prod_token: env::var("OPSML_PROD_TOKEN").unwrap_or_else(|_| "".to_string()),
 
             opsml_proxy_root: "opsml-root:/".to_string(),
@@ -141,7 +141,7 @@ impl OpsmlConfig {
             || opsml_storage_uri.starts_with("s3://")
             || opsml_storage_uri.starts_with("az://")
         {
-            return opsml_storage_uri;
+            opsml_storage_uri
         } else {
             let path = PathBuf::from(opsml_storage_uri);
 
@@ -150,7 +150,7 @@ impl OpsmlConfig {
                 std::fs::create_dir_all(&path).unwrap();
             }
 
-            return path.canonicalize().unwrap().to_str().unwrap().to_string();
+            path.canonicalize().unwrap().to_str().unwrap().to_string()
         }
     }
 

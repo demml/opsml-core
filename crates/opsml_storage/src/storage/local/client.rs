@@ -126,7 +126,7 @@ impl LocalMultiPartUpload {
                 .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
 
             if !response.uploaded {
-                return Err(StorageError::Error(format!("Failed to upload file",)));
+                return Err(StorageError::Error("Failed to upload file".to_string()));
             }
         }
 
@@ -383,8 +383,8 @@ impl LocalStorageClient {
     ) -> Result<LocalMultiPartUpload, StorageError> {
         Ok(LocalMultiPartUpload {
             rpath: self.bucket.join(path),
-            client_mode: client_mode,
-            api_client: api_client,
+            client_mode,
+            api_client,
         })
     }
 
