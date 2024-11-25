@@ -18,10 +18,12 @@ use google_cloud_storage::http::resumable_upload_client::ResumableUploadClient;
 use google_cloud_storage::http::resumable_upload_client::UploadStatus;
 use google_cloud_storage::sign::SignedURLMethod;
 use google_cloud_storage::sign::SignedURLOptions;
+use indicatif::{ProgressBar, ProgressStyle};
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
 use serde_json::Value;
 use std::env;
@@ -151,7 +153,7 @@ impl GoogleMultipartUpload {
         Ok(())
     }
 
-    async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
         let file = File::open(lpath)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
@@ -172,6 +174,13 @@ impl GoogleMultipartUpload {
             chunk_count -= 1;
         }
 
+        let bar = ProgressBar::new(chunk_count);
+        let style =
+            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
+                .unwrap();
+        bar.set_style(style);
+        bar.set_message(LogColors::green("Uploading file"));
+
         for chunk_index in 0..chunk_count {
             let this_chunk = if chunk_count - 1 == chunk_index {
                 size_of_last_chunk
@@ -188,17 +197,11 @@ impl GoogleMultipartUpload {
             };
 
             self.upload_next_chunk(&upload_args).await?;
+
+            bar.inc(1);
         } // extract the range from the result and update the first_byte and last_byte
 
-        match self.upload_status {
-            UploadStatus::Ok(_) => {
-                // complete the upload
-                Ok(())
-            }
-            _ => Err(StorageError::Error(
-                "Failed to upload file in chunks".to_string(),
-            )),
-        }
+        self.complete_upload().await
 
         // check if enum is Ok
     }

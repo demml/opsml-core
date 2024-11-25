@@ -1,14 +1,14 @@
 use crate::storage::base::{get_files, PathExt, StorageClient};
 use crate::storage::filesystem::FileSystem;
-use crate::storage::http::base::{OpsmlApiClient, RequestType, Routes};
-use aws_config::imds::client;
-use opsml_contracts::FileInfo;
-use opsml_settings::config::{OpsmlStorageSettings, StorageType};
-
+use crate::storage::http::base::OpsmlApiClient;
 use async_trait::async_trait;
 use aws_config::BehaviorVersion;
 use aws_config::SdkConfig;
+use indicatif::{ProgressBar, ProgressStyle};
+use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
+use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_utils::color::LogColors;
 
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use aws_sdk_s3::presigning::PresigningConfig;
@@ -25,8 +25,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
-
-const MAX_CHUNKS: u64 = 10000;
 
 /// Notes:
 /// For general compatibility with the Pyo3, Rust and generics, we need to define structs with sync in mind.
@@ -216,7 +214,7 @@ impl AWSMulitPartUpload {
         Ok(true)
     }
 
-    async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
         let file = File::open(lpath)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
@@ -236,6 +234,13 @@ impl AWSMulitPartUpload {
             size_of_last_chunk = chunk_size;
             chunk_count -= 1;
         }
+
+        let bar = ProgressBar::new(chunk_count);
+        let style =
+            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
+                .unwrap();
+        bar.set_style(style);
+        bar.set_message(LogColors::green("Uploading file"));
 
         for chunk_index in 0..chunk_count {
             let this_chunk = if chunk_count - 1 == chunk_index {
@@ -277,6 +282,8 @@ impl AWSMulitPartUpload {
             };
 
             self.upload_next_chunk(&upload_args).await?;
+
+            bar.inc(1);
         } // extract the range from the result and update the first_byte and last_byte
 
         self.complete_upload().await?;
@@ -618,12 +625,13 @@ impl AWSStorageClient {
         rpath: &str,
         lpath: &str,
         session_url: Option<String>,
+        api_client: Option<OpsmlApiClient>,
     ) -> Result<AWSMulitPartUpload, StorageError> {
         let upload_id = match session_url {
             Some(session_url) => session_url,
             None => self.create_multipart_upload(rpath).await?,
         };
-        AWSMulitPartUpload::new(&self.bucket, lpath, rpath, &upload_id).await
+        AWSMulitPartUpload::new(&self.bucket, lpath, rpath, &upload_id, api_client).await
     }
 
     /// Generate a presigned url for a part in the multipart upload
@@ -799,8 +807,9 @@ impl FileSystem for S3FStorageClient {
                 let mut uploader = self
                     .client
                     .create_multipart_uploader(
-                        stripped_lpath_clone.to_str().unwrap(),
                         remote_path.to_str().unwrap(),
+                        stripped_lpath_clone.to_str().unwrap(),
+                        None,
                         None,
                     )
                     .await?;
@@ -813,8 +822,9 @@ impl FileSystem for S3FStorageClient {
             let mut uploader = self
                 .client
                 .create_multipart_uploader(
-                    stripped_lpath.to_str().unwrap(),
                     stripped_rpath.to_str().unwrap(),
+                    stripped_lpath.to_str().unwrap(),
+                    None,
                     None,
                 )
                 .await?;
@@ -837,6 +847,7 @@ impl S3FStorageClient {
         rpath: &Path,
         lpath: &Path,
         session_url: Option<String>,
+        api_client: Option<OpsmlApiClient>,
     ) -> Result<AWSMulitPartUpload, StorageError> {
         let upload_id = match session_url {
             Some(session_url) => session_url,
@@ -851,6 +862,7 @@ impl S3FStorageClient {
             lpath.to_str().unwrap(),
             rpath.to_str().unwrap(),
             &upload_id,
+            api_client,
         )
         .await
     }

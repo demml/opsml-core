@@ -6,7 +6,6 @@ use crate::storage::local::client::{LocalFSStorageClient, LocalMultiPartUpload};
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use opsml_contracts::FileInfo;
-use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
@@ -33,12 +32,11 @@ impl MultiPartUploader {
         }
     }
 
-    pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
         match self {
-            MultiPartUploader::Google(uploader) => uploader.complete_upload().await,
-
-            MultiPartUploader::AWS(uploader) => uploader.complete_upload().await,
-            MultiPartUploader::Local(uploader) => uploader.complete_upload().await,
+            MultiPartUploader::Google(uploader) => uploader.upload_file_in_chunks(lpath).await,
+            MultiPartUploader::AWS(uploader) => uploader.upload_file_in_chunks(lpath).await,
+            MultiPartUploader::Local(uploader) => uploader.upload_file_in_chunks(lpath).await,
         }
     }
 }
@@ -53,7 +51,6 @@ impl StorageClientEnum {
     pub fn name(&self) -> &str {
         match self {
             StorageClientEnum::Google(client) => client.name(),
-
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
         }
@@ -62,7 +59,6 @@ impl StorageClientEnum {
     pub fn storage_type(&self) -> StorageType {
         match self {
             StorageClientEnum::Google(_) => StorageType::Google,
-
             StorageClientEnum::AWS(_) => StorageType::AWS,
             StorageClientEnum::Local(_) => StorageType::Local,
         }
@@ -133,7 +129,6 @@ impl StorageClientEnum {
     pub async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
         match self {
             StorageClientEnum::Google(client) => client.copy(src, dest, recursive).await,
-
             StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
         }
@@ -225,7 +220,7 @@ impl StorageClientEnum {
 
             StorageClientEnum::AWS(client) => {
                 let uploader = client
-                    .create_multipart_uploader(rpath, lpath, Some(session_url))
+                    .create_multipart_uploader(rpath, lpath, Some(session_url), api_client)
                     .await?;
                 Ok(MultiPartUploader::AWS(uploader))
             }

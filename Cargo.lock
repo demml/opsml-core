@@ -2500,6 +2500,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes 1.8.0",
  "futures",
+ "futures-util",
  "google-cloud-auth",
  "google-cloud-storage",
  "google-cloud-token",

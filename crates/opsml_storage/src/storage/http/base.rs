@@ -1,7 +1,5 @@
 use crate::storage::enums::client::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
-use futures::TryFutureExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
 };
@@ -19,10 +17,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use tokio::fs::File;
 
 const TIMEOUT_SECS: u64 = 30;
-const MAX_CHUNKS: u64 = 10000;
 
 #[derive(Debug, Clone)]
 pub enum RequestType {
@@ -247,6 +243,7 @@ impl OpsmlApiClient {
         Ok(response)
     }
 
+    // specific method for multipart uploads (mainly used for localstorageclient)
     pub async fn multipart_upload(self, form: Form) -> Result<Value, ApiError> {
         let response = self
             .client
@@ -263,6 +260,7 @@ impl OpsmlApiClient {
         Ok(response)
     }
 
+    // specific method for multipart uploads (mainly used for localstorageclient)
     pub async fn generate_presigned_url_for_part(
         &mut self,
         path: &str,
@@ -293,15 +291,10 @@ impl OpsmlApiClient {
     }
 }
 
-pub struct HttpMultiPartUpload {
-    session_url: String,
-    part_number: i32,
-    uploader: MultiPartUploader,
-}
-
 pub struct HttpStorageClient {
     pub api_client: OpsmlApiClient,
     storage_client: StorageClientEnum,
+    pub storage_type: StorageType,
 }
 
 impl HttpStorageClient {
@@ -323,7 +316,7 @@ impl HttpStorageClient {
                 ))?;
 
         // update settings type
-        settings.storage_type = storage_type;
+        settings.storage_type = storage_type.clone();
 
         // get storage client (options are gcs, aws, azure and local)
         let storage_client = StorageClientEnum::new(settings)
@@ -336,6 +329,7 @@ impl HttpStorageClient {
         Ok(Self {
             api_client,
             storage_client,
+            storage_type,
         })
     }
 
@@ -515,91 +509,6 @@ impl HttpStorageClient {
             .await?;
 
         Ok(uploader)
-    }
-
-    pub async fn upload_file_in_chunks(
-        &mut self,
-        lpath: &Path,
-        rpath: &Path,
-    ) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))
-            .await?;
-        // get file size
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))
-            .await?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 15);
-
-        // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
-
-        if chunk_count > MAX_CHUNKS {
-            return Err(StorageError::Error(
-                "File size is too large for multipart upload".to_string(),
-            ));
-        }
-
-        // if the last chunk is empty, reduce the number of parts
-        if size_of_last_chunk == 0 {
-            size_of_last_chunk = chunk_size;
-            chunk_count -= 1;
-        }
-
-        let bar = ProgressBar::new(chunk_count);
-        let style =
-            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
-                .unwrap();
-        bar.set_style(style);
-        bar.set_message(LogColors::green("Uploading file"));
-
-        for chunk_index in 0..chunk_count {
-            let this_chunk = if chunk_count - 1 == chunk_index {
-                size_of_last_chunk
-            } else {
-                chunk_size
-            };
-
-            let first_byte = chunk_index * chunk_size;
-            let last_byte = first_byte + this_chunk - 1;
-
-            let body = uploader
-                .get_next_chunk(lpath, chunk_size, chunk_index, this_chunk)
-                .await?;
-
-            let part_number = (chunk_index as i32) + 1;
-
-            // call server to get presigned url for part
-            let presigned_url = self
-                .generate_presigned_url_for_part(
-                    rpath.to_str().unwrap(),
-                    &uploader.session_url(),
-                    part_number,
-                )
-                .await?;
-
-            // pass presigned url to upload part
-            uploader
-                .upload_part_with_presigned_url(
-                    &first_byte,
-                    &last_byte,
-                    &part_number,
-                    &file_size,
-                    body,
-                    &presigned_url,
-                )
-                .await?;
-
-            bar.inc(1);
-        }
-
-        uploader.complete_upload().await?;
-
-        Ok(())
     }
 
     pub async fn generate_presigned_url(&mut self, path: &str) -> Result<String, StorageError> {

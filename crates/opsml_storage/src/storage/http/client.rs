@@ -1,11 +1,12 @@
+use crate::storage::base::get_files;
 use crate::storage::base::PathExt;
-use crate::storage::base::{get_files, PathExt};
 use crate::storage::http::base::{build_http_client, HttpStorageClient};
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 use opsml_settings::config::OpsmlStorageSettings;
+use opsml_settings::config::StorageType;
 use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
 use std::path::{Path, PathBuf};
@@ -15,14 +16,16 @@ pub struct HttpFSStorageClient {
 }
 
 impl HttpFSStorageClient {
+    pub fn storage_type(&self) -> StorageType {
+        self.client.storage_type.clone()
+    }
     pub fn name(&self) -> &str {
         "HttpFSStorageClient"
     }
 
-    pub async fn new(settings: &mut OpsmlStorageSettings) -> AnyhowResult<Self> {
+    pub async fn new(settings: &mut OpsmlStorageSettings) -> Result<Self, StorageError> {
         let client = build_http_client(&settings.api_settings)
-            .map_err(|e| StorageError::Error(format!("Failed to create http client {}", e)))
-            .context("Error occurred while building HTTP client")?;
+            .map_err(|e| StorageError::Error(format!("Failed to create http client {}", e)))?;
 
         Ok(HttpFSStorageClient {
             client: HttpStorageClient::new(settings, &client).await.unwrap(),
@@ -110,18 +113,13 @@ impl HttpFSStorageClient {
                     .create_multipart_uploader(&remote_path, stripped_lpath_clone)
                     .await?;
 
-                uploader
-                    .upload_file_in_chunks(&stripped_file_path, &remote_path, &mut uploader)
-                    .await?;
+                uploader.upload_file_in_chunks(&stripped_file_path).await?;
             }
 
             Ok(())
         } else {
-            let mut uploader = self.client.create_multipart_uploader(rpath).await?;
-
-            self.client
-                .upload_file_in_chunks(lpath, rpath, &mut uploader)
-                .await?;
+            let mut uploader = self.client.create_multipart_uploader(rpath, lpath).await?;
+            uploader.upload_file_in_chunks(lpath).await?;
 
             Ok(())
         }
@@ -238,20 +236,22 @@ impl PyHttpFSStorageClient {
                     let relative_path = file.relative_path(&stripped_lpath_clone)?;
                     let remote_path = stripped_rpath_clone.join(relative_path);
 
-                    let mut uploader = self.client.create_multipart_uploader(&remote_path).await?;
-
-                    self.client
-                        .upload_file_in_chunks(&stripped_file_path, &remote_path, &mut uploader)
+                    let mut uploader = self
+                        .client
+                        .create_multipart_uploader(&remote_path, &lpath)
                         .await?;
+
+                    uploader.upload_file_in_chunks(&stripped_file_path).await?;
                 }
 
                 Ok(())
             } else {
-                let mut uploader = self.client.create_multipart_uploader(&rpath).await?;
-
-                self.client
-                    .upload_file_in_chunks(&lpath, &rpath, &mut uploader)
+                let mut uploader = self
+                    .client
+                    .create_multipart_uploader(&rpath, &lpath)
                     .await?;
+
+                uploader.upload_file_in_chunks(&lpath).await?;
                 Ok(())
             }
         })

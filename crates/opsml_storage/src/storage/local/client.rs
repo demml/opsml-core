@@ -3,18 +3,24 @@ use crate::storage::base::PathExt;
 use crate::storage::base::StorageClient;
 use crate::storage::filesystem::FileSystem;
 use crate::storage::http::base::OpsmlApiClient;
-
 use async_trait::async_trait;
+use futures_util::stream::Stream;
+use futures_util::task::{Context, Poll};
+use indicatif::{ProgressBar, ProgressStyle};
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadResponse;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
 use reqwest::multipart::{Form, Part};
 use std::fs::{self};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::time::SystemTime;
 use tokio::fs::File as TokioFile;
+use tokio::io::AsyncRead;
+use tokio_util::io::ReaderStream;
 use walkdir::WalkDir;
 
 // left off here
@@ -23,6 +29,35 @@ use walkdir::WalkDir;
 // - method for creating resumable upload
 // - method for creating uploader from resumable upload
 // - method for uploading part (special handling for local storage, or do we just use the same method?)
+
+struct ProgressStream<R> {
+    inner: ReaderStream<R>,
+    progress_bar: ProgressBar,
+}
+
+impl<R: AsyncRead + Unpin> ProgressStream<R> {
+    fn new(reader: R, progress_bar: ProgressBar) -> Self {
+        Self {
+            inner: ReaderStream::new(reader),
+            progress_bar,
+        }
+    }
+}
+
+impl<R: AsyncRead + Unpin> Stream for ProgressStream<R> {
+    type Item = Result<bytes::Bytes, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.inner).poll_next(cx) {
+            Poll::Ready(Some(Ok(bytes))) => {
+                this.progress_bar.inc(bytes.len() as u64);
+                Poll::Ready(Some(Ok(bytes)))
+            }
+            other => other,
+        }
+    }
+}
 
 pub struct LocalMultiPartUpload {
     pub rpath: PathBuf,
@@ -51,7 +86,7 @@ impl LocalMultiPartUpload {
         })
     }
 
-    async fn upload_file_in_chunks(&self, lpath: &Path) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&self, lpath: &Path) -> Result<(), StorageError> {
         // if not client mode, copy the file to rpath
 
         if !self.client_mode {
@@ -63,12 +98,19 @@ impl LocalMultiPartUpload {
                 .await
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
-            file.metadata()
+            let file_size = file
+                .metadata()
                 .await
                 .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?
                 .len();
 
-            let stream = tokio_util::io::ReaderStream::new(file);
+            let bar = ProgressBar::new(file_size);
+            let style =
+                ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
+                    .unwrap();
+            bar.set_style(style);
+            bar.set_message(LogColors::green("Uploading file"));
+            let stream = ProgressStream::new(file, bar.clone());
             let part = Part::stream(reqwest::Body::wrap_stream(stream))
                 .file_name(lpath.to_str().unwrap().to_string())
                 .mime_str("application/octet-stream")
