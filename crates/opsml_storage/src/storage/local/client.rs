@@ -504,7 +504,7 @@ impl FileSystem for LocalFSStorageClient {
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
-                let mut uploader = self
+                let uploader = self
                     .create_multipart_uploader(&remote_path, false, None)
                     .await?;
 
@@ -513,7 +513,7 @@ impl FileSystem for LocalFSStorageClient {
 
             Ok(())
         } else {
-            let mut uploader = self
+            let uploader = self
                 .create_multipart_uploader(&stripped_lpath, false, None)
                 .await?;
 
