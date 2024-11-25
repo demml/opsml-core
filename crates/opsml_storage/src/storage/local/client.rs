@@ -1,20 +1,20 @@
-use crate::core::storage::base::get_files;
-use crate::core::storage::base::PathExt;
-use crate::core::storage::base::{FileSystem, StorageClient};
+use crate::storage::base::get_files;
+use crate::storage::base::PathExt;
+use crate::storage::base::StorageClient;
+use crate::storage::filesystem::FileSystem;
+use crate::storage::http::base::OpsmlApiClient;
+
 use async_trait::async_trait;
-use aws_smithy_types::byte_stream::{ByteStream, Length};
 use opsml_contracts::FileInfo;
-use opsml_contracts::UploadPartArgs;
+use opsml_contracts::UploadResponse;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use pyo3::prelude::*;
-use std::fs::File;
+use reqwest::multipart::{Form, Part};
 use std::fs::{self};
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use tokio::fs::File as TokioFile;
 use walkdir::WalkDir;
 
 // left off here
@@ -25,91 +25,70 @@ use walkdir::WalkDir;
 // - method for uploading part (special handling for local storage, or do we just use the same method?)
 
 pub struct LocalMultiPartUpload {
-    pub rpath: String,
-    file_reader: BufReader<File>,
+    pub rpath: PathBuf,
     client_mode: bool,
+    api_client: Option<OpsmlApiClient>,
 }
 
 impl LocalMultiPartUpload {
-    pub async fn new(lpath: &Path, rpath: &Path, client_mode: bool) -> Self {
-        // check if path parent exists
-
-        if !client_mode {
-            if let Some(parent) = rpath.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| StorageError::Error(format!("Unable to create directory: {}", e)))
-                    .unwrap();
-            }
-
-            // create a new file
-            let file = fs::File::create(rpath)
-                .map_err(|e| StorageError::Error(format!("Unable to create file: {}", e)))
-                .unwrap();
+    pub async fn new(
+        rpath: &Path,
+        client_mode: bool,
+        api_client: Option<OpsmlApiClient>,
+    ) -> Result<Self, StorageError> {
+        // if client_mode, api_client should be Some
+        if client_mode && api_client.is_none() {
+            // raise storage error
+            return Err(StorageError::Error(
+                "API client must be provided in client mode".to_string(),
+            ));
         }
 
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))
-            .unwrap();
-        let file_reader = BufReader::new(file);
-
-        Self {
-            rpath: rpath.to_str().unwrap().to_string(),
-            file_reader,
+        Ok(Self {
+            rpath: rpath.to_path_buf(),
             client_mode,
-        }
+            api_client,
+        })
     }
 
-    pub async fn get_next_chunk(
-        &self,
-        path: &Path,
-        chunk_size: u64,
-        chunk_index: u64,
-        this_chunk_size: u64,
-    ) -> Result<ByteStream, StorageError> {
-        let stream = ByteStream::read_from()
-            .path(path)
-            .offset(chunk_index * chunk_size)
-            .length(Length::Exact(this_chunk_size))
-            .build()
-            .await
-            .map_err(|e| StorageError::Error(format!("Failed to get next chunk: {}", e)))?;
+    async fn upload_file_in_chunks(&self, lpath: &Path) -> Result<(), StorageError> {
+        // if not client mode, copy the file to rpath
 
-        Ok(stream)
-    }
-
-    pub async fn upload_part(&mut self, chunk: bytes::Bytes) -> Result<bool, StorageError> {
-        //self.file
-        //    .write_all(&chunk)
-        //    .map_err(|e| StorageError::Error(format!("Unable to write to file: {}", e)))?;
-
-        Ok(true)
-    }
-
-    pub async fn upload_next_chunk(
-        &mut self,
-        upload_args: &UploadPartArgs,
-    ) -> Result<bool, StorageError> {
-        let mut buffer = vec![0; upload_args.this_chunk_size as usize];
-        let bytes_read = self
-            .file_reader
-            .read(&mut buffer)
-            .map_err(|e| StorageError::Error(format!("Failed to read file: {}", e)))?;
-
-        buffer.truncate(bytes_read);
-
-        // if not client mode, append to file
         if !self.client_mode {
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(&self.rpath)
+            fs::copy(lpath, self.rpath.as_path())
+                .map_err(|e| StorageError::Error(format!("Failed to copy file: {}", e)))?;
+        } else {
+            let client = self.api_client.as_ref().unwrap().clone();
+            let file = TokioFile::open(lpath)
+                .await
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
-            file.write_all(&buffer)
-                .map_err(|e| StorageError::Error(format!("Failed to write to file: {}", e)))?;
+            file.metadata()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?
+                .len();
+
+            let stream = tokio_util::io::ReaderStream::new(file);
+            let part = Part::stream(reqwest::Body::wrap_stream(stream))
+                .file_name(lpath.to_str().unwrap().to_string())
+                .mime_str("application/octet-stream")
+                .map_err(|e| StorageError::Error(format!("Failed to create part: {}", e)))?;
+            let form = Form::new().part("file", part);
+
+            let response = client
+                .multipart_upload(form)
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to upload part: {}", e)))?;
+
+            let response = serde_json::from_value::<UploadResponse>(response)
+                .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
+            if !response.uploaded {
+                return Err(StorageError::Error(format!("Failed to upload file",)));
+            }
         }
 
-        Ok(true)
+        Ok(())
     }
 
     pub async fn complete_upload(&mut self) -> Result<(), StorageError> {
@@ -354,8 +333,17 @@ impl StorageClient for LocalStorageClient {
 }
 
 impl LocalStorageClient {
-    pub async fn create_multipart_upload(&self, path: &str) -> Result<String, StorageError> {
-        Ok(path.to_string())
+    pub async fn create_multipart_uploader(
+        &self,
+        path: &str,
+        client_mode: bool,
+        api_client: Option<OpsmlApiClient>,
+    ) -> Result<LocalMultiPartUpload, StorageError> {
+        Ok(LocalMultiPartUpload {
+            rpath: self.bucket.join(path),
+            client_mode: client_mode,
+            api_client: api_client,
+        })
     }
 
     async fn upload_file(&self, lpath: &Path, rpath: &Path) -> Result<(), StorageError> {
@@ -375,34 +363,129 @@ impl LocalStorageClient {
 
 pub struct LocalFSStorageClient {
     client: LocalStorageClient,
+    client_mode: bool,
 }
 
 #[async_trait]
-impl FileSystem<LocalStorageClient> for LocalFSStorageClient {
-    fn name(&self) -> &str {
-        "LocalFSStorageClient"
-    }
-
-    fn client(&self) -> &LocalStorageClient {
-        &self.client
-    }
-
+impl FileSystem for LocalFSStorageClient {
     async fn new(settings: &OpsmlStorageSettings) -> Self {
-        Self {
-            client: LocalStorageClient::new(settings).await.unwrap(),
+        let client = LocalStorageClient::new(settings).await.unwrap();
+        LocalFSStorageClient {
+            client,
+            client_mode: settings.client_mode,
         }
     }
-}
 
-impl LocalFSStorageClient {
-    pub async fn put(
+    fn storage_type(&self) -> StorageType {
+        StorageType::Local
+    }
+
+    async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find_info(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        // strip the paths
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+
+        if recursive {
+            let stripped_lpath_clone = stripped_lpath.clone();
+
+            // list all objects in the path
+            let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
+
+            // iterate over each object and get it
+            for obj in objects {
+                let file_path = Path::new(obj.as_str());
+                let stripped_path = file_path.strip_path(self.client.bucket().await);
+                let relative_path = file_path.relative_path(&stripped_rpath)?;
+                let local_path = stripped_lpath_clone.join(relative_path);
+
+                self.client
+                    .get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )
+                    .await?;
+            }
+        } else {
+            self.client
+                .get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_src = src.strip_path(self.client.bucket().await);
+        let stripped_dest = dest.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        } else {
+            self.client
+                .copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .delete_objects(stripped_path.to_str().unwrap())
+                .await?;
+        } else {
+            self.client
+                .delete_object(stripped_path.to_str().unwrap())
+                .await?;
+        }
+
+        Ok(())
+    }
+    async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        let objects = self.client.find(stripped_path.to_str().unwrap()).await?;
+
+        Ok(!objects.is_empty())
+    }
+
+    async fn generate_presigned_url(
         &self,
-        lpath: &Path,
-        rpath: &Path,
-        recursive: bool,
-    ) -> Result<(), StorageError> {
-        let stripped_lpath = lpath.strip_path(self.client().bucket().await);
-        let stripped_rpath = rpath.strip_path(self.client().bucket().await);
+        path: &Path,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client
+            .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            .await
+    }
+
+    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
 
         if recursive {
             if !stripped_lpath.is_dir() {
@@ -416,23 +499,40 @@ impl LocalFSStorageClient {
             for file in files {
                 let stripped_lpath_clone = stripped_lpath.clone();
                 let stripped_rpath_clone = stripped_rpath.clone();
-                let stripped_file_path = file.strip_path(self.client().bucket().await);
+                let stripped_file_path = file.strip_path(self.client.bucket().await);
 
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
-                self.client()
-                    .upload_file(&stripped_file_path, &remote_path)
+                let mut uploader = self
+                    .create_multipart_uploader(&remote_path, false, None)
                     .await?;
+
+                uploader.upload_file_in_chunks(&stripped_file_path).await?;
             }
 
             Ok(())
         } else {
-            self.client()
-                .upload_file(&stripped_lpath, &stripped_rpath)
+            let mut uploader = self
+                .create_multipart_uploader(&stripped_lpath, false, None)
                 .await?;
+
+            uploader.upload_file_in_chunks(&stripped_lpath).await?;
             Ok(())
         }
+    }
+}
+
+impl LocalFSStorageClient {
+    pub async fn create_multipart_uploader(
+        &self,
+        path: &Path,
+        client_mode: bool,
+        api_client: Option<OpsmlApiClient>,
+    ) -> Result<LocalMultiPartUpload, StorageError> {
+        self.client
+            .create_multipart_uploader(path.to_str().unwrap(), client_mode, api_client)
+            .await
     }
 }
 
@@ -646,7 +746,7 @@ impl PyLocalFSStorageClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::storage::base::get_files;
+    use crate::storage::base::get_files;
     use opsml_settings::config::OpsmlConfig;
     use std::fs::File;
     use std::io::Write;

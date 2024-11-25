@@ -1,5 +1,5 @@
-use crate::core::storage::base::{get_files, PathExt, StorageClient};
-use crate::core::storage::filesystem::FileSystem;
+use crate::storage::base::{get_files, PathExt, StorageClient};
+use crate::storage::filesystem::FileSystem;
 use async_trait::async_trait;
 use base64::prelude::*;
 use futures::stream::Stream;
@@ -823,6 +823,23 @@ impl FileSystem for GCSFSStorageClient {
                 .await?;
             Ok(())
         }
+    }
+}
+
+impl GCSFSStorageClient {
+    pub async fn create_multipart_uploader(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        session_url: Option<String>,
+    ) -> Result<GoogleMultipartUpload, StorageError> {
+        self.client
+            .create_multipart_uploader(
+                lpath.to_str().unwrap(),
+                rpath.to_str().unwrap(),
+                session_url,
+            )
+            .await
     }
 }
 

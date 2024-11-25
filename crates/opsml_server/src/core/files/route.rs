@@ -12,6 +12,7 @@ use axum::{
 };
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
+    UploadResponse,
 };
 
 use opsml_error::error::ServerError;
@@ -107,6 +108,21 @@ pub async fn generate_presigned_url(
     Ok(Json(PresignedUrl { url }))
 }
 
+// this is for local storage only
+pub async fn upload_multipart(
+    mut multipart: Multipart,
+) -> Result<UploadResponse, (StatusCode, Json<serde_json::Value>)> {
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap().to_string();
+        let data = field.bytes().await.unwrap();
+
+        let mut file = File::create(name).await.unwrap();
+        file.write_all(&data).await.unwrap();
+    }
+
+    Ok(Json(UploadResponse { uploaded: true }))
+}
+
 pub async fn list_files(
     State(state): State<Arc<AppState>>,
     params: Query<ListFileQuery>,
@@ -200,6 +216,7 @@ pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
             &format!("{}/files/multipart", prefix),
             get(create_multipart_upload),
         )
+        .route("{}/files/multipart", post(upload_multipart))
         .route(
             &format!("{}/files/presigned", prefix),
             get(generate_presigned_url),

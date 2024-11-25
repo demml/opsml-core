@@ -1,4 +1,4 @@
-use crate::core::storage::enums::{MultiPartUploader, StorageClientEnum};
+use crate::storage::enums::client::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use futures::TryFutureExt;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -10,6 +10,7 @@ use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use opsml_utils::color::LogColors;
+use reqwest::multipart::Form;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
@@ -242,6 +243,22 @@ impl OpsmlApiClient {
 
         let response = response
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
+
+        Ok(response)
+    }
+
+    pub async fn multipart_upload(self, form: Form) -> Result<Value, ApiError> {
+        let response = self
+            .client
+            .post(format!("{}/files/multipart", self.base_path))
+            .multipart(form)
+            .bearer_auth(self.settings.api_settings.auth_token)
+            .send()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
+            .json::<Value>()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
         Ok(response)
     }

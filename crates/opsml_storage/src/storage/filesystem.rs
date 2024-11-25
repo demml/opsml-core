@@ -1,5 +1,5 @@
 use crate::core::storage::enums::StorageClientEnum;
-use crate::core::storage::gcs::google::GCSFSStorageClient;
+use crate::core::storage::gcs::client::GCSFSStorageClient;
 use async_trait::async_trait;
 use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;

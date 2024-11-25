@@ -1,10 +1,10 @@
 /// Implements a generic enum to handle different storage clients based on the storage URI
 /// This enum is meant to provide a common interface to use in the server
-use crate::core::storage::base::FileSystem;
-use crate::core::storage::local::{LocalFSStorageClient, LocalMultiPartUpload};
+use crate::storage::base::FileSystem;
+use crate::storage::local::client::{LocalFSStorageClient, LocalMultiPartUpload};
+
 use anyhow::Context;
 use anyhow::Result as AnyhowResult;
-use aws_smithy_types::byte_stream::ByteStream;
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
@@ -13,8 +13,8 @@ use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::core::storage::aws::{AWSMulitPartUpload, S3FStorageClient};
-use crate::core::storage::gcs::{GCSFSStorageClient, GoogleMultipartUpload};
+use crate::storage::aws::client::{AWSMulitPartUpload, S3FStorageClient};
+use crate::storage::gcs::client::{GCSFSStorageClient, GoogleMultipartUpload};
 
 pub enum MultiPartUploader {
     Google(GoogleMultipartUpload),
@@ -27,21 +27,9 @@ impl MultiPartUploader {
         match self {
             MultiPartUploader::Google(uploader) => uploader.upload_client.url().to_string().clone(),
             MultiPartUploader::AWS(uploader) => uploader.upload_id.clone(),
-            MultiPartUploader::Local(uploader) => uploader.rpath.clone(),
-        }
-    }
-    pub async fn upload_part(
-        &mut self,
-        upload_args: &UploadPartArgs,
-    ) -> Result<bool, StorageError> {
-        match self {
-            MultiPartUploader::Google(uploader) => {
-                uploader.upload_next_chunk(upload_args).await?;
-                Ok(true)
+            MultiPartUploader::Local(uploader) => {
+                uploader.rpath.clone().to_str().unwrap().to_string()
             }
-            //#[cfg(feature = "aws_storage")]
-            MultiPartUploader::AWS(uploader) => uploader.upload_next_chunk(upload_args).await,
-            MultiPartUploader::Local(uploader) => uploader.upload_next_chunk(upload_args).await,
         }
     }
 
@@ -245,26 +233,20 @@ impl StorageClientEnum {
         match self {
             StorageClientEnum::Google(client) => {
                 let uploader = client
-                    .client()
-                    .create_multipart_uploader(
-                        lpath.to_str().unwrap(),
-                        rpath.to_str().unwrap(),
-                        Some(session_url),
-                    )
+                    .create_multipart_uploader(lpath, rpath, Some(session_url))
                     .await?;
                 Ok(MultiPartUploader::Google(uploader))
             }
 
             StorageClientEnum::AWS(client) => {
                 let uploader = client
-                    .client()
-                    .create_multipart_uploader(rpath.to_str().unwrap(), Some(session_url))
+                    .create_multipart_uploader(rpath, lpath, Some(session_url))
                     .await?;
                 Ok(MultiPartUploader::AWS(uploader))
             }
-            StorageClientEnum::Local(_client) => {
-                unimplemented!("Local file system does not support multipart uploads")
-            }
+            StorageClientEnum::Local(client) => LocalMultiPartUpload::new(rpath, session_url)
+                .await
+                .map(|uploader| MultiPartUploader::Local(uploader)),
         }
     }
 }

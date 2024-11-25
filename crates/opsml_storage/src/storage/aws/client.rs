@@ -1,5 +1,5 @@
-use crate::core::storage::base::{get_files, PathExt, StorageClient};
-use crate::core::storage::filesystem::FileSystem;
+use crate::storage::base::{get_files, PathExt, StorageClient};
+use crate::storage::filesystem::FileSystem;
 use opsml_contracts::FileInfo;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 
@@ -64,12 +64,9 @@ impl AWSMulitPartUpload {
         let creds = AWSCreds::new().await?;
         let client = Client::new(&creds.config);
 
-        let _bucket = bucket.to_string();
-        let _path = rpath.to_string();
-
         Ok(Self {
             client,
-            bucket: _bucket,
+            bucket: bucket.to_string(),
             rpath: rpath.to_string(),
             lpath: lpath.to_string(),
             upload_id: upload_id.to_string(),
@@ -799,6 +796,31 @@ impl FileSystem for S3FStorageClient {
             uploader.upload_file_in_chunks(&stripped_lpath).await?;
             Ok(())
         }
+    }
+}
+
+impl S3FStorageClient {
+    pub async fn create_multipart_uploader(
+        &self,
+        rpath: &Path,
+        lpath: &Path,
+        session_url: Option<String>,
+    ) -> Result<AWSMulitPartUpload, StorageError> {
+        let upload_id = match session_url {
+            Some(session_url) => session_url,
+            None => {
+                self.client
+                    .create_multipart_upload(rpath.to_str().unwrap())
+                    .await?
+            }
+        };
+        AWSMulitPartUpload::new(
+            &self.client.bucket,
+            lpath.to_str().unwrap(),
+            rpath.to_str().unwrap(),
+            &upload_id,
+        )
+        .await
     }
 }
 

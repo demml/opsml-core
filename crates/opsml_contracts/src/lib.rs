@@ -56,6 +56,11 @@ pub struct StorageSettings {
     pub storage_type: StorageType,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UploadResponse {
+    pub uploaded: bool,
+}
+
 pub struct UploadPartArgs {
     pub file_size: u64,
     pub presigned_url: Option<String>,
