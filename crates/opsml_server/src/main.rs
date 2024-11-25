@@ -2,6 +2,7 @@ use crate::core::router::create_router;
 use crate::core::setup::setup_components;
 use crate::core::state::AppState;
 use anyhow::Ok;
+use anyhow::Result;
 use axum::Router;
 use opsml_utils::color::LogColors;
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use tracing::info;
 
 mod core;
 
-async fn create_app() -> Result<Router, anyhow::Error> {
+async fn create_app() -> Result<Router> {
     // setup components (config, logging, storage client)
     let (config, storage_client) = setup_components().await?;
 
@@ -22,7 +23,7 @@ async fn create_app() -> Result<Router, anyhow::Error> {
     info!("Application state created");
 
     // create the router
-    let app = create_router(app_state).await;
+    let app = create_router(app_state).await?;
 
     info!("Router created");
 

@@ -34,6 +34,8 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+const CHUNK_SIZE: usize = 1024 * 1024 * 25;
+
 pub struct GcpCreds {
     pub creds: Option<CredentialsFile>,
     pub project: Option<String>,
@@ -162,7 +164,7 @@ impl GoogleMultipartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+        let chunk_size = std::cmp::min(file_size, CHUNK_SIZE as u64);
 
         // calculate the number of parts
         let mut chunk_count = (file_size / chunk_size) + 1;
@@ -175,11 +177,20 @@ impl GoogleMultipartUpload {
         }
 
         let bar = ProgressBar::new(chunk_count);
-        let style =
-            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
-                .unwrap();
+
+        let msg1 = LogColors::green("Uploading file:");
+        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg = format!("{} {}", msg1, msg2);
+
+        let template = format!(
+            "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
+            msg
+        );
+
+        let style = ProgressStyle::with_template(&template)
+            .unwrap()
+            .progress_chars("#--");
         bar.set_style(style);
-        bar.set_message(LogColors::green("Uploading file"));
 
         for chunk_index in 0..chunk_count {
             let this_chunk = if chunk_count - 1 == chunk_index {
@@ -201,7 +212,10 @@ impl GoogleMultipartUpload {
             bar.inc(1);
         } // extract the range from the result and update the first_byte and last_byte
 
-        self.complete_upload().await
+        self.complete_upload().await?;
+        bar.finish_with_message("Upload complete");
+
+        Ok(())
 
         // check if enum is Ok
     }
@@ -219,6 +233,7 @@ impl GoogleMultipartUpload {
     }
 }
 
+#[derive(Clone)]
 pub struct GoogleStorageClient {
     pub client: Client,
     pub bucket: String,
@@ -589,6 +604,7 @@ impl GoogleStorageClient {
     }
 }
 
+#[derive(Clone)]
 pub struct GCSFSStorageClient {
     client: GoogleStorageClient,
 }

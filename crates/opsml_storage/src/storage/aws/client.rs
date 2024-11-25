@@ -294,6 +294,7 @@ impl AWSMulitPartUpload {
     }
 }
 
+#[derive(Clone)]
 pub struct AWSStorageClient {
     pub client: Client,
     pub bucket: String,
@@ -662,6 +663,7 @@ impl AWSStorageClient {
 }
 
 // For both python and rust, we need to define 2 structs: one for rust that supports async and one for python that does not
+#[derive(Clone)]
 pub struct S3FStorageClient {
     client: AWSStorageClient,
 }

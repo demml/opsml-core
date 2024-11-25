@@ -12,11 +12,13 @@ if __name__ == "__main__":
     import os
     import uuid
 
-    from opsml_core import PyHttpFSStorageClient, OpsmlConfig
+    from opsml_core import PyFileSystemStorage, OpsmlConfig
 
     config = OpsmlConfig(client_mode=True)
 
-    storage_client = PyHttpFSStorageClient(config.storage_settings())
+    storage_client = PyFileSystemStorage(config.storage_settings())
+    print(storage_client.name())
+    print(storage_client.storage_type())
     # print("client loaded")
 
     # path = Path("inkscape")
@@ -25,12 +27,12 @@ if __name__ == "__main__":
 
     # info = storage_client.find_info(path)
 
-    lpath = Path("tests/assets/blah.so")
+    lpath = Path("tests/assets")
     rpath_dir = Path(uuid.uuid4().hex)
-    rpath = rpath_dir / "blah.so"
+    rpath = rpath_dir / "assets"
 
-    storage_client.put(lpath, rpath)
-    storage_client.rm(rpath)
+    storage_client.put(lpath, rpath, recursive=True)
+    storage_client.rm(rpath, recursive=True)
 
     # kwargs = {
     #    "base_url": "http://localhost:3000",

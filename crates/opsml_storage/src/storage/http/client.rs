@@ -91,6 +91,9 @@ impl HttpFSStorageClient {
         rpath: &Path,
         recursive: bool,
     ) -> Result<(), StorageError> {
+        let lpath_clone = lpath.to_path_buf();
+        let rpath_clone = rpath.to_path_buf();
+
         if recursive {
             if !lpath.is_dir() {
                 return Err(StorageError::Error(
@@ -99,21 +102,32 @@ impl HttpFSStorageClient {
             }
 
             let files: Vec<PathBuf> = get_files(lpath)?;
+            let mut tasks = Vec::new();
 
             for file in files {
-                let stripped_lpath_clone = lpath;
-                let stripped_rpath_clone = rpath;
+                let stripped_lpath_clone = lpath_clone.clone();
+                let stripped_rpath_clone = rpath_clone.clone();
                 let stripped_file_path = file.clone();
+                let mut cloned_client = self.client.clone();
 
-                let relative_path = file.relative_path(stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
+                let task = tokio::spawn(async move {
+                    let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                    let remote_path = stripped_rpath_clone.join(relative_path);
 
-                let mut uploader = self
-                    .client
-                    .create_multipart_uploader(&remote_path, stripped_lpath_clone)
-                    .await?;
+                    let mut uploader = cloned_client
+                        .create_multipart_uploader(&remote_path, &stripped_file_path)
+                        .await?;
 
-                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                    uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                    Ok::<(), StorageError>(())
+                });
+
+                tasks.push(task);
+            }
+            let results = futures::future::join_all(tasks).await;
+
+            for result in results {
+                result.map_err(|e| StorageError::Error(e.to_string()))??;
             }
 
             Ok(())

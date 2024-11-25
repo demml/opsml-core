@@ -291,6 +291,7 @@ impl OpsmlApiClient {
     }
 }
 
+#[derive(Clone)]
 pub struct HttpStorageClient {
     pub api_client: OpsmlApiClient,
     storage_client: StorageClientEnum,

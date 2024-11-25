@@ -41,6 +41,7 @@ impl MultiPartUploader {
     }
 }
 
+#[derive(Clone)]
 pub enum StorageClientEnum {
     Google(GCSFSStorageClient),
     AWS(S3FStorageClient),

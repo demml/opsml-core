@@ -137,7 +137,7 @@ impl LocalMultiPartUpload {
         Ok(())
     }
 }
-
+#[derive(Clone)]
 pub struct LocalStorageClient {
     pub bucket: PathBuf,
 }
@@ -402,7 +402,7 @@ impl LocalStorageClient {
         Ok(())
     }
 }
-
+#[derive(Clone)]
 pub struct LocalFSStorageClient {
     client: LocalStorageClient,
     pub client_mode: bool,

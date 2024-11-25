@@ -18,9 +18,11 @@ use opsml_contracts::{
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
+use anyhow::{Context, Result};
 use opsml_error::error::ServerError;
 /// Route for debugging information
 use serde_json::json;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -214,18 +216,33 @@ pub async fn delete_file(
     }
 }
 
-pub async fn get_file_router(prefix: &str) -> Router<Arc<AppState>> {
-    Router::new()
-        .route(
-            &format!("{}/files/multipart", prefix),
-            get(create_multipart_upload),
-        )
-        .route("{}/files/multipart", post(upload_multipart))
-        .route(
-            &format!("{}/files/presigned", prefix),
-            get(generate_presigned_url),
-        )
-        .route(&format!("{}/files/list", prefix), get(list_files))
-        .route(&format!("{}/files/list/info", prefix), get(list_file_info))
-        .route(&format!("{}/files/delete", prefix), delete(delete_file))
+pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        Router::new()
+            .route(
+                &format!("{}/files/multipart", prefix),
+                get(create_multipart_upload),
+            )
+            .route(
+                &format!("{}/files/multipart", prefix),
+                post(upload_multipart),
+            )
+            .route(
+                &format!("{}/files/presigned", prefix),
+                get(generate_presigned_url),
+            )
+            .route(&format!("{}/files/list", prefix), get(list_files))
+            .route(&format!("{}/files/list/info", prefix), get(list_file_info))
+            .route(&format!("{}/files/delete", prefix), delete(delete_file))
+    }));
+
+    match result {
+        Ok(router) => Ok(router),
+        Err(_) => {
+            error!("Failed to create file router");
+            // panic
+            Err(anyhow::anyhow!("Failed to create file router"))
+                .context("Panic occurred while creating the router")
+        }
+    }
 }

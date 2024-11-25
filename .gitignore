@@ -72,3 +72,6 @@ test_scripts/
 # Pyenv
 .python-version
 
+
+# ide
+crates/opsml_server/dev
