@@ -17,6 +17,7 @@ async-trait = { workspace = true }
 aws-config = { workspace = true }
 aws-sdk-s3 = { workspace = true }
 aws-smithy-types = { workspace = true }
+aws-types = { workspace = true }
 azure_core = { workspace = true }
 azure_storage = { workspace = true }
 azure_storage_blobs = { workspace = true }

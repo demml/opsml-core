@@ -446,4 +446,48 @@ mod tests {
 
         client.rm(rpath, true).await.unwrap();
     }
+
+    #[tokio::test]
+    async fn test_filesystemstorage_with_http_aws() {
+        let config = OpsmlConfig::new(Some(true));
+
+        let mut client = FileSystemStorage::new(&mut config.storage_settings())
+            .await
+            .unwrap();
+
+        assert_eq!(client.name(), "HttpFSStorageClient");
+        assert_eq!(client.storage_type(), StorageType::AWS);
+
+        let dirname = create_nested_data();
+
+        let lpath = Path::new(&dirname);
+        let rpath = Path::new(&dirname);
+
+        // put the file
+        client.put(lpath, rpath, true).await.unwrap();
+
+        // check if the file exists
+        let exists = client.exists(rpath).await.unwrap();
+        assert!(exists);
+
+        // list all files
+        let files = client.find(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+
+        // list files with info
+        let files = client.find_info(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+
+        // download the files
+        let new_path = uuid::Uuid::new_v4().to_string();
+        let new_path = Path::new(&new_path);
+
+        client.get(new_path, rpath, true).await.unwrap();
+
+        // cleanup
+        std::fs::remove_dir_all(&dirname).unwrap();
+        std::fs::remove_dir_all(new_path).unwrap();
+
+        client.rm(rpath, true).await.unwrap();
+    }
 }

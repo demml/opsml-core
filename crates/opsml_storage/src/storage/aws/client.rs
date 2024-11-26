@@ -10,6 +10,8 @@ use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use opsml_utils::color::LogColors;
 
+use aws_sdk_s3::config::Builder;
+use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
@@ -236,11 +238,20 @@ impl AWSMulitPartUpload {
         }
 
         let bar = ProgressBar::new(chunk_count);
-        let style =
-            ProgressStyle::with_template("{msg} [{bar:40.green/magenta}] {pos}/{len} ({eta})")
-                .unwrap();
+
+        let msg1 = LogColors::green("Uploading file:");
+        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg = format!("{} {}", msg1, msg2);
+
+        let template = format!(
+            "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
+            msg
+        );
+
+        let style = ProgressStyle::with_template(&template)
+            .unwrap()
+            .progress_chars("#--");
         bar.set_style(style);
-        bar.set_message(LogColors::green("Uploading file"));
 
         for chunk_index in 0..chunk_count {
             let this_chunk = if chunk_count - 1 == chunk_index {
@@ -287,6 +298,7 @@ impl AWSMulitPartUpload {
         } // extract the range from the result and update the first_byte and last_byte
 
         self.complete_upload().await?;
+        bar.finish_with_message("Upload complete");
 
         Ok(())
 
@@ -310,9 +322,21 @@ impl StorageClient for AWSStorageClient {
     }
     async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         // create a resuable runtime for client
+        let client = if !settings.client_mode {
+            let creds = AWSCreds::new().await?;
+            let client = Client::new(&creds.config);
+            client
+        } else {
+            // set anonymous credentials if client mode is enabled
+            // this is because we want to force the client to use the api client to generate presigned urls
+            let creds = Credentials::new("", "", None, None, "anonymous");
+            let config = Builder::new()
+                .credentials_provider(creds)
+                .behavior_version(BehaviorVersion::latest())
+                .build();
 
-        let creds = AWSCreds::new().await?;
-        let client = Client::new(&creds.config);
+            Client::from_conf(config)
+        };
 
         let bucket = settings
             .storage_uri
