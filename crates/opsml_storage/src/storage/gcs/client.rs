@@ -800,3 +800,109 @@ impl GCSFSStorageClient {
             .await
     }
 }
+
+// tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opsml_error::error::StorageError;
+    use opsml_settings::config::OpsmlConfig;
+    use rand::distributions::Alphanumeric;
+    use rand::thread_rng;
+    use rand::Rng;
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    pub fn create_file(name: &str, chunk_size: &u64) {
+        let mut file = File::create(name).expect("Could not create sample file.");
+
+        while file.metadata().unwrap().len() <= chunk_size * 2 {
+            let rand_string: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(256)
+                .map(char::from)
+                .collect();
+            let return_string: String = "\n".to_string();
+            file.write_all(rand_string.as_ref())
+                .expect("Error writing to file.");
+            file.write_all(return_string.as_ref())
+                .expect("Error writing to file.");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_gcs_storage_client() -> Result<(), StorageError> {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+        let filename = format!("file-{}.txt", rand_name);
+
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_path = tmp_dir.path();
+
+        // write file to temp dir (create_file)
+        let lpath = tmp_path.join(&filename);
+        create_file(lpath.to_str().unwrap(), &1024);
+
+        let settings = OpsmlConfig::default(); // Adjust settings as needed
+        let gcs_storage_client = GCSFSStorageClient::new(&settings.storage_settings()).await;
+
+        let rpath_dir = Path::new("test_dir");
+        let rpath = rpath_dir.join(&filename);
+
+        if gcs_storage_client.exists(&rpath_dir).await? {
+            gcs_storage_client.rm(&rpath_dir, true).await?;
+        }
+
+        assert!(!gcs_storage_client.exists(&rpath_dir).await?);
+
+        // put
+        gcs_storage_client.put(&lpath, &rpath, false).await?;
+        assert!(gcs_storage_client.exists(&rpath).await?);
+
+        let nested_path = format!("nested/really/deep/file-{}.txt", rand_name);
+        let rpath_nested = rpath.parent().unwrap().join(nested_path);
+
+        gcs_storage_client.put(&lpath, &rpath_nested, false).await?;
+
+        let path = gcs_storage_client
+            .generate_presigned_url(&rpath, 10)
+            .await?;
+        assert!(!path.is_empty());
+
+        // ls
+        assert!(!gcs_storage_client
+            .find(rpath_nested.parent().unwrap())
+            .await?
+            .is_empty());
+
+        // find
+        let blobs = gcs_storage_client.find(&rpath_dir).await?;
+
+        assert_eq!(
+            blobs,
+            vec![
+                rpath.to_str().unwrap().to_string(),
+                rpath_nested.to_str().unwrap().to_string()
+            ]
+        );
+
+        // create new temp dir
+        let new_tmp_dir = TempDir::new().unwrap();
+
+        let new_lpath = new_tmp_dir.path().join(&filename);
+
+        // get
+        gcs_storage_client.get(&new_lpath, &rpath, false).await?;
+        assert!(new_lpath.exists());
+
+        // rm
+        gcs_storage_client.rm(&rpath, false).await?;
+        assert!(!gcs_storage_client.exists(&rpath).await?);
+
+        // rm recursive
+        gcs_storage_client.rm(&rpath_dir, true).await?;
+        assert!(!gcs_storage_client.exists(&rpath_dir).await?);
+
+        Ok(())
+    }
+}
