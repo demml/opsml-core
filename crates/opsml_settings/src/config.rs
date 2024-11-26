@@ -11,6 +11,7 @@ pub enum StorageType {
     Google,
     AWS,
     Local,
+    Azure,
 }
 
 /// ApiSettings for use with ApiClient

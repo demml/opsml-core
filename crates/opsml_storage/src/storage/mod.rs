@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod azure;
 pub mod base;
 pub mod enums;
 pub mod filesystem;

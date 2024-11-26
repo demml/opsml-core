@@ -4,12 +4,6 @@ use crate::storage::http::base::OpsmlApiClient;
 use async_trait::async_trait;
 use aws_config::BehaviorVersion;
 use aws_config::SdkConfig;
-use indicatif::{ProgressBar, ProgressStyle};
-use opsml_contracts::FileInfo;
-use opsml_error::error::StorageError;
-use opsml_settings::config::{OpsmlStorageSettings, StorageType};
-use opsml_utils::color::LogColors;
-
 use aws_sdk_s3::config::Builder;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
@@ -18,7 +12,13 @@ use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::primitives::Length;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
+use indicatif::{ProgressBar, ProgressStyle};
+use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
+use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
+use opsml_error::error::StorageError;
+use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
 use reqwest::Client as HttpClient;
 use std::fs::File;
@@ -225,7 +225,7 @@ impl AWSMulitPartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, 1024 * 1024 * 5);
+        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE);
 
         // calculate the number of parts
         let mut chunk_count = (file_size / chunk_size) + 1;

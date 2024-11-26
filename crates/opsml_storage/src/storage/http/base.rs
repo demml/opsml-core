@@ -22,7 +22,6 @@ use std::io::Write;
 use std::path::Path;
 
 const TIMEOUT_SECS: u64 = 30;
-const DOWNLOAD_CHUNK_SIZE: usize = 1024 * 1024 * 5;
 
 #[derive(Debug, Clone)]
 pub enum RequestType {

@@ -1,0 +1,13 @@
+[package]
+name = "opsml-constants"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+license = "MIT"
+description = "Constants for OpsML"
+
+
+[lib]
+doctest = false
+
+

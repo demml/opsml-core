@@ -19,6 +19,7 @@ use google_cloud_storage::http::resumable_upload_client::UploadStatus;
 use google_cloud_storage::sign::SignedURLMethod;
 use google_cloud_storage::sign::SignedURLOptions;
 use indicatif::{ProgressBar, ProgressStyle};
+use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
@@ -33,8 +34,6 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-
-const CHUNK_SIZE: usize = 1024 * 1024 * 25;
 
 pub struct GcpCreds {
     pub creds: Option<CredentialsFile>,
@@ -164,7 +163,7 @@ impl GoogleMultipartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, CHUNK_SIZE as u64);
+        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
 
         // calculate the number of parts
         let mut chunk_count = (file_size / chunk_size) + 1;

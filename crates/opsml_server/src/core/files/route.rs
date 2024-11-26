@@ -17,11 +17,13 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use opsml_constants::MAX_FILE_SIZE;
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
 use opsml_settings::config::StorageType;
+use opsml_storage::storage::base::MAX_FILE_SIZE;
 
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -282,7 +284,7 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             )
             .route(
                 &format!("{}/files/multipart", prefix),
-                post(upload_multipart).layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
+                post(upload_multipart).layer(DefaultBodyLimit::max(MAX_FILE_SIZE)),
             )
             .route(
                 &format!("{}/files/presigned", prefix),

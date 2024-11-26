@@ -18,6 +18,7 @@ repository = "https://github.com/demml/opsml-core"
 
 [workspace.dependencies]
 
+opsml-constants = { path = "crates/opsml_constants" }
 opsml-contracts = { path = "crates/opsml_contracts" }
 opsml-error = { path = "crates/opsml_error" }
 opsml-logging = { path = "crates/opsml_logging" }
@@ -31,6 +32,7 @@ anyhow = "1.0.93"
 async-trait = "0.*"
 aws-sdk-s3 = "1.*"
 azure_core = "0.21.0"
+azure_identity = "0.21.0"
 azure_storage = "0.21.0"
 azure_storage_blobs = "0.21.0"
 aws-config = "1.5.10"
