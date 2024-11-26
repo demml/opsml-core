@@ -324,8 +324,7 @@ impl StorageClient for AWSStorageClient {
         // create a resuable runtime for client
         let client = if !settings.client_mode {
             let creds = AWSCreds::new().await?;
-            let client = Client::new(&creds.config);
-            client
+            Client::new(&creds.config)
         } else {
             // set anonymous credentials if client mode is enabled
             // this is because we want to force the client to use the api client to generate presigned urls

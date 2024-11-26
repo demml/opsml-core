@@ -2675,6 +2675,7 @@ dependencies = [
  "futures",
  "mockall",
  "mockito",
+ "opsml-constants",
  "opsml-contracts",
  "opsml-error",
  "opsml-logging",

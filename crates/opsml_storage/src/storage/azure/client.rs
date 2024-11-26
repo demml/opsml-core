@@ -4,9 +4,7 @@ use crate::storage::base::StorageClient;
 use crate::storage::filesystem::FileSystem;
 use async_trait::async_trait;
 use azure_storage::prelude::*;
-use azure_storage::shared_access_signature::account_sas::{
-    AccountSasPermissions, AccountSasResourceType,
-};
+use azure_storage::shared_access_signature::service_sas::BlobSasPermissions;
 use azure_storage_blobs::container::operations::BlobItem;
 use azure_storage_blobs::prelude::*;
 use base64::prelude::*;
@@ -235,9 +233,10 @@ impl StorageClient for AzureStorageClient {
         };
 
         let client = BlobServiceClient::new(creds.account, creds.creds);
+
         let bucket = settings
             .storage_uri
-            .strip_prefix("azure://")
+            .strip_prefix("az://")
             .unwrap_or(&settings.storage_uri)
             .to_string();
 
@@ -333,29 +332,30 @@ impl StorageClient for AzureStorageClient {
         path: &str,
         expiration: u64,
     ) -> Result<String, StorageError> {
+        let start = OffsetDateTime::now_utc();
+        let expiry = start + Duration::seconds(expiration as i64);
+        let response = self
+            .client
+            .get_user_deligation_key(start, expiry)
+            .await
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
+
         let container = self.client.container_client(self.bucket.as_str());
         let blob = container.blob_client(path);
 
-        let expiry = OffsetDateTime::now_utc() + Duration::seconds(expiration as i64);
-        let permissions = AccountSasPermissions {
-            read: true,
-            write: false,
-            delete: false,
-            list: false,
-            add: false,
-            create: false,
-            update: false,
-            process: false,
-        };
-        let signature = self
-            .client
-            .shared_access_signature(AccountSasResourceType::Object, expiry, permissions)
+        let sas = blob
+            .user_delegation_shared_access_signature(
+                BlobSasPermissions {
+                    read: true,
+                    ..Default::default()
+                },
+                &response.user_deligation_key,
+            )
             .await
-            .map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
-
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
         let url = blob
-            .generate_signed_blob_url(&signature)
-            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+            .generate_signed_blob_url(&sas)
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
 
         Ok(url.to_string())
     }
@@ -368,7 +368,8 @@ impl StorageClient for AzureStorageClient {
         let mut stream = container.list_blobs().prefix(rpath).into_stream();
 
         while let Some(value) = stream.next().await {
-            let value = value.map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+            let value = value.unwrap();
+
             let blobs = value.blobs.items;
             // iterate over the blobs and match to enum
             for blob in blobs {
@@ -450,24 +451,32 @@ impl AzureStorageClient {
         path: &str,
         expiration: u64,
     ) -> Result<String, StorageError> {
+        let start = OffsetDateTime::now_utc();
+        let expiry = start + Duration::seconds(expiration as i64);
+        let response = self
+            .client
+            .get_user_deligation_key(start, expiry)
+            .await
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
+
         let container = self.client.container_client(self.bucket.as_str());
         let blob = container.blob_client(path);
 
-        let expiry = OffsetDateTime::now_utc() + Duration::seconds(expiration as i64);
-        let permissions = AccountSasPermissions {
-            write: true,
-            create: true,
-            ..Default::default()
-        };
-        let signature = self
-            .client
-            .shared_access_signature(AccountSasResourceType::Object, expiry, permissions)
+        let sas = blob
+            .user_delegation_shared_access_signature(
+                BlobSasPermissions {
+                    read: true,
+                    write: true,
+                    create: true,
+                    ..Default::default()
+                },
+                &response.user_deligation_key,
+            )
             .await
-            .map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
-
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
         let url = blob
-            .generate_signed_blob_url(&signature)
-            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+            .generate_signed_blob_url(&sas)
+            .map_err(|e| StorageError::Error(format!("{}", e)))?;
 
         Ok(url.to_string())
     }
@@ -658,9 +667,8 @@ impl AzureFSStorageClient {
     }
 
     pub async fn create_multipart_upload(&self, rpath: &Path) -> Result<String, StorageError> {
-        Ok(self
-            .client
+        self.client
             .generate_presigned_url_for_block_upload(rpath.to_str().unwrap(), 600)
-            .await?)
+            .await
     }
 }

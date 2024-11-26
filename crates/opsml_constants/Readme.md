@@ -1,1 +1,1 @@
-# Server and Client contract for OpsML
+# Constants to use in OpsML crates

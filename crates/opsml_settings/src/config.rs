@@ -191,6 +191,8 @@ impl OpsmlConfig {
             StorageType::Google
         } else if storage_uri_lower.starts_with("s3://") {
             StorageType::AWS
+        } else if storage_uri_lower.starts_with("az://") {
+            StorageType::Azure
         } else {
             StorageType::Local
         }

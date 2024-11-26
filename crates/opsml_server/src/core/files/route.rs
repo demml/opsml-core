@@ -23,7 +23,6 @@ use opsml_contracts::{
     UploadResponse,
 };
 use opsml_settings::config::StorageType;
-use opsml_storage::storage::base::MAX_FILE_SIZE;
 
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
