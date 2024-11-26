@@ -13,7 +13,7 @@ use aws_sdk_s3::primitives::Length;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
 use indicatif::{ProgressBar, ProgressStyle};
-use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
+use opsml_constants::UPLOAD_CHUNK_SIZE;
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;

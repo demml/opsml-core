@@ -19,7 +19,7 @@ use google_cloud_storage::http::resumable_upload_client::UploadStatus;
 use google_cloud_storage::sign::SignedURLMethod;
 use google_cloud_storage::sign::SignedURLOptions;
 use indicatif::{ProgressBar, ProgressStyle};
-use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
+use opsml_constants::UPLOAD_CHUNK_SIZE;
 use opsml_contracts::FileInfo;
 use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;

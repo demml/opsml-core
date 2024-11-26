@@ -3,18 +3,14 @@ use crate::storage::base::PathExt;
 use crate::storage::base::StorageClient;
 use crate::storage::filesystem::FileSystem;
 use async_trait::async_trait;
-
-use azure_core::date::iso8601::option;
-use azure_identity::{EnvironmentCredential, TokenCredentialOptions};
 use azure_storage::prelude::*;
 use azure_storage::shared_access_signature::account_sas::{
     AccountSasPermissions, AccountSasResourceType,
 };
-use azure_storage_blobs::container::operations::{BlobItem, BlobPrefix};
+use azure_storage_blobs::container::operations::BlobItem;
 use azure_storage_blobs::prelude::*;
 use base64::prelude::*;
 use futures::stream::StreamExt;
-use google_cloud_storage::sign;
 use indicatif::{ProgressBar, ProgressStyle};
 use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
 use opsml_contracts::FileInfo;
@@ -253,7 +249,7 @@ impl StorageClient for AzureStorageClient {
         let src_blob = container.blob_client(src);
         let dest_blob = container.blob_client(dest);
 
-        let response = dest_blob
+        let _response = dest_blob
             .copy_from_url(
                 src_blob
                     .url()
