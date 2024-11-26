@@ -225,7 +225,7 @@ impl AWSMulitPartUpload {
             .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
 
         let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE);
+        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
 
         // calculate the number of parts
         let mut chunk_count = (file_size / chunk_size) + 1;

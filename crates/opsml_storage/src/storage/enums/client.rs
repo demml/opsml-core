@@ -13,12 +13,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::storage::aws::client::{AWSMulitPartUpload, S3FStorageClient};
+use crate::storage::azure::client::{AzureFSStorageClient, AzureMultipartUpload};
 use crate::storage::gcs::client::{GCSFSStorageClient, GoogleMultipartUpload};
 
 pub enum MultiPartUploader {
     Google(GoogleMultipartUpload),
     AWS(AWSMulitPartUpload),
     Local(LocalMultiPartUpload),
+    Azure(AzureMultipartUpload),
 }
 
 impl MultiPartUploader {
@@ -29,6 +31,7 @@ impl MultiPartUploader {
             MultiPartUploader::Local(uploader) => {
                 uploader.rpath.clone().to_str().unwrap().to_string()
             }
+            MultiPartUploader::Azure(uploader) => uploader.signed_url.clone(),
         }
     }
 
@@ -37,6 +40,7 @@ impl MultiPartUploader {
             MultiPartUploader::Google(uploader) => uploader.upload_file_in_chunks(lpath).await,
             MultiPartUploader::AWS(uploader) => uploader.upload_file_in_chunks(lpath).await,
             MultiPartUploader::Local(uploader) => uploader.upload_file_in_chunks(lpath).await,
+            MultiPartUploader::Azure(uploader) => uploader.upload_file_in_chunks(lpath).await,
         }
     }
 }
@@ -46,6 +50,7 @@ pub enum StorageClientEnum {
     Google(GCSFSStorageClient),
     AWS(S3FStorageClient),
     Local(LocalFSStorageClient),
+    Azure(AzureFSStorageClient),
 }
 
 impl StorageClientEnum {
@@ -54,6 +59,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.name(),
             StorageClientEnum::AWS(client) => client.name(),
             StorageClientEnum::Local(client) => client.name(),
+            StorageClientEnum::Azure(client) => client.name(),
         }
     }
 
@@ -62,6 +68,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(_) => StorageType::Google,
             StorageClientEnum::AWS(_) => StorageType::AWS,
             StorageClientEnum::Local(_) => StorageType::Local,
+            StorageClientEnum::Azure(_) => StorageType::Azure,
         }
     }
 
@@ -82,6 +89,11 @@ impl StorageClientEnum {
                 let client = LocalFSStorageClient::new(settings).await;
                 Ok(StorageClientEnum::Local(client))
             }
+
+            StorageType::Azure => {
+                let client = AzureFSStorageClient::new(settings).await;
+                Ok(StorageClientEnum::Azure(client))
+            }
         }
     }
 
@@ -90,6 +102,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.find(path).await,
             StorageClientEnum::AWS(client) => client.find(path).await,
             StorageClientEnum::Local(client) => client.find(path).await,
+            StorageClientEnum::Azure(client) => client.find(path).await,
         }
     }
 
@@ -98,6 +111,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.find_info(path).await,
             StorageClientEnum::AWS(client) => client.find_info(path).await,
             StorageClientEnum::Local(client) => client.find_info(path).await,
+            StorageClientEnum::Azure(client) => client.find_info(path).await,
         }
     }
 
@@ -111,6 +125,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::AWS(client) => client.get(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.get(lpath, rpath, recursive).await,
+            StorageClientEnum::Azure(client) => client.get(lpath, rpath, recursive).await,
         }
     }
 
@@ -124,6 +139,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::AWS(client) => client.put(lpath, rpath, recursive).await,
             StorageClientEnum::Local(client) => client.put(lpath, rpath, recursive).await,
+            StorageClientEnum::Azure(client) => client.put(lpath, rpath, recursive).await,
         }
     }
 
@@ -132,6 +148,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::AWS(client) => client.copy(src, dest, recursive).await,
             StorageClientEnum::Local(client) => client.copy(src, dest, recursive).await,
+            StorageClientEnum::Azure(client) => client.copy(src, dest, recursive).await,
         }
     }
 
@@ -140,6 +157,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.rm(path, recursive).await,
             StorageClientEnum::AWS(client) => client.rm(path, recursive).await,
             StorageClientEnum::Local(client) => client.rm(path, recursive).await,
+            StorageClientEnum::Azure(client) => client.rm(path, recursive).await,
         }
     }
 
@@ -148,6 +166,7 @@ impl StorageClientEnum {
             StorageClientEnum::Google(client) => client.exists(path).await,
             StorageClientEnum::AWS(client) => client.exists(path).await,
             StorageClientEnum::Local(client) => client.exists(path).await,
+            StorageClientEnum::Azure(client) => client.exists(path).await,
         }
     }
 
@@ -162,6 +181,9 @@ impl StorageClientEnum {
             }
             StorageClientEnum::AWS(client) => client.generate_presigned_url(path, expiration).await,
             StorageClientEnum::Local(client) => {
+                client.generate_presigned_url(path, expiration).await
+            }
+            StorageClientEnum::Azure(client) => {
                 client.generate_presigned_url(path, expiration).await
             }
         }
@@ -182,6 +204,7 @@ impl StorageClientEnum {
                     .await
             }
             StorageClientEnum::Local(_client) => Ok(session_url),
+            StorageClientEnum::Azure(_client) => Ok(session_url),
         }
     }
 
@@ -199,6 +222,11 @@ impl StorageClientEnum {
             }
             StorageClientEnum::Local(client) => {
                 // local returns the path
+                client.create_multipart_upload(path).await
+            }
+
+            StorageClientEnum::Azure(client) => {
+                // azure returns the session uri
                 client.create_multipart_upload(path).await
             }
         }
@@ -229,6 +257,18 @@ impl StorageClientEnum {
                 let uploader = client.create_multipart_uploader(rpath, api_client).await?;
 
                 Ok(MultiPartUploader::Local(uploader))
+            }
+            StorageClientEnum::Azure(client) => {
+                let api_client = if let Some(api_client) = api_client {
+                    Some(api_client.client)
+                } else {
+                    None
+                };
+
+                let uploader = client
+                    .create_multipart_uploader(lpath, rpath, Some(session_url), api_client)
+                    .await?;
+                Ok(MultiPartUploader::Azure(uploader))
             }
         }
     }

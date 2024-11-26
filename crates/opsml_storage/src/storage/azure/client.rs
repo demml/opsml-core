@@ -1,5 +1,9 @@
+use crate::storage::base::get_files;
+use crate::storage::base::PathExt;
 use crate::storage::base::StorageClient;
+use crate::storage::filesystem::FileSystem;
 use async_trait::async_trait;
+
 use azure_core::date::iso8601::option;
 use azure_identity::{EnvironmentCredential, TokenCredentialOptions};
 use azure_storage::prelude::*;
@@ -8,16 +12,24 @@ use azure_storage::shared_access_signature::account_sas::{
 };
 use azure_storage_blobs::container::operations::{BlobItem, BlobPrefix};
 use azure_storage_blobs::prelude::*;
+use base64::prelude::*;
 use futures::stream::StreamExt;
+use google_cloud_storage::sign;
+use indicatif::{ProgressBar, ProgressStyle};
 use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
 use opsml_contracts::FileInfo;
+use opsml_contracts::UploadPartArgs;
 use opsml_error::error::StorageError;
 use opsml_settings::config::OpsmlStorageSettings;
 use opsml_settings::config::StorageType;
+use opsml_utils::color::LogColors;
+use reqwest::Client as HttpClient;
 use std::env;
 use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use time::{Duration, OffsetDateTime};
 
 pub struct AzureCreds {
@@ -38,6 +50,165 @@ impl AzureCreds {
         let creds = StorageCredentials::token_credential(credential);
 
         Ok(Self { account, creds })
+    }
+}
+
+pub struct AzureMultipartUpload {
+    pub client: HttpClient,
+    pub signed_url: String,
+    pub block_parts: Vec<BlobBlockType>,
+    file_reader: BufReader<File>,
+}
+
+impl AzureMultipartUpload {
+    pub async fn new(
+        signed_url: &str,
+        client: Option<HttpClient>,
+        path: &str,
+    ) -> Result<Self, StorageError> {
+        let file = File::open(path)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+        let file_reader = BufReader::new(file);
+
+        let client = match client {
+            Some(client) => client,
+            None => HttpClient::new(),
+        };
+
+        Ok(Self {
+            client,
+            signed_url: signed_url.to_string(),
+            block_parts: Vec::new(),
+            file_reader,
+        })
+    }
+
+    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
+
+        // calculate the number of parts
+        let mut chunk_count = (file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = file_size % chunk_size;
+
+        // if the last chunk is empty, reduce the number of parts
+        if size_of_last_chunk == 0 {
+            size_of_last_chunk = chunk_size;
+            chunk_count -= 1;
+        }
+
+        let bar = ProgressBar::new(chunk_count);
+
+        let msg1 = LogColors::green("Uploading file:");
+        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg = format!("{} {}", msg1, msg2);
+
+        let template = format!(
+            "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
+            msg
+        );
+
+        let style = ProgressStyle::with_template(&template)
+            .unwrap()
+            .progress_chars("#--");
+        bar.set_style(style);
+
+        for chunk_index in 0..chunk_count {
+            let this_chunk = if chunk_count - 1 == chunk_index {
+                size_of_last_chunk
+            } else {
+                chunk_size
+            };
+
+            let upload_args = UploadPartArgs {
+                file_size,
+                presigned_url: None,
+                chunk_size: chunk_size as u64,
+                chunk_index,
+                this_chunk_size: this_chunk as u64,
+            };
+
+            self.upload_next_chunk(&upload_args).await?;
+
+            bar.inc(1);
+        } // extract the range from the result and update the first_byte and last_byte
+
+        self.complete_upload().await?;
+        bar.finish_with_message("Upload complete");
+
+        Ok(())
+
+        // check if enum is Ok
+    }
+
+    pub async fn upload_block(&self, block_id: &str, data: &[u8]) -> Result<(), StorageError> {
+        let url = format!(
+            "{}&comp=block&blockid={}",
+            self.signed_url,
+            BASE64_STANDARD.encode(block_id)
+        );
+
+        self.client
+            .put(&url)
+            .body(data.to_vec())
+            .send()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to upload block: {:?}", e)))?;
+
+        Ok(())
+    }
+
+    pub async fn upload_next_chunk(
+        &mut self,
+        upload_args: &UploadPartArgs,
+    ) -> Result<(), StorageError> {
+        let mut buffer = vec![0; upload_args.this_chunk_size as usize];
+        let bytes_read = self
+            .file_reader
+            .read(&mut buffer)
+            .map_err(|e| StorageError::Error(format!("Failed to read file: {}", e)))?;
+
+        buffer.truncate(bytes_read);
+
+        let block_id = format!("{:06}", upload_args.chunk_index);
+
+        self.upload_block(&block_id, &buffer).await.map_err(|e| {
+            StorageError::Error(format!(
+                "Unable to upload multiple chunks to resumable upload: {}",
+                e
+            ))
+        })?;
+
+        let block_id = BlockId::new(block_id);
+        self.block_parts.push(BlobBlockType::Uncommitted(block_id));
+
+        Ok(())
+    }
+
+    pub async fn complete_upload(&self) -> Result<(), StorageError> {
+        let url = format!("{}&comp=blocklist", self.signed_url);
+        let block_list = BlockList {
+            blocks: self.block_parts.clone(),
+        };
+
+        let block_xml = block_list.to_xml();
+
+        self.client
+            .put(&url)
+            .header("Content-Type", "application/xml")
+            .body(block_xml)
+            .send()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to commit block list: {:?}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -75,6 +246,40 @@ impl StorageClient for AzureStorageClient {
             .to_string();
 
         Ok(Self { client, bucket })
+    }
+
+    async fn copy_object(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+        let container = self.client.container_client(self.bucket.as_str());
+        let src_blob = container.blob_client(src);
+        let dest_blob = container.blob_client(dest);
+
+        let response = dest_blob
+            .copy_from_url(
+                src_blob
+                    .url()
+                    .map_err(|e| StorageError::Error(format!("Error: {}", e)))?,
+            )
+            .await
+            .map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+
+        Ok(true)
+    }
+
+    async fn copy_objects(&self, src: &str, dest: &str) -> Result<bool, StorageError> {
+        let objects = self.find(src).await?;
+        let dest = Path::new(dest);
+        let src = PathBuf::from(src);
+
+        for obj in objects {
+            let file_path = Path::new(obj.as_str());
+            let relative_path = file_path.relative_path(&src)?;
+            let remote_path = dest.join(relative_path);
+
+            self.copy_object(file_path.to_str().unwrap(), remote_path.to_str().unwrap())
+                .await?;
+        }
+
+        Ok(true)
     }
 
     async fn get_object(&self, lpath: &str, rpath: &str) -> Result<(), StorageError> {
@@ -218,5 +423,248 @@ impl StorageClient for AzureStorageClient {
         }
 
         Ok(results)
+    }
+
+    async fn delete_object(&self, path: &str) -> Result<bool, StorageError> {
+        let container = self.client.container_client(self.bucket.as_str());
+        let blob = container.blob_client(path);
+
+        let response = blob
+            .delete()
+            .await
+            .map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+
+        Ok(response.delete_type_permanent)
+    }
+
+    async fn delete_objects(&self, path: &str) -> Result<bool, StorageError> {
+        let objects = self.find(path).await?;
+
+        for obj in objects {
+            self.delete_object(obj.as_str()).await?;
+        }
+
+        Ok(true)
+    }
+}
+
+impl AzureStorageClient {
+    async fn generate_presigned_url_for_block_upload(
+        &self,
+        path: &str,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let container = self.client.container_client(self.bucket.as_str());
+        let blob = container.blob_client(path);
+
+        let expiry = OffsetDateTime::now_utc() + Duration::seconds(expiration as i64);
+        let permissions = AccountSasPermissions {
+            write: true,
+            create: true,
+            ..Default::default()
+        };
+        let signature = self
+            .client
+            .shared_access_signature(AccountSasResourceType::Object, expiry, permissions)
+            .await
+            .map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+
+        let url = blob
+            .generate_signed_blob_url(&signature)
+            .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+        Ok(url.to_string())
+    }
+}
+
+#[derive(Clone)]
+pub struct AzureFSStorageClient {
+    client: AzureStorageClient,
+}
+
+#[async_trait]
+impl FileSystem for AzureFSStorageClient {
+    fn name(&self) -> &str {
+        "AzureFSStorageClient"
+    }
+
+    fn storage_type(&self) -> StorageType {
+        StorageType::Local
+    }
+
+    async fn new(settings: &OpsmlStorageSettings) -> Self {
+        let client = AzureStorageClient::new(settings).await.unwrap();
+        Self { client }
+    }
+
+    async fn find(&self, path: &Path) -> Result<Vec<String>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn find_info(&self, path: &Path) -> Result<Vec<FileInfo>, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client.find_info(stripped_path.to_str().unwrap()).await
+    }
+
+    async fn get(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        // strip the paths
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+
+        if recursive {
+            let stripped_lpath_clone = stripped_lpath.clone();
+
+            // list all objects in the path
+            let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
+
+            // iterate over each object and get it
+            for obj in objects {
+                let file_path = Path::new(obj.as_str());
+                let stripped_path = file_path.strip_path(self.client.bucket().await);
+                let relative_path = file_path.relative_path(&stripped_rpath)?;
+                let local_path = stripped_lpath_clone.join(relative_path);
+
+                self.client
+                    .get_object(
+                        local_path.to_str().unwrap(),
+                        stripped_path.to_str().unwrap(),
+                    )
+                    .await?;
+            }
+        } else {
+            self.client
+                .get_object(
+                    stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn copy(&self, src: &Path, dest: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_src = src.strip_path(self.client.bucket().await);
+        let stripped_dest = dest.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .copy_objects(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        } else {
+            self.client
+                .copy_object(
+                    stripped_src.to_str().unwrap(),
+                    stripped_dest.to_str().unwrap(),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn rm(&self, path: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+
+        if recursive {
+            self.client
+                .delete_objects(stripped_path.to_str().unwrap())
+                .await?;
+        } else {
+            self.client
+                .delete_object(stripped_path.to_str().unwrap())
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn exists(&self, path: &Path) -> Result<bool, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        let objects = self.client.find(stripped_path.to_str().unwrap()).await?;
+
+        Ok(!objects.is_empty())
+    }
+
+    async fn generate_presigned_url(
+        &self,
+        path: &Path,
+        expiration: u64,
+    ) -> Result<String, StorageError> {
+        let stripped_path = path.strip_path(self.client.bucket().await);
+        self.client
+            .generate_presigned_url(stripped_path.to_str().unwrap(), expiration)
+            .await
+    }
+
+    async fn put(&self, lpath: &Path, rpath: &Path, recursive: bool) -> Result<(), StorageError> {
+        let stripped_lpath = lpath.strip_path(self.client.bucket().await);
+        let stripped_rpath = rpath.strip_path(self.client.bucket().await);
+
+        if recursive {
+            if !stripped_lpath.is_dir() {
+                return Err(StorageError::Error(
+                    "Local path must be a directory for recursive put".to_string(),
+                ));
+            }
+
+            let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
+
+            for file in files {
+                let stripped_lpath_clone = stripped_lpath.clone();
+                let stripped_rpath_clone = stripped_rpath.clone();
+                let stripped_file_path = file.strip_path(self.client.bucket().await);
+
+                let relative_path = file.relative_path(&stripped_lpath_clone)?;
+                let remote_path = stripped_rpath_clone.join(relative_path);
+
+                let mut uploader = self
+                    .create_multipart_uploader(&stripped_lpath_clone, &remote_path, None, None)
+                    .await?;
+
+                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+            }
+
+            Ok(())
+        } else {
+            let mut uploader = self
+                .create_multipart_uploader(&stripped_lpath, &stripped_rpath, None, None)
+                .await?;
+
+            uploader.upload_file_in_chunks(&stripped_lpath).await?;
+            Ok(())
+        }
+    }
+}
+
+impl AzureFSStorageClient {
+    pub async fn create_multipart_uploader(
+        &self,
+        lpath: &Path,
+        rpath: &Path,
+        session_url: Option<String>,
+        api_client: Option<HttpClient>,
+    ) -> Result<AzureMultipartUpload, StorageError> {
+        let signed_url = match session_url {
+            Some(url) => url,
+            None => {
+                self.client
+                    .generate_presigned_url_for_block_upload(rpath.to_str().unwrap(), 600)
+                    .await?
+            }
+        };
+
+        AzureMultipartUpload::new(&signed_url, api_client, lpath.to_str().unwrap()).await
+    }
+
+    pub async fn create_multipart_upload(&self, rpath: &Path) -> Result<String, StorageError> {
+        Ok(self
+            .client
+            .generate_presigned_url_for_block_upload(rpath.to_str().unwrap(), 600)
+            .await?)
     }
 }

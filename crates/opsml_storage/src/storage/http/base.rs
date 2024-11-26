@@ -2,6 +2,7 @@ use crate::storage::enums::client::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use bytes::BytesMut;
 use indicatif::{ProgressBar, ProgressStyle};
+use opsml_constants::DOWNLOAD_CHUNK_SIZE;
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
 };
@@ -77,7 +78,7 @@ pub fn build_http_client(settings: &ApiSettings) -> Result<Client, ApiError> {
 
 #[derive(Debug, Clone)]
 pub struct OpsmlApiClient {
-    client: Client,
+    pub client: Client,
     settings: OpsmlStorageSettings,
     base_path: String,
 }
