@@ -6,9 +6,11 @@ use azure_storage::prelude::*;
 use azure_storage::shared_access_signature::account_sas::{
     AccountSasPermissions, AccountSasResourceType,
 };
+use azure_storage_blobs::container::operations::{BlobItem, BlobPrefix};
 use azure_storage_blobs::prelude::*;
 use futures::stream::StreamExt;
 use opsml_constants::{DOWNLOAD_CHUNK_SIZE, UPLOAD_CHUNK_SIZE};
+use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
 use opsml_settings::config::OpsmlStorageSettings;
 use opsml_settings::config::StorageType;
@@ -16,7 +18,7 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
 
 pub struct AzureCreds {
     pub account: String,
@@ -133,7 +135,7 @@ impl StorageClient for AzureStorageClient {
         let container = self.client.container_client(self.bucket.as_str());
         let blob = container.blob_client(path);
 
-        let expiry = OffsetDateTime::now_utc() + expiration;
+        let expiry = OffsetDateTime::now_utc() + Duration::seconds(expiration as i64);
         let permissions = AccountSasPermissions {
             read: true,
             write: false,
@@ -155,5 +157,66 @@ impl StorageClient for AzureStorageClient {
             .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
 
         Ok(url.to_string())
+    }
+
+    async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+        let container = self.client.container_client(self.bucket.as_str());
+        let mut results = Vec::new();
+
+        let rpath = path.to_string();
+        let mut stream = container.list_blobs().prefix(rpath).into_stream();
+
+        while let Some(value) = stream.next().await {
+            let value = value.map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+            let blobs = value.blobs.items;
+            // iterate over the blobs and match to enum
+            for blob in blobs {
+                match blob {
+                    BlobItem::Blob(blob) => {
+                        results.push(blob.name);
+                    }
+                    BlobItem::BlobPrefix(_prefix) => {
+                        // pass
+                    }
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn find_info(&self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
+        let container = self.client.container_client(self.bucket.as_str());
+        let mut results = Vec::new();
+
+        let rpath = path.to_string();
+        let mut stream = container.list_blobs().prefix(rpath).into_stream();
+
+        while let Some(value) = stream.next().await {
+            let value = value.map_err(|e| StorageError::Error(format!("Error: {}", e)))?;
+            let blobs = value.blobs.items;
+            // iterate over the blobs and match to enum
+            for blob in blobs {
+                match blob {
+                    BlobItem::Blob(blob) => {
+                        let name = blob.name;
+                        let suffix = name.split('.').last().unwrap().to_string();
+                        let info = FileInfo {
+                            name,
+                            size: blob.properties.content_length as i64,
+                            created: blob.properties.creation_time.to_string(),
+                            object_type: "file".to_string(),
+                            suffix,
+                        };
+                        results.push(info);
+                    }
+                    BlobItem::BlobPrefix(_prefix) => {
+                        // pass
+                    }
+                }
+            }
+        }
+
+        Ok(results)
     }
 }
