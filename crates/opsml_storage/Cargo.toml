@@ -3,11 +3,6 @@ name = "opsml-storage"
 version = { workspace = true }
 edition = { workspace = true }
 repository = { workspace = true }
-
-authors = [
-  "Steven Forrester <sjforrester32@gmail.com>"
-]
-
 license = "MIT"
 description = "Core rust library for the opsml project"
 
@@ -51,6 +46,3 @@ rand = "0.8.5"
 reqwest_mock = "0.*"
 tempfile = "3.*"
 uuid = { version = "1.11.0", features = ["v4"] }
-
-[profile.release]
-workspace = true

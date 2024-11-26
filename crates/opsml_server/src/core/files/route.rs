@@ -3,10 +3,10 @@ use crate::core::files::schema::{
     DeleteFileQuery, DownloadFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery,
 };
 use crate::core::state::AppState;
-use axum::extract::{Path as AxumPath, Request};
+use axum::extract::DefaultBodyLimit;
+use axum::extract::Multipart;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::BoxError;
 use axum::{
     body::Body,
     routing::{delete, get, post},
@@ -17,19 +17,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use bytes::Bytes;
-use futures::{Stream, TryStreamExt};
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
 use opsml_settings::config::StorageType;
-use std::io;
-use std::path::{Path, PathBuf};
-use tokio_util::io::StreamReader;
 
 use tokio::fs::File;
-use tokio::io::BufWriter;
+use tokio::io::AsyncWriteExt;
 use tokio_util::io::ReaderStream;
 
 use anyhow::{Context, Result};
@@ -38,6 +33,7 @@ use opsml_error::error::ServerError;
 /// Route for debugging information
 use serde_json::json;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -129,60 +125,28 @@ pub async fn generate_presigned_url(
 }
 
 // this is for local storage only
-async fn stream_to_file<S, E>(path: &str, stream: S) -> Result<(), (StatusCode, String)>
-where
-    S: Stream<Item = Result<Bytes, E>>,
-    E: Into<BoxError>,
-{
-    async {
-        let path = Path::new(path);
+pub async fn upload_multipart(
+    State(state): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Result<Json<UploadResponse>, (StatusCode, Json<serde_json::Value>)> {
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let file_name = field.file_name().unwrap().to_string();
+        let data = field.bytes().await.unwrap();
+        let bucket = state.config.opsml_storage_uri.clone();
 
-        // create the file parents if they don't exist
-        if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-                .unwrap();
+        // join the bucket and the file name
+        let rpath = Path::new(&bucket).join(&file_name);
+
+        // create the directory if it doesn't exist
+        if let Some(parent) = rpath.parent() {
+            tokio::fs::create_dir_all(parent).await.unwrap();
         }
 
-        // Convert the stream into an `AsyncRead`.
-        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
-        let body_reader = StreamReader::new(body_with_io_error);
-        futures::pin_mut!(body_reader);
-
-        // Create the file. `File` implements `AsyncWrite`.
-        let mut file = BufWriter::new(File::create(path).await?);
-
-        // Copy the body into the file.
-        tokio::io::copy(&mut body_reader, &mut file).await?;
-
-        Ok::<_, io::Error>(())
+        let mut file = File::create(rpath).await.unwrap();
+        file.write_all(&data).await.unwrap();
     }
-    .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
-}
 
-// Handler that streams the request body to a file.
-//
-// POST'ing to `/file/foo.txt` will create a file called `foo.txt`.
-async fn save_request_body(request: Request) -> Result<(), (StatusCode, String)> {
-    // get filename header
-    let headers = request.headers().clone();
-    let file_name = headers
-        .get("File-Name")
-        .ok_or((StatusCode::BAD_REQUEST, "Missing filename header"));
-
-    let filename = match file_name {
-        Ok(file_name) => file_name.to_str().unwrap(),
-        Err(e) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Missing filename header".to_string(),
-            ))
-        }
-    };
-
-    stream_to_file(filename, request.into_body().into_data_stream()).await
+    Ok(Json(UploadResponse { uploaded: true }))
 }
 
 pub async fn list_files(
@@ -285,7 +249,13 @@ pub async fn download_file(
             .into_response();
     }
 
-    let file = match File::open(&params.path).await {
+    // need to join the bucket and the file name
+
+    let path = Path::new(&params.path);
+    let bucket = state.config.opsml_storage_uri.clone();
+    let rpath = Path::new(&bucket).join(path);
+
+    let file = match File::open(&rpath).await {
         Ok(file) => file,
         Err(e) => {
             error!("Failed to open file: {}", e);
@@ -310,7 +280,10 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
                 &format!("{}/files/multipart", prefix),
                 get(create_multipart_upload),
             )
-            .route(&format!("{}/files", prefix), post(save_request_body))
+            .route(
+                &format!("{}/files/multipart", prefix),
+                post(upload_multipart).layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
+            )
             .route(
                 &format!("{}/files/presigned", prefix),
                 get(generate_presigned_url),

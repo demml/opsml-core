@@ -121,6 +121,7 @@ impl HttpFSStorageClient {
             }
 
             let files: Vec<PathBuf> = get_files(lpath)?;
+
             let mut tasks = Vec::new();
 
             for file in files {
@@ -140,9 +141,9 @@ impl HttpFSStorageClient {
                     uploader.upload_file_in_chunks(&stripped_file_path).await?;
                     Ok::<(), StorageError>(())
                 });
-
                 tasks.push(task);
             }
+
             let results = futures::future::join_all(tasks).await;
 
             for result in results {

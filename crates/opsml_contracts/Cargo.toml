@@ -3,23 +3,15 @@ name = "opsml-contracts"
 version = { workspace = true }
 edition = { workspace = true }
 repository = { workspace = true }
+license = "MIT"
+description = "Server and client contracts for the opsml"
+
 
 [lib]
 doctest = false
-
-authors = [
-  "Steven Forrester <sjforrester32@gmail.com>"
-]
-
-license = "MIT"
-description = "Server and client contracts for the opsml"
 
 [dependencies]
 opsml-settings = { workspace = true }
 opsml-utils = { workspace = true }
 pyo3 = { workspace = true }
 serde = { workspace = true }
-
-
-[profile.release]
-workspace = true

@@ -3,7 +3,6 @@ use crate::storage::base::PathExt;
 use crate::storage::base::StorageClient;
 use crate::storage::filesystem::FileSystem;
 use crate::storage::http::base::OpsmlApiClient;
-use crate::storage::http::base::{RequestType, Routes};
 use async_trait::async_trait;
 use futures_util::stream::Stream;
 use futures_util::task::{Context, Poll};
@@ -14,9 +13,7 @@ use opsml_error::error::StorageError;
 use opsml_settings::config::{OpsmlStorageSettings, StorageType};
 use opsml_utils::color::LogColors;
 use pyo3::prelude::*;
-use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::multipart::{Form, Part};
-use std::collections::HashMap;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -32,6 +29,35 @@ use walkdir::WalkDir;
 // - method for creating resumable upload
 // - method for creating uploader from resumable upload
 // - method for uploading part (special handling for local storage, or do we just use the same method?)
+
+struct ProgressStream<R> {
+    inner: ReaderStream<R>,
+    progress_bar: ProgressBar,
+}
+
+impl<R: AsyncRead + Unpin> ProgressStream<R> {
+    fn new(reader: R, progress_bar: ProgressBar) -> Self {
+        Self {
+            inner: ReaderStream::new(reader),
+            progress_bar,
+        }
+    }
+}
+
+impl<R: AsyncRead + Unpin> Stream for ProgressStream<R> {
+    type Item = Result<bytes::Bytes, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.inner).poll_next(cx) {
+            Poll::Ready(Some(Ok(bytes))) => {
+                this.progress_bar.inc(bytes.len() as u64);
+                Poll::Ready(Some(Ok(bytes)))
+            }
+            other => other,
+        }
+    }
+}
 
 pub struct LocalMultiPartUpload {
     pub rpath: PathBuf,
@@ -79,25 +105,41 @@ impl LocalMultiPartUpload {
                 .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?
                 .len();
 
-            let stream = ReaderStream::new(file);
-            let body = reqwest::Body::wrap_stream(stream);
-            let mut headers = reqwest::header::HeaderMap::new();
-
-            headers.insert(
-                "Content-Type",
-                HeaderValue::from_static("application/octet-stream"),
+            let bar = ProgressBar::new(file_size);
+            let msg1 = LogColors::green("Uploading file:");
+            let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+            let msg = format!("{} {}", msg1, msg2);
+            let template = format!(
+                "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
+                msg
             );
-            headers.insert("Content-Length", HeaderValue::from(file_size));
-            headers.insert(
-                "File-Name",
-                HeaderValue::from_str(self.rpath.to_str().unwrap()).unwrap(),
-            );
+            let style = ProgressStyle::with_template(&template)
+                .unwrap()
+                .progress_chars("#--");
+            bar.set_style(style);
 
-            let response = client.multipart_upload(body, headers).await.map_err(|e| {
-                StorageError::Error(format!("Failed to upload file in chunks: {}", e))
-            })?;
+            let stream = ProgressStream::new(file, bar.clone());
 
-            let response = serde_json::from_value::<UploadResponse>(response)
+            let part = Part::stream(reqwest::Body::wrap_stream(stream))
+                .file_name(lpath.to_str().unwrap().to_string())
+                .mime_str("application/octet-stream")
+                .map_err(|e| StorageError::Error(format!("Failed to create part: {}", e)))?;
+
+            let form = Form::new().part("file", part);
+
+            let response = client
+                .multipart_upload(form)
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to upload part: {}", e)))?;
+
+            bar.finish_with_message("Upload complete");
+
+            let value = response
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
+            let response = serde_json::from_value::<UploadResponse>(value)
                 .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
 
             if !response.uploaded {
@@ -233,8 +275,17 @@ impl StorageClient for LocalStorageClient {
                     .unwrap()
                     .as_secs()
                     .to_string();
+
+                let path = entry.path().to_str().unwrap().to_string();
+                let path = path
+                    .strip_prefix(self.bucket.to_str().unwrap())
+                    .unwrap_or(&path)
+                    .strip_prefix("/")
+                    .unwrap_or(&path)
+                    .to_string();
+
                 let file_info = FileInfo {
-                    name: entry.file_name().to_str().unwrap().to_string(),
+                    name: path,
                     size: metadata.len() as i64,
                     object_type: "file".to_string(),
                     created,

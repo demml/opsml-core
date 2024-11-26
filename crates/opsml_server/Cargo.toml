@@ -3,13 +3,8 @@ name = "opsml-server"
 version = { workspace = true }
 edition = { workspace = true }
 repository = { workspace = true }
-
-authors = [
-  "Steven Forrester <sjforrester32@gmail.com>"
-]
-
+description = "Server for OpsML"
 license = "MIT"
-description = "Core rust library for the opsml project"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -37,6 +32,3 @@ mockall = "0.*"
 mockito = "1.*"
 rand = "0.8.5"
 tower = { version = "0.4.13", features = ["util"] }
-
-[profile.release]
-workspace = true

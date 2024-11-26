@@ -11,11 +11,11 @@ use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
 use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
+use reqwest::Response;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
 };
-use reqwest::{Body, Response};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
@@ -243,20 +243,15 @@ impl OpsmlApiClient {
     }
 
     // specific method for multipart uploads (mainly used for localstorageclient)
-    pub async fn multipart_upload(self, body: Body, headers: HeaderMap) -> Result<Value, ApiError> {
+    pub async fn multipart_upload(self, form: Form) -> Result<Response, ApiError> {
         let response = self
             .client
-            .post(format!("{}/files", self.base_path))
+            .post(format!("{}/files/multipart", self.base_path))
+            .multipart(form)
             .bearer_auth(self.settings.api_settings.auth_token)
-            .headers(headers)
-            .body(body)
             .send()
             .await
-            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
-            .json::<Value>()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
-
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?;
         Ok(response)
     }
 
@@ -425,6 +420,7 @@ impl HttpStorageClient {
     ) -> Result<(), StorageError> {
         // check if local path exists, create it if it doesn't
         let local_path = Path::new(local_path);
+
         if !local_path.exists() {
             std::fs::create_dir_all(local_path.parent().unwrap())
                 .map_err(|e| StorageError::Error(format!("Failed to create directory: {}", e)))?;
@@ -454,11 +450,6 @@ impl HttpStorageClient {
         // generate presigned url for downloading the object
         let presigned_url = self.generate_presigned_url(remote_path).await?;
 
-        // if storage clients are gcs, aws and azure, use presigned url to download the object
-        // If local storage client, download the object from api route
-        let url = reqwest::Url::parse(&presigned_url)
-            .map_err(|e| StorageError::Error(format!("Invalid presigned URL: {}", e)))?;
-
         // download the object
         let mut response = if self.storage_type == StorageType::Local {
             let mut query_parms = HashMap::new();
@@ -475,6 +466,11 @@ impl HttpStorageClient {
                 .await
                 .map_err(|e| StorageError::Error(format!("Failed to get file: {}", e)))?
         } else {
+            // if storage clients are gcs, aws and azure, use presigned url to download the object
+            // If local storage client, download the object from api route
+            let url = reqwest::Url::parse(&presigned_url)
+                .map_err(|e| StorageError::Error(format!("Invalid presigned URL: {}", e)))?;
+
             self.api_client.client.get(url).send().await.unwrap()
         };
 

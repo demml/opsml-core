@@ -385,7 +385,7 @@ mod tests {
         dir_name
     }
 
-    fn create_single_file(chunk_size: &u64) -> String {
+    fn _create_single_file(chunk_size: &u64) -> String {
         let rand_name = uuid::Uuid::new_v4().to_string();
 
         // create a temporary directory
@@ -517,21 +517,37 @@ mod tests {
         // list all files
         let files = client.find(rpath).await.unwrap();
         assert_eq!(files.len(), 2);
-
-        // list files with info
+        //
+        //// list files with info
         let files = client.find_info(rpath).await.unwrap();
         assert_eq!(files.len(), 2);
-
-        // download the files
+        //
+        //// download the files
         let new_path = uuid::Uuid::new_v4().to_string();
         let new_path = Path::new(&new_path);
 
         client.get(new_path, rpath, true).await.unwrap();
 
-        // cleanup
+        // check if the local file exists
+        let meta = std::fs::metadata(new_path).unwrap();
+        assert!(meta.is_dir());
+
+        // check number of files in the directory
+        let files = std::fs::read_dir(new_path).unwrap();
+        assert_eq!(files.count(), 2);
+
+        //// cleanup
         std::fs::remove_dir_all(&dirname).unwrap();
         std::fs::remove_dir_all(new_path).unwrap();
 
         client.rm(rpath, true).await.unwrap();
+
+        // get parent of current directory
+
+        let current_dir = std::env::current_dir().unwrap();
+
+        // opsml_registries is 2 directories up
+        let path = current_dir.join("../../opsml_registries");
+        std::fs::remove_dir_all(&path).unwrap();
     }
 }

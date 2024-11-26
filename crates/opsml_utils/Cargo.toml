@@ -7,13 +7,6 @@ repository = { workspace = true }
 [lib]
 doctest = false
 
-authors = [
-  "Steven Forrester <sjforrester32@gmail.com>"
-]
-
-license = "MIT"
-description = "Core rust library for the opsml project"
-
 [dependencies]
 opsml-error = { workspace = true }
 
@@ -22,7 +15,3 @@ colored_json = { workspace = true}
 pyo3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-
-[profile.release]
-workspace = true
