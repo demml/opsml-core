@@ -15,6 +15,7 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
 };
+use reqwest::{Body, Response};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
@@ -141,7 +142,7 @@ impl OpsmlApiClient {
         body_params: Option<Value>,
         query_params: HashMap<String, String>,
         headers: Option<HeaderMap>,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<Response, ApiError> {
         let headers = headers.unwrap_or_default();
 
         let url = format!("{}/{}", self.base_path, route.as_str());
@@ -192,11 +193,6 @@ impl OpsmlApiClient {
                 })?,
         };
 
-        let response = response
-            .json::<Value>()
-            .await
-            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
-
         Ok(response)
     }
 
@@ -207,11 +203,11 @@ impl OpsmlApiClient {
         body_params: Option<Value>,
         query_params: Option<HashMap<String, String>>,
         headers: Option<HeaderMap>,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<Response, ApiError> {
         // this will attempt to send a request. If the request fails, it will refresh the token and try again. If it fails all 3 times it will return an error
         let mut attempts = 0;
         let max_attempts = 3;
-        let mut response: Result<Value, ApiError>;
+        let mut response: Result<Response, ApiError>;
 
         let query_params = query_params.unwrap_or_default();
 
@@ -247,12 +243,13 @@ impl OpsmlApiClient {
     }
 
     // specific method for multipart uploads (mainly used for localstorageclient)
-    pub async fn multipart_upload(self, form: Form) -> Result<Value, ApiError> {
+    pub async fn multipart_upload(self, body: Body, headers: HeaderMap) -> Result<Value, ApiError> {
         let response = self
             .client
-            .post(format!("{}/files/multipart", self.base_path))
-            .multipart(form)
+            .post(format!("{}/files", self.base_path))
             .bearer_auth(self.settings.api_settings.auth_token)
+            .headers(headers)
+            .body(body)
             .send()
             .await
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
@@ -286,6 +283,12 @@ impl OpsmlApiClient {
             )
             .await
             .map_err(|e| ApiError::Error(format!("Failed to generate presigned url: {}", e)))?;
+
+        // move response into PresignedUrl
+        let response = response
+            .json::<Value>()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
         let response = serde_json::from_value::<PresignedUrl>(response)
             .map_err(|e| ApiError::Error(format!("Failed to deserialize response: {}", e)))?;
@@ -347,24 +350,25 @@ impl HttpStorageClient {
     /// # Returns
     ///
     /// * `StorageType` - The storage type
-    async fn get_storage_setting(client: &mut OpsmlApiClient) -> Result<StorageType, ApiError> {
+    async fn get_storage_setting(client: &mut OpsmlApiClient) -> Result<StorageType, StorageError> {
         let response = client
             .request_with_retry(Routes::StorageSettings, RequestType::Get, None, None, None)
             .await
             .map_err(|e| {
-                ApiError::Error(LogColors::alert(&format!(
+                StorageError::Error(LogColors::alert(&format!(
                     "Failed to get storage settings: {}",
                     e
                 )))
             })?;
 
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
         // convert Value to Vec<String>
-        let settings = serde_json::from_value::<StorageSettings>(response).map_err(|e| {
-            ApiError::Error(LogColors::alert(&format!(
-                "Failed to deserialize response: {}",
-                e
-            )))
-        })?;
+        let settings = serde_json::from_value::<StorageSettings>(val)
+            .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(settings.storage_type)
     }
@@ -380,8 +384,13 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
         // convert Value to Vec<String>
-        let response = serde_json::from_value::<ListFileResponse>(response)
+        let response = serde_json::from_value::<ListFileResponse>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(response.files)
@@ -397,9 +406,12 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
-        // convert Value to Vec<FileInfo>
-        // convert Value to Vec<String>
-        let response = serde_json::from_value::<ListFileInfoResponse>(response)
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
+        let response = serde_json::from_value::<ListFileInfoResponse>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(response.files)
@@ -442,11 +454,29 @@ impl HttpStorageClient {
         // generate presigned url for downloading the object
         let presigned_url = self.generate_presigned_url(remote_path).await?;
 
+        // if storage clients are gcs, aws and azure, use presigned url to download the object
+        // If local storage client, download the object from api route
         let url = reqwest::Url::parse(&presigned_url)
             .map_err(|e| StorageError::Error(format!("Invalid presigned URL: {}", e)))?;
 
         // download the object
-        let mut response = self.api_client.client.get(url).send().await.unwrap();
+        let mut response = if self.storage_type == StorageType::Local {
+            let mut query_parms = HashMap::new();
+            query_parms.insert("path".to_string(), remote_path.to_string());
+
+            self.api_client
+                .request_with_retry(
+                    Routes::Files,
+                    RequestType::Get,
+                    None,
+                    Some(query_parms),
+                    None,
+                )
+                .await
+                .map_err(|e| StorageError::Error(format!("Failed to get file: {}", e)))?
+        } else {
+            self.api_client.client.get(url).send().await.unwrap()
+        };
 
         // create buffer to store downloaded data
         let mut buffer = BytesMut::with_capacity(DOWNLOAD_CHUNK_SIZE);
@@ -494,8 +524,13 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
         // load DeleteFileResponse from response
-        let response = serde_json::from_value::<DeleteFileResponse>(response)
+        let response = serde_json::from_value::<DeleteFileResponse>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(response.deleted)
@@ -518,7 +553,12 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to delete file: {}", e)))?;
 
-        let response = serde_json::from_value::<DeleteFileResponse>(response)
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
+        let response = serde_json::from_value::<DeleteFileResponse>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(response.deleted)
@@ -543,8 +583,12 @@ impl HttpStorageClient {
             })?;
 
         // deserialize response into MultiPartSession
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
 
-        let session = serde_json::from_value::<MultiPartSession>(response)
+        let session = serde_json::from_value::<MultiPartSession>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         let session_url = session.session_url;
@@ -586,7 +630,12 @@ impl HttpStorageClient {
             .await
             .map_err(|e| StorageError::Error(format!("Failed to generate presigned url: {}", e)))?;
 
-        let response = serde_json::from_value::<PresignedUrl>(response)
+        let val = response
+            .json::<Value>()
+            .await
+            .map_err(|e| StorageError::Error(format!("Failed to parse response: {}", e)))?;
+
+        let response = serde_json::from_value::<PresignedUrl>(val)
             .map_err(|e| StorageError::Error(format!("Failed to deserialize response: {}", e)))?;
 
         Ok(response.url)
@@ -636,7 +685,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response["status"], "ok");
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -667,7 +716,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response["status"], "authenticated");
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -698,7 +747,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response["status"], "success");
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -773,7 +822,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response["status"], "success_after_refresh");
+        assert_eq!(response.status(), 200);
 
         _first_attempt_mock.assert();
         _second_attempt_mock.assert();

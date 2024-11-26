@@ -42,3 +42,8 @@ pub struct DeleteFileQuery {
     pub path: String,
     pub recursive: bool,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct DownloadFileQuery {
+    pub path: String,
+}

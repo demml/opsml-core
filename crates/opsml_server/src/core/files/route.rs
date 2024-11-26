@@ -1,29 +1,43 @@
 use crate::core::error::internal_server_error;
-use crate::core::files::schema::{DeleteFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery};
+use crate::core::files::schema::{
+    DeleteFileQuery, DownloadFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery,
+};
 use crate::core::state::AppState;
-use axum::extract::Multipart;
+use axum::extract::{Path as AxumPath, Request};
+use axum::response::IntoResponse;
+use axum::response::Response;
+use axum::BoxError;
+use axum::{
+    body::Body,
+    routing::{delete, get, post},
+    Router,
+};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     Json,
 };
-use axum::{
-    routing::{delete, get, post},
-    Router,
-};
+use bytes::Bytes;
+use futures::{Stream, TryStreamExt};
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
+use opsml_settings::config::StorageType;
+use std::io;
+use std::path::{Path, PathBuf};
+use tokio_util::io::StreamReader;
+
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::BufWriter;
+use tokio_util::io::ReaderStream;
 
 use anyhow::{Context, Result};
 use opsml_error::error::ServerError;
+
 /// Route for debugging information
 use serde_json::json;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -115,18 +129,60 @@ pub async fn generate_presigned_url(
 }
 
 // this is for local storage only
-pub async fn upload_multipart(
-    mut multipart: Multipart,
-) -> Result<Json<UploadResponse>, (StatusCode, Json<serde_json::Value>)> {
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let name = field.name().unwrap().to_string();
-        let data = field.bytes().await.unwrap();
+async fn stream_to_file<S, E>(path: &str, stream: S) -> Result<(), (StatusCode, String)>
+where
+    S: Stream<Item = Result<Bytes, E>>,
+    E: Into<BoxError>,
+{
+    async {
+        let path = Path::new(path);
 
-        let mut file = File::create(name).await.unwrap();
-        file.write_all(&data).await.unwrap();
+        // create the file parents if they don't exist
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+                .unwrap();
+        }
+
+        // Convert the stream into an `AsyncRead`.
+        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+        let body_reader = StreamReader::new(body_with_io_error);
+        futures::pin_mut!(body_reader);
+
+        // Create the file. `File` implements `AsyncWrite`.
+        let mut file = BufWriter::new(File::create(path).await?);
+
+        // Copy the body into the file.
+        tokio::io::copy(&mut body_reader, &mut file).await?;
+
+        Ok::<_, io::Error>(())
     }
+    .await
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+}
 
-    Ok(Json(UploadResponse { uploaded: true }))
+// Handler that streams the request body to a file.
+//
+// POST'ing to `/file/foo.txt` will create a file called `foo.txt`.
+async fn save_request_body(request: Request) -> Result<(), (StatusCode, String)> {
+    // get filename header
+    let headers = request.headers().clone();
+    let file_name = headers
+        .get("File-Name")
+        .ok_or((StatusCode::BAD_REQUEST, "Missing filename header"));
+
+    let filename = match file_name {
+        Ok(file_name) => file_name.to_str().unwrap(),
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Missing filename header".to_string(),
+            ))
+        }
+    };
+
+    stream_to_file(filename, request.into_body().into_data_stream()).await
 }
 
 pub async fn list_files(
@@ -216,6 +272,37 @@ pub async fn delete_file(
     }
 }
 
+pub async fn download_file(
+    State(state): State<Arc<AppState>>,
+    params: Query<DownloadFileQuery>,
+) -> Response<Body> {
+    // check if storage client is local (fails if not)
+    if state.storage_client.storage_type() != StorageType::Local {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Download is only supported for local storage" })),
+        )
+            .into_response();
+    }
+
+    let file = match File::open(&params.path).await {
+        Ok(file) => file,
+        Err(e) => {
+            error!("Failed to open file: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "failed": "Failed to open file" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stream = ReaderStream::new(file);
+    let body = Body::from_stream(stream);
+
+    (StatusCode::OK, body).into_response()
+}
+
 pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -223,14 +310,12 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
                 &format!("{}/files/multipart", prefix),
                 get(create_multipart_upload),
             )
-            .route(
-                &format!("{}/files/multipart", prefix),
-                post(upload_multipart),
-            )
+            .route(&format!("{}/files", prefix), post(save_request_body))
             .route(
                 &format!("{}/files/presigned", prefix),
                 get(generate_presigned_url),
             )
+            .route(&format!("{}/files", prefix), get(download_file))
             .route(&format!("{}/files/list", prefix), get(list_files))
             .route(&format!("{}/files/list/info", prefix), get(list_file_info))
             .route(&format!("{}/files/delete", prefix), delete(delete_file))
