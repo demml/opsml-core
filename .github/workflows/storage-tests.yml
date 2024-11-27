@@ -81,8 +81,8 @@ jobs:
           RUST_BACKTRACE: 1
           OPSML_TRACKING_URI: http://0.0.0.0:3000
 
-      - name: Shutdown Docker Compose services
-        run: docker-compose down
+      - name: Shutdown background processes
+        run: pkill -f opsml_server
 
   gcs-rust-lints-test:
     permissions:
