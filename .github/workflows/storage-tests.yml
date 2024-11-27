@@ -1,0 +1,68 @@
+name: Storage Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
+
+  # aws args
+  AWS_REGION: "${{ secrets.AWS_REGION }}"
+  PYTHON_VERSION: "3.11"
+  AWS_CLOUD_BUCKET_NAME: "${{ secrets.AWS_CLOUD_BUCKET_NAME }}"
+
+  # gcs args
+  GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
+  GCS_CLOUD_BUCKET_NAME: "${{ secrets.GCS_CLOUD_BUCKET_NAME }}"
+
+  #azure args
+  AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  AZURE_CLOUD_BUCKET_NAME: "${{ secrets.AZURE_CLOUD_BUCKET_NAME }}"
+
+jobs:
+  aws-rust-lints-test:
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      OPSML_STORAGE_URI: s3//${{ secrets.AWS_CLOUD_BUCKET_NAME }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Rust
+        run: rustup override set stable && rustup update
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo clippy
+        working-directory: ./crates
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: ./crates/opsml_storage
+        run: |
+          make test.storage.aws.http
+          make test.storage.aws.client
+        env:
+          RUST_BACKTRACE: 1
