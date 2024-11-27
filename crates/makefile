@@ -8,11 +8,11 @@ test.storage.aws.http:
 
 .PHONY: test.storage.local.http
 test.storage.local.http:
-	TEST_NAME=test_filesystemstorage_with_http_local  ./test.sh
+	cargo test -p opsml-storage test_filesystemstorage_with_http_local -- --nocapture
 
 .PHONY: test.storage.azure.http
 test.storage.azure.http:
-	TEST_NAME=test_filesystemstorage_with_http_azure  ./test.sh
+	cargo test -p opsml-storage test_filesystemstorage_with_http_azure -- --nocapture
 
 .PHONY: test.storage.gcs.client
 test.storage.gcs.client:
