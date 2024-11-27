@@ -57,9 +57,6 @@ jobs:
         working-directory: ./crates
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Set up Docker Compose
-        run: sudo apt-get update && sudo apt-get install -y docker-compose
-
       - name: Run test script in the background
         run: ./crates/test.sh &
 
