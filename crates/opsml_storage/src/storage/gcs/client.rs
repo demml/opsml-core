@@ -838,6 +838,7 @@ mod tests {
         }
     }
 
+    #[tokio::test]
     async fn test_gcs_storage_client() -> Result<(), StorageError> {
         let rand_name = uuid::Uuid::new_v4().to_string();
         let filename = format!("file-{}.txt", rand_name);
