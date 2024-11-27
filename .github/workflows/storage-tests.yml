@@ -116,6 +116,9 @@ jobs:
           name: opsml_server
           path: ./target/debug/
 
+      - name: Make opsml_server executable
+        run: chmod +x ./target/debug/opsml-server
+
       - name: Run opsml_server in the background
         run: ./target/debug/opsml-server &
         env:
