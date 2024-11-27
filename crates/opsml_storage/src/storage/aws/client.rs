@@ -353,10 +353,6 @@ impl StorageClient for AWSStorageClient {
             .unwrap_or(&settings.storage_uri)
             .to_string();
 
-        let obs = client.list_objects().bucket(&bucket).send().await.unwrap();
-
-        println!("obs: {:?}", obs);
-
         Ok(Self { client, bucket })
     }
 
