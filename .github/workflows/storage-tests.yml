@@ -57,8 +57,15 @@ jobs:
         working-directory: ./crates
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Run test script in the background
-        run: ./crates/test.sh &
+      - name: Build opsml_server
+        working-directory: ./crates
+        run: cargo build --release -p opsml_server
+
+      - name: Run opsml_server in the background
+        run: ./target/release/opsml_server &
+        env:
+          OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
+          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
 
       - name: Debug List running processes
         run: ps aux
@@ -68,7 +75,7 @@ jobs:
 
       - name: Wait for service to be available
         run: |
-          until curl --output /dev/null --silent --head --fail http://0.0.0.0:3000; do
+          until curl --output /dev/null --silent --head --fail http://localhost:3000; do
             echo "Waiting for the service to be available..."
             sleep 5
           done
