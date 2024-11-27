@@ -939,8 +939,6 @@ mod tests {
         }
 
         // put
-        println!("tmp_path: {:?}", tmp_path);
-        println!("rpath_root: {:?}", rpath_root);
         gcs_storage_client.put(&tmp_path, &rpath_root, true).await?;
         assert_eq!(gcs_storage_client.find(&rpath_root).await?.len(), 3);
 

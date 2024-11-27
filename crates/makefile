@@ -18,6 +18,11 @@ test.storage.azure:
 test.storage.gcs.client:
 	cargo test -p opsml-storage test_gcs_storage_client -- --nocapture
 
+.PHONY: test.storage.aws.client
+test.storage.aws.client:
+	cargo test -p opsml-storage test_aws_storage_client -- --nocapture
+
+
 .PHONY: lints
 lints:
 	cargo clippy --workspace --all-targets -- -D warnings
