@@ -143,7 +143,7 @@ impl GoogleMultipartUpload {
         let first_byte = upload_args.chunk_index * upload_args.chunk_size;
         let last_byte = first_byte + upload_args.this_chunk_size - 1;
 
-        let size = ChunkSize::new(first_byte, last_byte, Some(upload_args.file_size));
+        let size = ChunkSize::new(first_byte, last_byte, Some(self.file_size));
 
         let mut buffer = vec![0; upload_args.this_chunk_size as usize];
         let bytes_read = self
@@ -206,7 +206,6 @@ impl GoogleMultipartUpload {
             };
 
             let upload_args = UploadPartArgs {
-                file_size: self.file_size,
                 presigned_url: None,
                 chunk_size: chunk_size as u64,
                 chunk_index,
