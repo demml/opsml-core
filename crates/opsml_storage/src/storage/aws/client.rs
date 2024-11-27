@@ -954,39 +954,37 @@ mod tests {
         create_file(lpath.to_str().unwrap(), &1024);
 
         let settings = OpsmlConfig::default(); // Adjust settings as needed
-        let gcs_storage_client = S3FStorageClient::new(&settings.storage_settings()).await;
+        let storage_client = S3FStorageClient::new(&settings.storage_settings()).await;
 
         let rpath_dir = Path::new("test_dir");
         let rpath = rpath_dir.join(&filename);
 
-        if gcs_storage_client.exists(&rpath_dir).await? {
-            gcs_storage_client.rm(&rpath_dir, true).await?;
+        if storage_client.exists(&rpath_dir).await? {
+            storage_client.rm(&rpath_dir, true).await?;
         }
 
-        assert!(!gcs_storage_client.exists(&rpath_dir).await?);
+        assert!(!storage_client.exists(&rpath_dir).await?);
 
         // put
-        gcs_storage_client.put(&lpath, &rpath, false).await?;
-        assert!(gcs_storage_client.exists(&rpath).await?);
+        storage_client.put(&lpath, &rpath, false).await?;
+        assert!(storage_client.exists(&rpath).await?);
 
         let nested_path = format!("nested/really/deep/file-{}.txt", rand_name);
         let rpath_nested = rpath.parent().unwrap().join(nested_path);
 
-        gcs_storage_client.put(&lpath, &rpath_nested, false).await?;
+        storage_client.put(&lpath, &rpath_nested, false).await?;
 
-        let path = gcs_storage_client
-            .generate_presigned_url(&rpath, 10)
-            .await?;
+        let path = storage_client.generate_presigned_url(&rpath, 10).await?;
         assert!(!path.is_empty());
 
         // ls
-        assert!(!gcs_storage_client
+        assert!(!storage_client
             .find(rpath_nested.parent().unwrap())
             .await?
             .is_empty());
 
         // find
-        let blobs = gcs_storage_client.find(&rpath_dir).await?;
+        let blobs = storage_client.find(&rpath_dir).await?;
 
         assert_eq!(
             blobs,
@@ -1002,16 +1000,16 @@ mod tests {
         let new_lpath = new_tmp_dir.path().join(&filename);
 
         // get
-        gcs_storage_client.get(&new_lpath, &rpath, false).await?;
+        storage_client.get(&new_lpath, &rpath, false).await?;
         assert!(new_lpath.exists());
 
         // rm
-        gcs_storage_client.rm(&rpath, false).await?;
-        assert!(!gcs_storage_client.exists(&rpath).await?);
+        storage_client.rm(&rpath, false).await?;
+        assert!(!storage_client.exists(&rpath).await?);
 
         // rm recursive
-        gcs_storage_client.rm(&rpath_dir, true).await?;
-        assert!(!gcs_storage_client.exists(&rpath_dir).await?);
+        storage_client.rm(&rpath_dir, true).await?;
+        assert!(!storage_client.exists(&rpath_dir).await?);
 
         Ok(())
     }
@@ -1023,7 +1021,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let tmp_path = tmp_dir.path();
         let settings = OpsmlConfig::default(); // Adjust settings as needed
-        let gcs_storage_client = S3FStorageClient::new(&settings.storage_settings()).await;
+        let storage_client = S3FStorageClient::new(&settings.storage_settings()).await;
 
         let child = tmp_path.join("child");
         let grand_child = child.join("grandchild");
@@ -1037,31 +1035,31 @@ mod tests {
         let new_rand_name = uuid::Uuid::new_v4().to_string();
         let rpath_root = Path::new(&new_rand_name);
 
-        if gcs_storage_client.exists(&rpath_root).await? {
-            gcs_storage_client.rm(&rpath_root, true).await?;
+        if storage_client.exists(&rpath_root).await? {
+            storage_client.rm(&rpath_root, true).await?;
         }
 
         // put
-        gcs_storage_client.put(&tmp_path, &rpath_root, true).await?;
-        assert_eq!(gcs_storage_client.find(&rpath_root).await?.len(), 3);
+        storage_client.put(&tmp_path, &rpath_root, true).await?;
+        assert_eq!(storage_client.find(&rpath_root).await?.len(), 3);
 
         // copy
         let copy_dir = rpath_root.join("copy");
-        gcs_storage_client
+        storage_client
             .copy(&rpath_root.join("child"), &copy_dir, true)
             .await?;
-        assert_eq!(gcs_storage_client.find(&copy_dir).await?.len(), 2);
+        assert_eq!(storage_client.find(&copy_dir).await?.len(), 2);
 
         // put
         let put_dir = rpath_root.join("copy2");
-        gcs_storage_client.put(&child, &put_dir, true).await?;
-        assert_eq!(gcs_storage_client.find(&put_dir).await?.len(), 2);
+        storage_client.put(&child, &put_dir, true).await?;
+        assert_eq!(storage_client.find(&put_dir).await?.len(), 2);
 
         // rm
-        gcs_storage_client.rm(&put_dir, true).await?;
-        assert_eq!(gcs_storage_client.find(&put_dir).await?.len(), 0);
+        storage_client.rm(&put_dir, true).await?;
+        assert_eq!(storage_client.find(&put_dir).await?.len(), 0);
 
-        gcs_storage_client.rm(&rpath_root, true).await?;
+        storage_client.rm(&rpath_root, true).await?;
 
         Ok(())
     }
