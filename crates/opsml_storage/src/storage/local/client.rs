@@ -681,15 +681,17 @@ mod tests {
             .is_empty());
 
         // find
-        let blobs = storage_client.find(rpath_dir).await?;
+        let mut blobs = storage_client.find(rpath_dir).await?;
+        let mut expected_blobs = vec![
+            rpath.to_str().unwrap().to_string(),
+            rpath_nested.to_str().unwrap().to_string(),
+        ];
 
-        assert_eq!(
-            blobs,
-            vec![
-                rpath.to_str().unwrap().to_string(),
-                rpath_nested.to_str().unwrap().to_string()
-            ]
-        );
+        // sort the blobs
+        blobs.sort();
+        expected_blobs.sort();
+
+        assert_eq!(blobs, expected_blobs,);
 
         // create new temp dir
         let new_tmp_dir = TempDir::new().unwrap();
@@ -709,7 +711,7 @@ mod tests {
         assert!(!storage_client.exists(rpath_dir).await?);
 
         let current_dir = std::env::current_dir().unwrap();
-        let path = current_dir.join("../opsml_registries");
+        let path = current_dir.join(settings.storage_settings().storage_uri);
         std::fs::remove_dir_all(&path).unwrap();
 
         Ok(())
@@ -763,7 +765,8 @@ mod tests {
         storage_client.rm(rpath_root, true).await?;
 
         let current_dir = std::env::current_dir().unwrap();
-        let path = current_dir.join("../opsml_registries");
+
+        let path = current_dir.join(settings.storage_settings().storage_uri);
         std::fs::remove_dir_all(&path).unwrap();
 
         Ok(())
