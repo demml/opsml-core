@@ -58,11 +58,17 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Run test script in the background
-        run: ./crates/test.sh
+        run: ./crates/test.sh &
+
+      - name: Debug List running processes
+        run: ps aux
+
+      - name: Debug Check if port 3000 is open
+        run: netstat -an | grep 3000
 
       - name: Wait for service to be available
         run: |
-          until curl --output /dev/null --silent --head --fail http://localhost:3000; do
+          until curl --output /dev/null --silent --head --fail http://0.0.0.0:3000; do
             echo "Waiting for the service to be available..."
             sleep 5
           done
