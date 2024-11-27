@@ -58,14 +58,13 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Build opsml_server
-        working-directory: ./crates
         run: cargo build -p opsml-server
 
       - name: Upload opsml_server binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: opsml-server
-          path: ./crates/target/debug/opsml-server
+          name: opsml_server
+          path: ./target/debug/opsml-server
 
       - name: Run opsml_server in the background
         run: ./target/debug/opsml-server &
@@ -112,9 +111,9 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Download opsml_server binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: opsml-server
+          name: opsml_server
           path: ./target/debug/
 
       - name: Run opsml_server in the background
