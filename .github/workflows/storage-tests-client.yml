@@ -9,6 +9,7 @@ on:
 
 env:
   RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
+  OPSML_SERVER_PORT: 3000
 
   # aws args
   AWS_REGION: "${{ secrets.AWS_REGION }}"
@@ -32,7 +33,6 @@ jobs:
       id-token: write
       contents: read
     env:
-      OPSML_SERVER_PORT: 3000
       OPSML_STORAGE_URI: s3://${{ secrets.AWS_CLOUD_BUCKET_NAME }}
     runs-on: ubuntu-latest
     steps:
@@ -89,7 +89,6 @@ jobs:
       id-token: write
       contents: read
     env:
-      OPSML_SERVER_PORT: 3000
       OPSML_STORAGE_URI: gs://${{ secrets.GCS_CLOUD_BUCKET_NAME }}
       GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
     runs-on: ubuntu-latest
