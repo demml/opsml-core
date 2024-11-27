@@ -49,7 +49,7 @@ async fn main() {
 
     // get OPSML_SERVER_PORT from env
     let port = std::env::var("OPSML_SERVER_PORT").unwrap_or_else(|_| "3000".to_string());
-    let addr = format!("127.0.0.1:{}", port);
+    let addr = format!("0.0.0.0:{}", port);
 
     // run it
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

@@ -1,0 +1,10 @@
+services:
+  test_service:
+    build:
+      context: .
+      args:
+        OPSML_STORAGE_URI: ${OPSML_STORAGE_URI}
+    environment:
+      - OPSML_STORAGE_URI=${OPSML_STORAGE_URI}
+    ports:
+      - "3000:3000"
