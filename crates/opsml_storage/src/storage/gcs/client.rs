@@ -207,9 +207,9 @@ impl GoogleMultipartUpload {
 
             let upload_args = UploadPartArgs {
                 presigned_url: None,
-                chunk_size: chunk_size as u64,
+                chunk_size,
                 chunk_index,
-                this_chunk_size: this_chunk as u64,
+                this_chunk_size: this_chunk,
             };
 
             self.upload_next_chunk(&upload_args).await?;
