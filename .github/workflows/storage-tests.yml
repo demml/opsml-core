@@ -62,7 +62,7 @@ jobs:
         run: cargo build -p opsml-server
 
       - name: Run opsml_server in the background
-        run: ./target/release/opsml-server &
+        run: ./target/debug/opsml-server &
         env:
           OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
           OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
