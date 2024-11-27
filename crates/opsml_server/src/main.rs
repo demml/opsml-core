@@ -47,10 +47,12 @@ async fn main() {
     // build our application with routes
     let app = create_app().await.unwrap();
 
+    // get OPSML_SERVER_PORT from env
+    let port = std::env::var("OPSML_SERVER_PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("127.0.0.1:{}", port);
+
     // run it
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     info!("listening on {}", listener.local_addr().unwrap());
 
