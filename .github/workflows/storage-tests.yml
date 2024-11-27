@@ -61,17 +61,17 @@ jobs:
         working-directory: ./crates
         run: cargo build -p opsml-server
 
+      - name: Upload opsml_server binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: opsml-server
+          path: ./crates/target/release/opsml-server
+
       - name: Run opsml_server in the background
         run: ./target/debug/opsml-server &
         env:
           OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
           OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
-
-      - name: Debug List running processes
-        run: ps aux
-
-      - name: Debug Check if port 3000 is open
-        run: netstat -an | grep 3000
 
       - name: Tests
         working-directory: ./crates
@@ -82,7 +82,8 @@ jobs:
           OPSML_TRACKING_URI: http://0.0.0.0:3000
 
       - name: Shutdown background processes
-        run: pkill -f opsml_server
+        run: |
+          lsof -ti tcp:3000 | xargs kill -9
 
   gcs-rust-lints-test:
     permissions:
@@ -109,6 +110,12 @@ jobs:
       - name: Run cargo clippy
         working-directory: ./crates
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Download opsml_server binary
+        uses: actions/download-artifact@v3
+        with:
+          name: opsml-server
+          path: ./crates/target/release/
 
       - name: Tests
         working-directory: ./crates
