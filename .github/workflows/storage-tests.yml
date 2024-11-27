@@ -7,9 +7,6 @@ on:
       - master
   pull_request:
 
-permissions:
-  contents: read
-
 env:
   RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
 
