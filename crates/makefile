@@ -26,6 +26,9 @@ test.storage.aws.client:
 test.storage.az.client:
 	cargo test -p opsml-storage test_azure_storage_client -- --nocapture
 
+.PHONY: test.storage.local.client
+test.storage.local.client:
+	cargo test -p opsml-storage test_local_storage_client -- --nocapture --test-threads 1
 
 .PHONY: lints
 lints:

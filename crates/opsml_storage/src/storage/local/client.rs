@@ -99,6 +99,13 @@ impl LocalMultiPartUpload {
 
         if !self.client_mode {
             // join client bucket to rpath
+            // create rpath parents if they don't exist
+            if let Some(parent) = self.rpath.parent() {
+                fs::create_dir_all(parent).map_err(|e| {
+                    StorageError::Error(format!("Failed to create directory: {}", e))
+                })?;
+            }
+
             fs::copy(&self.lpath, self.rpath.as_path())
                 .map_err(|e| StorageError::Error(format!("Failed to copy file: {}", e)))?;
         } else {
@@ -231,15 +238,12 @@ impl StorageClient for LocalStorageClient {
     }
 
     async fn find(&self, path: &str) -> Result<Vec<String>, StorageError> {
+        let mut files = Vec::new();
         let full_path = self.bucket.join(path);
         if !full_path.exists() {
-            return Err(StorageError::Error(format!(
-                "Path does not exist: {}",
-                full_path.display()
-            )));
+            return Ok(files);
         }
 
-        let mut files = Vec::new();
         for entry in WalkDir::new(full_path) {
             let entry = entry
                 .map_err(|e| StorageError::Error(format!("Unable to read directory: {}", e)))?;
@@ -374,10 +378,7 @@ impl StorageClient for LocalStorageClient {
         let full_path = self.bucket.join(path);
 
         if !full_path.exists() {
-            return Err(StorageError::Error(format!(
-                "Path does not exist: {}",
-                full_path.display()
-            )));
+            return Ok(true);
         }
 
         fs::remove_file(&full_path)
@@ -390,10 +391,7 @@ impl StorageClient for LocalStorageClient {
         let full_path = self.bucket.join(path);
 
         if !full_path.exists() {
-            return Err(StorageError::Error(format!(
-                "Path does not exist: {}",
-                full_path.display()
-            )));
+            return Ok(true);
         }
 
         for entry in WalkDir::new(&full_path) {
@@ -607,5 +605,167 @@ impl LocalFSStorageClient {
 
     pub async fn create_multipart_upload(&self, path: &Path) -> Result<String, StorageError> {
         Ok(path.to_str().unwrap().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opsml_error::error::StorageError;
+    use opsml_settings::config::OpsmlConfig;
+    use rand::distributions::Alphanumeric;
+    use rand::thread_rng;
+    use rand::Rng;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    pub fn create_file(name: &str, chunk_size: &u64) {
+        let mut file = File::create(name).expect("Could not create sample file.");
+
+        while file.metadata().unwrap().len() <= chunk_size * 2 {
+            let rand_string: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(256)
+                .map(char::from)
+                .collect();
+            let return_string: String = "\n".to_string();
+            file.write_all(rand_string.as_ref())
+                .expect("Error writing to file.");
+            file.write_all(return_string.as_ref())
+                .expect("Error writing to file.");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_local_storage_client() -> Result<(), StorageError> {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+        let filename = format!("file-{}.txt", rand_name);
+
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_path = tmp_dir.path();
+
+        // write file to temp dir (create_file)
+        let lpath = tmp_path.join(&filename);
+        create_file(lpath.to_str().unwrap(), &1024);
+
+        let settings = OpsmlConfig::default(); // Adjust settings as needed
+        let storage_client = LocalFSStorageClient::new(&settings.storage_settings()).await;
+
+        let rpath_dir = Path::new("test_dir");
+        let rpath = rpath_dir.join(&filename);
+
+        if storage_client.exists(&rpath_dir).await? {
+            storage_client.rm(&rpath_dir, true).await?;
+        }
+
+        assert!(!storage_client.exists(&rpath_dir).await?);
+
+        // put
+        storage_client.put(&lpath, &rpath, false).await?;
+        assert!(storage_client.exists(&rpath).await?);
+
+        let nested_path = format!("nested/really/deep/file-{}.txt", rand_name);
+        let rpath_nested = rpath.parent().unwrap().join(nested_path);
+
+        storage_client.put(&lpath, &rpath_nested, false).await?;
+
+        let path = storage_client.generate_presigned_url(&rpath, 10).await?;
+        assert!(!path.is_empty());
+
+        // ls
+        assert!(!storage_client
+            .find(rpath_nested.parent().unwrap())
+            .await?
+            .is_empty());
+
+        // find
+        let blobs = storage_client.find(&rpath_dir).await?;
+
+        assert_eq!(
+            blobs,
+            vec![
+                rpath.to_str().unwrap().to_string(),
+                rpath_nested.to_str().unwrap().to_string()
+            ]
+        );
+
+        // create new temp dir
+        let new_tmp_dir = TempDir::new().unwrap();
+
+        let new_lpath = new_tmp_dir.path().join(&filename);
+
+        // get
+        storage_client.get(&new_lpath, &rpath, false).await?;
+        assert!(new_lpath.exists());
+
+        // rm
+        storage_client.rm(&rpath, false).await?;
+        assert!(!storage_client.exists(&rpath).await?);
+
+        // rm recursive
+        storage_client.rm(&rpath_dir, true).await?;
+        assert!(!storage_client.exists(&rpath_dir).await?);
+
+        let current_dir = std::env::current_dir().unwrap();
+        let path = current_dir.join("../opsml_registries");
+        std::fs::remove_dir_all(&path).unwrap();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_local_storage_client_trees() -> Result<(), StorageError> {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_path = tmp_dir.path();
+        let settings = OpsmlConfig::default(); // Adjust settings as needed
+        let storage_client = LocalFSStorageClient::new(&settings.storage_settings()).await;
+
+        let child = tmp_path.join("child");
+        let grand_child = child.join("grandchild");
+        for path in &[tmp_path, &child, &grand_child] {
+            std::fs::create_dir_all(path).unwrap();
+            let txt_file = format!("file-{}.txt", rand_name);
+            let txt_path = path.join(txt_file);
+            std::fs::write(&txt_path, "hello, world").unwrap();
+        }
+
+        let new_rand_name = uuid::Uuid::new_v4().to_string();
+        let rpath_root = Path::new(&new_rand_name);
+
+        if storage_client.exists(&rpath_root).await? {
+            storage_client.rm(&rpath_root, true).await?;
+        }
+
+        // put
+        storage_client.put(&tmp_path, &rpath_root, true).await?;
+        assert_eq!(storage_client.find(&rpath_root).await?.len(), 3);
+
+        // copy
+        let copy_dir = rpath_root.join("copy");
+        storage_client
+            .copy(&rpath_root.join("child"), &copy_dir, true)
+            .await?;
+        assert_eq!(storage_client.find(&copy_dir).await?.len(), 2);
+
+        // put
+        let put_dir = rpath_root.join("copy2");
+        storage_client.put(&child, &put_dir, true).await?;
+        assert_eq!(storage_client.find(&put_dir).await?.len(), 2);
+
+        // rm
+        storage_client.rm(&put_dir, true).await?;
+        assert_eq!(storage_client.find(&put_dir).await?.len(), 0);
+
+        storage_client.rm(&rpath_root, true).await?;
+
+        let current_dir = std::env::current_dir().unwrap();
+        let path = current_dir.join("../opsml_registries");
+        std::fs::remove_dir_all(&path).unwrap();
+
+        Ok(())
     }
 }
