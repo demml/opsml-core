@@ -59,14 +59,17 @@ impl<R: AsyncRead + Unpin> Stream for ProgressStream<R> {
 }
 
 pub struct LocalMultiPartUpload {
+    pub lpath: PathBuf,
     pub rpath: PathBuf,
     client_mode: bool,
     api_client: Option<OpsmlApiClient>,
+    pub filename: String,
 }
 
 impl LocalMultiPartUpload {
     pub async fn new(
-        rpath: &Path,
+        lpath: &str,
+        rpath: &str,
         client_mode: bool,
         api_client: Option<OpsmlApiClient>,
     ) -> Result<Self, StorageError> {
@@ -79,22 +82,29 @@ impl LocalMultiPartUpload {
         }
 
         Ok(Self {
-            rpath: rpath.to_path_buf(),
+            lpath: PathBuf::from(lpath),
+            rpath: PathBuf::from(rpath),
             client_mode,
             api_client,
+            filename: Path::new(lpath)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
         })
     }
 
-    pub async fn upload_file_in_chunks(&self, lpath: &Path) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&self) -> Result<(), StorageError> {
         // if not client mode, copy the file to rpath
 
         if !self.client_mode {
-            fs::copy(lpath, self.rpath.as_path())
+            // join client bucket to rpath
+            fs::copy(&self.lpath, self.rpath.as_path())
                 .map_err(|e| StorageError::Error(format!("Failed to copy file: {}", e)))?;
         } else {
             let client = self.api_client.as_ref().unwrap().clone();
 
-            let file = TokioFile::open(lpath)
+            let file = TokioFile::open(&self.lpath)
                 .await
                 .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
 
@@ -106,7 +116,7 @@ impl LocalMultiPartUpload {
 
             let bar = ProgressBar::new(file_size);
             let msg1 = LogColors::green("Uploading file:");
-            let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+            let msg2 = LogColors::purple(&self.filename);
             let msg = format!("{} {}", msg1, msg2);
             let template = format!(
                 "{} [{{bar:40.green/magenta}}] {{pos}}/{{len}} ({{eta}})",
@@ -120,7 +130,7 @@ impl LocalMultiPartUpload {
             let stream = ProgressStream::new(file, bar.clone());
 
             let part = Part::stream(reqwest::Body::wrap_stream(stream))
-                .file_name(lpath.to_str().unwrap().to_string())
+                .file_name(self.lpath.to_str().unwrap().to_string())
                 .mime_str("application/octet-stream")
                 .map_err(|e| StorageError::Error(format!("Failed to create part: {}", e)))?;
 
@@ -402,15 +412,14 @@ impl StorageClient for LocalStorageClient {
 impl LocalStorageClient {
     pub async fn create_multipart_uploader(
         &self,
-        path: &str,
+        lpath: &str,
+        rpath: &str,
         client_mode: bool,
         api_client: Option<OpsmlApiClient>,
     ) -> Result<LocalMultiPartUpload, StorageError> {
-        Ok(LocalMultiPartUpload {
-            rpath: self.bucket.join(path),
-            client_mode,
-            api_client,
-        })
+        // join bucket to rpath
+        let rpath = self.bucket.join(rpath);
+        LocalMultiPartUpload::new(lpath, &rpath.to_str().unwrap(), client_mode, api_client).await
     }
 }
 #[derive(Clone)]
@@ -560,18 +569,20 @@ impl FileSystem for LocalFSStorageClient {
                 let relative_path = file.relative_path(&stripped_lpath_clone)?;
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
-                let uploader = self.create_multipart_uploader(&remote_path, None).await?;
+                let uploader = self
+                    .create_multipart_uploader(&stripped_file_path, &remote_path, None)
+                    .await?;
 
-                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                uploader.upload_file_in_chunks().await?;
             }
 
             Ok(())
         } else {
             let uploader = self
-                .create_multipart_uploader(&stripped_lpath, None)
+                .create_multipart_uploader(&stripped_lpath, &stripped_rpath, None)
                 .await?;
 
-            uploader.upload_file_in_chunks(&stripped_lpath).await?;
+            uploader.upload_file_in_chunks().await?;
             Ok(())
         }
     }
@@ -580,11 +591,17 @@ impl FileSystem for LocalFSStorageClient {
 impl LocalFSStorageClient {
     pub async fn create_multipart_uploader(
         &self,
-        path: &Path,
+        lpath: &Path,
+        rpath: &Path,
         api_client: Option<OpsmlApiClient>,
     ) -> Result<LocalMultiPartUpload, StorageError> {
         self.client
-            .create_multipart_uploader(path.to_str().unwrap(), self.client_mode, api_client)
+            .create_multipart_uploader(
+                lpath.to_str().unwrap(),
+                rpath.to_str().unwrap(),
+                self.client_mode,
+                api_client,
+            )
             .await
     }
 

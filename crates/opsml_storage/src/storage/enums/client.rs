@@ -35,12 +35,12 @@ impl MultiPartUploader {
         }
     }
 
-    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
+    pub async fn upload_file_in_chunks(&mut self) -> Result<(), StorageError> {
         match self {
             MultiPartUploader::Google(uploader) => uploader.upload_file_in_chunks().await,
             MultiPartUploader::AWS(uploader) => uploader.upload_file_in_chunks().await,
-            MultiPartUploader::Local(uploader) => uploader.upload_file_in_chunks(lpath).await,
-            MultiPartUploader::Azure(uploader) => uploader.upload_file_in_chunks(lpath).await,
+            MultiPartUploader::Local(uploader) => uploader.upload_file_in_chunks().await,
+            MultiPartUploader::Azure(uploader) => uploader.upload_file_in_chunks().await,
         }
     }
 }
@@ -254,7 +254,9 @@ impl StorageClientEnum {
                 Ok(MultiPartUploader::AWS(uploader))
             }
             StorageClientEnum::Local(client) => {
-                let uploader = client.create_multipart_uploader(rpath, api_client).await?;
+                let uploader = client
+                    .create_multipart_uploader(lpath, rpath, api_client)
+                    .await?;
 
                 Ok(MultiPartUploader::Local(uploader))
             }

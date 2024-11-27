@@ -138,7 +138,7 @@ impl HttpFSStorageClient {
                         .create_multipart_uploader(&remote_path, &stripped_file_path)
                         .await?;
 
-                    uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                    uploader.upload_file_in_chunks().await?;
                     Ok::<(), StorageError>(())
                 });
                 tasks.push(task);
@@ -153,7 +153,7 @@ impl HttpFSStorageClient {
             Ok(())
         } else {
             let mut uploader = self.client.create_multipart_uploader(rpath, lpath).await?;
-            uploader.upload_file_in_chunks(lpath).await?;
+            uploader.upload_file_in_chunks().await?;
 
             Ok(())
         }
