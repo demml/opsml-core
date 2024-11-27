@@ -40,8 +40,6 @@ impl AWSCreds {
     pub async fn new() -> Result<Self, StorageError> {
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
 
-        println!("AWS Config: {:?}", config);
-
         Ok(Self { config })
     }
 }
@@ -333,6 +331,7 @@ impl StorageClient for AWSStorageClient {
     }
     async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         // create a resuable runtime for client
+        println!("settings: {:?}", settings);
         let client = if !settings.client_mode {
             let creds = AWSCreds::new().await?;
             Client::new(&creds.config)
@@ -353,6 +352,10 @@ impl StorageClient for AWSStorageClient {
             .strip_prefix("s3://")
             .unwrap_or(&settings.storage_uri)
             .to_string();
+
+        let obs = client.list_objects().bucket(&bucket).send().await.unwrap();
+
+        println!("obs: {:?}", obs);
 
         Ok(Self { client, bucket })
     }
