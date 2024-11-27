@@ -60,8 +60,8 @@ jobs:
       - name: Set up Docker Compose
         run: sudo apt-get update && sudo apt-get install -y docker-compose
 
-      - name: Build and run Docker Compose
-        run: docker-compose up --build -d
+      - name: Run test script in the background
+        run: ./crates/test.sh &
 
       - name: Wait for service to be available
         run: |
@@ -73,8 +73,6 @@ jobs:
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.aws.client
-          sleep 5
           make test.storage.aws.http
         env:
           RUST_BACKTRACE: 1
