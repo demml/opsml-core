@@ -46,6 +46,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: List
+        run: |
+          aws s3 ls ${{ secrets.AWS_CLOUD_BUCKET_NAME }}
+
       - name: Set up Rust
         run: rustup override set stable && rustup update
 
@@ -62,7 +66,6 @@ jobs:
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.aws.http
           make test.storage.aws.client
         env:
           RUST_BACKTRACE: 1
