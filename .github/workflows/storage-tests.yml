@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: opsml-server
-          path: ./crates/target/release/opsml-server
+          path: ./crates/target/debug/opsml-server
 
       - name: Run opsml_server in the background
         run: ./target/debug/opsml-server &
@@ -90,7 +90,7 @@ jobs:
       id-token: write
       contents: read
     env:
-      OPSML_SERVER_PORT: 8080
+      OPSML_SERVER_PORT: 3000
       OPSML_STORAGE_URI: gs://${{ secrets.GCS_CLOUD_BUCKET_NAME }}
       GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
     runs-on: ubuntu-latest
@@ -115,14 +115,25 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: opsml-server
-          path: ./crates/target/release/
+          path: ./target/debug/
+
+      - name: Run opsml_server in the background
+        run: ./target/debug/opsml-server &
+        env:
+          OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
+          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
 
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.gcs.client
+          make test.storage.gcs.http
         env:
           RUST_BACKTRACE: 1
+          OPSML_TRACKING_URI: http://0.0.0.0:3000
+
+      - name: Shutdown background processes
+        run: |
+          lsof -ti tcp:3000 | xargs kill -9
 
   azure-rust-lints-test:
     needs: gcs-rust-lints-test
