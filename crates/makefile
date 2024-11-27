@@ -4,7 +4,7 @@ test.storage.gcs.http:
 
 .PHONY: test.storage.aws.http
 test.storage.aws.http:
-	TEST_NAME=test_filesystemstorage_with_http_aws  ./test.sh
+	cargo test -p opsml-storage test_filesystemstorage_with_http_aws -- --nocapture
 
 .PHONY: test.storage.local.http
 test.storage.local.http:
