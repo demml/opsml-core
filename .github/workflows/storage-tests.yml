@@ -73,20 +73,13 @@ jobs:
       - name: Debug Check if port 3000 is open
         run: netstat -an | grep 3000
 
-      - name: Wait for service to be available
-        run: |
-          until curl --output /dev/null --silent --head --fail http://localhost:3000; do
-            echo "Waiting for the service to be available..."
-            sleep 5
-          done
-
       - name: Tests
         working-directory: ./crates
         run: |
           make test.storage.aws.http
         env:
           RUST_BACKTRACE: 1
-          OPSML_TRACKING_URI: http://localhost:3000
+          OPSML_TRACKING_URI: http://0.0.0.0:3000
 
       - name: Shutdown Docker Compose services
         run: docker-compose down
