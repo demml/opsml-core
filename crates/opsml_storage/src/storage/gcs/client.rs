@@ -102,6 +102,8 @@ pub struct GoogleMultipartUpload {
     pub upload_client: ResumableUploadClient,
     pub upload_status: UploadStatus,
     file_reader: BufReader<File>,
+    file_size: u64,
+    filename: String,
 }
 
 impl GoogleMultipartUpload {
@@ -111,12 +113,26 @@ impl GoogleMultipartUpload {
     ) -> Result<Self, StorageError> {
         let file = File::open(path)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+        let filename = Path::new(path)
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
         let file_reader = BufReader::new(file);
 
         Ok(GoogleMultipartUpload {
             upload_client,
             upload_status: UploadStatus::NotStarted,
             file_reader,
+            file_size,
+            filename,
         })
     }
 
@@ -153,20 +169,12 @@ impl GoogleMultipartUpload {
         Ok(())
     }
 
-    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
+    pub async fn upload_file_in_chunks(&mut self) -> Result<(), StorageError> {
+        let chunk_size = std::cmp::min(self.file_size, UPLOAD_CHUNK_SIZE as u64);
 
         // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
+        let mut chunk_count = (self.file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = self.file_size % chunk_size;
 
         // if the last chunk is empty, reduce the number of parts
         if size_of_last_chunk == 0 {
@@ -177,7 +185,7 @@ impl GoogleMultipartUpload {
         let bar = ProgressBar::new(chunk_count);
 
         let msg1 = LogColors::green("Uploading file:");
-        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg2 = LogColors::purple(&self.filename);
         let msg = format!("{} {}", msg1, msg2);
 
         let template = format!(
@@ -198,7 +206,7 @@ impl GoogleMultipartUpload {
             };
 
             let upload_args = UploadPartArgs {
-                file_size,
+                file_size: self.file_size,
                 presigned_url: None,
                 chunk_size: chunk_size as u64,
                 chunk_index,
@@ -749,13 +757,13 @@ impl FileSystem for GCSFSStorageClient {
                 let mut uploader = self
                     .client
                     .create_multipart_uploader(
-                        stripped_lpath_clone.to_str().unwrap(),
+                        stripped_file_path.to_str().unwrap(),
                         remote_path.to_str().unwrap(),
                         None,
                     )
                     .await?;
 
-                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                uploader.upload_file_in_chunks().await?;
             }
 
             Ok(())
@@ -769,7 +777,7 @@ impl FileSystem for GCSFSStorageClient {
                 )
                 .await?;
 
-            uploader.upload_file_in_chunks(&stripped_lpath).await?;
+            uploader.upload_file_in_chunks().await?;
             Ok(())
         }
     }
@@ -831,7 +839,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     async fn test_gcs_storage_client() -> Result<(), StorageError> {
         let rand_name = uuid::Uuid::new_v4().to_string();
         let filename = format!("file-{}.txt", rand_name);
@@ -902,6 +909,56 @@ mod tests {
         // rm recursive
         gcs_storage_client.rm(&rpath_dir, true).await?;
         assert!(!gcs_storage_client.exists(&rpath_dir).await?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_gcs_storage_client_trees() -> Result<(), StorageError> {
+        let rand_name = uuid::Uuid::new_v4().to_string();
+
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_path = tmp_dir.path();
+        let settings = OpsmlConfig::default(); // Adjust settings as needed
+        let gcs_storage_client = GCSFSStorageClient::new(&settings.storage_settings()).await;
+
+        let child = tmp_path.join("child");
+        let grand_child = child.join("grandchild");
+        for path in &[tmp_path, &child, &grand_child] {
+            std::fs::create_dir_all(path).unwrap();
+            let txt_file = format!("file-{}.txt", rand_name);
+            let txt_path = path.join(txt_file);
+            std::fs::write(&txt_path, "hello, world").unwrap();
+        }
+
+        let new_rand_name = uuid::Uuid::new_v4().to_string();
+        let rpath_root = Path::new(&new_rand_name);
+
+        if gcs_storage_client.exists(&rpath_root).await? {
+            gcs_storage_client.rm(&rpath_root, true).await?;
+        }
+
+        // put
+        println!("tmp_path: {:?}", tmp_path);
+        println!("rpath_root: {:?}", rpath_root);
+        gcs_storage_client.put(&tmp_path, &rpath_root, true).await?;
+        assert_eq!(gcs_storage_client.find(&rpath_root).await?.len(), 3);
+
+        // copy
+        let copy_dir = rpath_root.join("copy");
+        gcs_storage_client
+            .copy(&rpath_root.join("child"), &copy_dir, true)
+            .await?;
+        assert_eq!(gcs_storage_client.find(&copy_dir).await?.len(), 2);
+
+        // put
+        let put_dir = rpath_root.join("copy2");
+        gcs_storage_client.put(&child, &put_dir, true).await?;
+        assert_eq!(gcs_storage_client.find(&put_dir).await?.len(), 2);
+
+        // rm
+        gcs_storage_client.rm(&put_dir, true).await?;
+        assert_eq!(gcs_storage_client.find(&put_dir).await?.len(), 0);
 
         Ok(())
     }

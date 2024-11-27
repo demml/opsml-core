@@ -62,7 +62,6 @@ pub struct UploadResponse {
 }
 
 pub struct UploadPartArgs {
-    pub file_size: u64,
     pub presigned_url: Option<String>,
     pub chunk_size: u64,
     pub chunk_index: u64,

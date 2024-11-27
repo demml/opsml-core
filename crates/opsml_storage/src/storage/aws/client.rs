@@ -78,6 +78,8 @@ pub struct AWSMulitPartUpload {
     pub upload_id: String,
     pub api_client: Option<OpsmlApiClient>,
     upload_parts: Vec<aws_sdk_s3::types::CompletedPart>,
+    pub file_size: u64,
+    pub filename: String,
 }
 
 impl AWSMulitPartUpload {
@@ -93,6 +95,21 @@ impl AWSMulitPartUpload {
         let creds = AWSCreds::new().await?;
         let client = Client::new(&creds.config);
 
+        let file = File::open(lpath)
+            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+
+        let filename = Path::new(lpath)
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
         Ok(Self {
             client,
             bucket: bucket.to_string(),
@@ -101,6 +118,8 @@ impl AWSMulitPartUpload {
             upload_id: upload_id.to_string(),
             upload_parts: Vec::new(),
             api_client,
+            file_size,
+            filename,
         })
     }
 
@@ -215,20 +234,12 @@ impl AWSMulitPartUpload {
         Ok(true)
     }
 
-    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
+    pub async fn upload_file_in_chunks(&mut self) -> Result<(), StorageError> {
+        let chunk_size = std::cmp::min(self.file_size, UPLOAD_CHUNK_SIZE as u64);
 
         // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
+        let mut chunk_count = (self.file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = self.file_size % chunk_size;
 
         // if the last chunk is empty, reduce the number of parts
         if size_of_last_chunk == 0 {
@@ -239,7 +250,7 @@ impl AWSMulitPartUpload {
         let bar = ProgressBar::new(chunk_count);
 
         let msg1 = LogColors::green("Uploading file:");
-        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg2 = LogColors::purple(&self.filename);
         let msg = format!("{} {}", msg1, msg2);
 
         let template = format!(
@@ -284,7 +295,6 @@ impl AWSMulitPartUpload {
             };
 
             let upload_args = UploadPartArgs {
-                file_size,
                 presigned_url: Some(presigned_url),
                 chunk_size: chunk_size as u64,
                 chunk_index,
@@ -645,8 +655,8 @@ impl AWSStorageClient {
 
     pub async fn create_multipart_uploader(
         &self,
-        rpath: &str,
         lpath: &str,
+        rpath: &str,
         session_url: Option<String>,
         api_client: Option<OpsmlApiClient>,
     ) -> Result<AWSMulitPartUpload, StorageError> {
@@ -831,14 +841,14 @@ impl FileSystem for S3FStorageClient {
                 let mut uploader = self
                     .client
                     .create_multipart_uploader(
+                        stripped_file_path.to_str().unwrap(),
                         remote_path.to_str().unwrap(),
-                        stripped_lpath_clone.to_str().unwrap(),
                         None,
                         None,
                     )
                     .await?;
 
-                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                uploader.upload_file_in_chunks().await?;
             }
 
             Ok(())
@@ -846,14 +856,14 @@ impl FileSystem for S3FStorageClient {
             let mut uploader = self
                 .client
                 .create_multipart_uploader(
-                    stripped_rpath.to_str().unwrap(),
                     stripped_lpath.to_str().unwrap(),
+                    stripped_rpath.to_str().unwrap(),
                     None,
                     None,
                 )
                 .await?;
 
-            uploader.upload_file_in_chunks(&stripped_lpath).await?;
+            uploader.upload_file_in_chunks().await?;
             Ok(())
         }
     }

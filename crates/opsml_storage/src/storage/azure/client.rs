@@ -52,6 +52,8 @@ pub struct AzureMultipartUpload {
     pub signed_url: String,
     pub block_parts: Vec<BlobBlockType>,
     file_reader: BufReader<File>,
+    pub file_size: u64,
+    pub filename: String,
 }
 
 impl AzureMultipartUpload {
@@ -62,6 +64,14 @@ impl AzureMultipartUpload {
     ) -> Result<Self, StorageError> {
         let file = File::open(path)
             .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
+
+        let metadata = file
+            .metadata()
+            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
+
+        let file_size = metadata.len();
+        let filename = Path::new(path).file_name().unwrap().to_str().unwrap();
+
         let file_reader = BufReader::new(file);
 
         let client = match client {
@@ -74,23 +84,17 @@ impl AzureMultipartUpload {
             signed_url: signed_url.to_string(),
             block_parts: Vec::new(),
             file_reader,
+            file_size,
+            filename: filename.to_string(),
         })
     }
 
-    pub async fn upload_file_in_chunks(&mut self, lpath: &Path) -> Result<(), StorageError> {
-        let file = File::open(lpath)
-            .map_err(|e| StorageError::Error(format!("Failed to open file: {}", e)))?;
-
-        let metadata = file
-            .metadata()
-            .map_err(|e| StorageError::Error(format!("Failed to get file metadata: {}", e)))?;
-
-        let file_size = metadata.len();
-        let chunk_size = std::cmp::min(file_size, UPLOAD_CHUNK_SIZE as u64);
+    pub async fn upload_file_in_chunks(&mut self) -> Result<(), StorageError> {
+        let chunk_size = std::cmp::min(self.file_size, UPLOAD_CHUNK_SIZE as u64);
 
         // calculate the number of parts
-        let mut chunk_count = (file_size / chunk_size) + 1;
-        let mut size_of_last_chunk = file_size % chunk_size;
+        let mut chunk_count = (self.file_size / chunk_size) + 1;
+        let mut size_of_last_chunk = self.file_size % chunk_size;
 
         // if the last chunk is empty, reduce the number of parts
         if size_of_last_chunk == 0 {
@@ -101,7 +105,7 @@ impl AzureMultipartUpload {
         let bar = ProgressBar::new(chunk_count);
 
         let msg1 = LogColors::green("Uploading file:");
-        let msg2 = LogColors::purple(lpath.file_name().unwrap().to_string_lossy().as_ref());
+        let msg2 = LogColors::purple(&self.filename);
         let msg = format!("{} {}", msg1, msg2);
 
         let template = format!(
@@ -122,7 +126,6 @@ impl AzureMultipartUpload {
             };
 
             let upload_args = UploadPartArgs {
-                file_size,
                 presigned_url: None,
                 chunk_size: chunk_size as u64,
                 chunk_index,
@@ -628,10 +631,10 @@ impl FileSystem for AzureFSStorageClient {
                 let remote_path = stripped_rpath_clone.join(relative_path);
 
                 let mut uploader = self
-                    .create_multipart_uploader(&stripped_lpath_clone, &remote_path, None, None)
+                    .create_multipart_uploader(&stripped_file_path, &remote_path, None, None)
                     .await?;
 
-                uploader.upload_file_in_chunks(&stripped_file_path).await?;
+                uploader.upload_file_in_chunks().await?;
             }
 
             Ok(())
@@ -640,7 +643,7 @@ impl FileSystem for AzureFSStorageClient {
                 .create_multipart_uploader(&stripped_lpath, &stripped_rpath, None, None)
                 .await?;
 
-            uploader.upload_file_in_chunks(&stripped_lpath).await?;
+            uploader.upload_file_in_chunks().await?;
             Ok(())
         }
     }
