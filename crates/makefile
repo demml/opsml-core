@@ -1,16 +1,16 @@
-.PHONY: test.storage.gcs
+.PHONY: test.storage.gcs.http
 test.storage.gcs:
 	TEST_NAME=test_filesystemstorage_with_http_google  ./test.sh
 
-.PHONY: test.storage.aws
+.PHONY: test.storage.aws.http
 test.storage.aws:
 	TEST_NAME=test_filesystemstorage_with_http_aws  ./test.sh
 
-.PHONY: test.storage.local
+.PHONY: test.storage.local.http
 test.storage.local:
 	TEST_NAME=test_filesystemstorage_with_http_local  ./test.sh
 
-.PHONY: test.storage.azure
+.PHONY: test.storage.azure.http
 test.storage.azure:
 	TEST_NAME=test_filesystemstorage_with_http_azure  ./test.sh
 

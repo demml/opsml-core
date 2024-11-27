@@ -722,11 +722,11 @@ mod tests {
         let rpath_dir = Path::new("test_dir");
         let rpath = rpath_dir.join(&filename);
 
-        if storage_client.exists(&rpath_dir).await? {
-            storage_client.rm(&rpath_dir, true).await?;
+        if storage_client.exists(rpath_dir).await? {
+            storage_client.rm(rpath_dir, true).await?;
         }
 
-        assert!(!storage_client.exists(&rpath_dir).await?);
+        assert!(!storage_client.exists(rpath_dir).await?);
 
         // put
         storage_client.put(&lpath, &rpath, false).await?;
@@ -747,7 +747,7 @@ mod tests {
             .is_empty());
 
         // find
-        let blobs = storage_client.find(&rpath_dir).await?;
+        let blobs = storage_client.find(rpath_dir).await?;
 
         assert_eq!(
             blobs,
@@ -771,8 +771,8 @@ mod tests {
         assert!(!storage_client.exists(&rpath).await?);
 
         // rm recursive
-        storage_client.rm(&rpath_dir, true).await?;
-        assert!(!storage_client.exists(&rpath_dir).await?);
+        storage_client.rm(rpath_dir, true).await?;
+        assert!(!storage_client.exists(rpath_dir).await?);
 
         Ok(())
     }
@@ -798,13 +798,13 @@ mod tests {
         let new_rand_name = uuid::Uuid::new_v4().to_string();
         let rpath_root = Path::new(&new_rand_name);
 
-        if storage_client.exists(&rpath_root).await? {
-            storage_client.rm(&rpath_root, true).await?;
+        if storage_client.exists(rpath_root).await? {
+            storage_client.rm(rpath_root, true).await?;
         }
 
         // put
-        storage_client.put(&tmp_path, &rpath_root, true).await?;
-        assert_eq!(storage_client.find(&rpath_root).await?.len(), 3);
+        storage_client.put(tmp_path, rpath_root, true).await?;
+        assert_eq!(storage_client.find(rpath_root).await?.len(), 3);
 
         // copy
         let copy_dir = rpath_root.join("copy");
@@ -822,7 +822,7 @@ mod tests {
         storage_client.rm(&put_dir, true).await?;
         assert_eq!(storage_client.find(&put_dir).await?.len(), 0);
 
-        storage_client.rm(&rpath_root, true).await?;
+        storage_client.rm(rpath_root, true).await?;
 
         Ok(())
     }
