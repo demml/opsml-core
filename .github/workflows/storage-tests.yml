@@ -58,7 +58,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Run test script in the background
-        run: ./crates/test.sh &
+        run: ./crates/test.sh
 
       - name: Wait for service to be available
         run: |
