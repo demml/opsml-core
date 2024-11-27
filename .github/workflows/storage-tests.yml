@@ -59,10 +59,10 @@ jobs:
 
       - name: Build opsml_server
         working-directory: ./crates
-        run: cargo build --release -p opsml_server
+        run: cargo build -p opsml-server
 
       - name: Run opsml_server in the background
-        run: ./target/release/opsml_server &
+        run: ./target/release/opsml-server &
         env:
           OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
           OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
