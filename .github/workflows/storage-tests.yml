@@ -64,3 +64,76 @@ jobs:
           make test.storage.aws.http
         env:
           RUST_BACKTRACE: 1
+
+  gcs-rust-lints-test:
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      OPSML_STORAGE_URI: gs://${{ secrets.GCS_CLOUD_BUCKET_NAME }}
+      GOOGLE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_ACCOUNT_JSON_BASE64 }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup override set stable && rustup update
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo clippy
+        working-directory: ./crates
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: ./crates
+        run: |
+          make test.storage.gcs.client
+          sleep 5
+          make test.storage.gcs.http
+        env:
+          RUST_BACKTRACE: 1
+
+  azure-rust-lints-test:
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      OPSML_STORAGE_URI: az://${{ secrets.AZURE_CLOUD_BUCKET_NAME }}
+      AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Az CLI login"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Rust
+        run: rustup override set stable && rustup update
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo clippy
+        working-directory: ./crates
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        working-directory: ./crates
+        run: |
+          make test.storage.azure.client
+          sleep 5
+          make test.storage.azure.http
+        env:
+          RUST_BACKTRACE: 1
