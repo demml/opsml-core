@@ -32,7 +32,7 @@ jobs:
       id-token: write
       contents: read
     env:
-      OPSML_STORAGE_URI: s3//${{ secrets.AWS_CLOUD_BUCKET_NAME }}
+      OPSML_STORAGE_URI: s3://${{ secrets.AWS_CLOUD_BUCKET_NAME }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,11 +42,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: List
-        run: |
-          printenv | cut -d= -f1 | sort
-          aws s3 ls ${{ secrets.AWS_CLOUD_BUCKET_NAME }}
 
       - name: Set up Rust
         run: rustup override set stable && rustup update
