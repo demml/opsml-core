@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_filesystemstorage_with_http_google() {
+    async fn test_gcs_storage_client() {
         let config = OpsmlConfig::new(Some(true));
 
         let mut client = FileSystemStorage::new(&mut config.storage_settings())
@@ -448,7 +448,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_filesystemstorage_with_http_aws() {
+    async fn test_aws_storage_client() {
         let config = OpsmlConfig::new(Some(true));
 
         let mut client = FileSystemStorage::new(&mut config.storage_settings())
@@ -492,7 +492,59 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_filesystemstorage_with_http_local() {
+    async fn test_azure_storage_client() {
+        let config = OpsmlConfig::new(Some(true));
+
+        let mut client = FileSystemStorage::new(&mut config.storage_settings())
+            .await
+            .unwrap();
+
+        assert_eq!(client.name(), "HttpFSStorageClient");
+        assert_eq!(client.storage_type(), StorageType::Azure);
+
+        let dirname = create_nested_data();
+
+        let lpath = Path::new(&dirname);
+        let rpath = Path::new(&dirname);
+
+        // put the file
+        client.put(lpath, rpath, true).await.unwrap();
+
+        // check if the file exists
+        let exists = client.exists(rpath).await.unwrap();
+        assert!(exists);
+
+        // list all files
+        let files = client.find(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+
+        //// list files with info
+        let files = client.find_info(rpath).await.unwrap();
+        assert_eq!(files.len(), 2);
+        //
+        //// download the files
+        let new_path = uuid::Uuid::new_v4().to_string();
+        let new_path = Path::new(&new_path);
+
+        client.get(new_path, rpath, true).await.unwrap();
+
+        // check if the local file exists
+        let meta = std::fs::metadata(new_path).unwrap();
+        assert!(meta.is_dir());
+        //
+        //// check number of files in the directory
+        let files = std::fs::read_dir(new_path).unwrap();
+        assert_eq!(files.count(), 2);
+        //
+        ////// cleanup
+        std::fs::remove_dir_all(&dirname).unwrap();
+        std::fs::remove_dir_all(new_path).unwrap();
+        //
+        client.rm(rpath, true).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_local_storage_client() {
         let config = OpsmlConfig::new(Some(true));
 
         let mut client = FileSystemStorage::new(&mut config.storage_settings())
@@ -549,57 +601,5 @@ mod tests {
         // opsml_registries is 2 directories up
         let path = current_dir.join("../../opsml_registries");
         std::fs::remove_dir_all(&path).unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_filesystemstorage_with_http_azure() {
-        let config = OpsmlConfig::new(Some(true));
-
-        let mut client = FileSystemStorage::new(&mut config.storage_settings())
-            .await
-            .unwrap();
-
-        assert_eq!(client.name(), "HttpFSStorageClient");
-        assert_eq!(client.storage_type(), StorageType::Azure);
-
-        let dirname = create_nested_data();
-
-        let lpath = Path::new(&dirname);
-        let rpath = Path::new(&dirname);
-
-        // put the file
-        client.put(lpath, rpath, true).await.unwrap();
-
-        // check if the file exists
-        let exists = client.exists(rpath).await.unwrap();
-        assert!(exists);
-
-        // list all files
-        let files = client.find(rpath).await.unwrap();
-        assert_eq!(files.len(), 2);
-
-        //// list files with info
-        let files = client.find_info(rpath).await.unwrap();
-        assert_eq!(files.len(), 2);
-        //
-        //// download the files
-        let new_path = uuid::Uuid::new_v4().to_string();
-        let new_path = Path::new(&new_path);
-
-        client.get(new_path, rpath, true).await.unwrap();
-
-        // check if the local file exists
-        let meta = std::fs::metadata(new_path).unwrap();
-        assert!(meta.is_dir());
-        //
-        //// check number of files in the directory
-        let files = std::fs::read_dir(new_path).unwrap();
-        assert_eq!(files.count(), 2);
-        //
-        ////// cleanup
-        std::fs::remove_dir_all(&dirname).unwrap();
-        std::fs::remove_dir_all(new_path).unwrap();
-        //
-        client.rm(rpath, true).await.unwrap();
     }
 }

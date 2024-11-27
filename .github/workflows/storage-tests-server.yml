@@ -1,4 +1,4 @@
-name: Client Storage Tests
+name: Server Storage Tests
 
 on:
   push:
@@ -9,7 +9,6 @@ on:
 
 env:
   RUSTFLAGS: -C debuginfo=0 # Do not produce debug symbols to keep memory usage down
-  OPSML_SERVER_PORT: 3000
 
   # aws args
   AWS_REGION: "${{ secrets.AWS_REGION }}"
@@ -57,32 +56,12 @@ jobs:
         working-directory: ./crates
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Build opsml_server
-        run: cargo build -p opsml-server
-
-      - name: Upload opsml_server binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: opsml_server
-          path: ./target/debug/opsml-server
-
-      - name: Run opsml_server in the background
-        run: ./target/debug/opsml-server &
-        env:
-          OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
-          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
-
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.aws.client
+          make test.storage.aws.server
         env:
           RUST_BACKTRACE: 1
-          OPSML_TRACKING_URI: http://0.0.0.0:3000
-
-      - name: Shutdown background processes
-        run: |
-          lsof -ti tcp:3000 | xargs kill -9
 
   gcs-client-test:
     permissions:
@@ -96,38 +75,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        run: rustup override set stable && rustup update
-
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
 
-      - name: Download opsml_server binary
-        uses: actions/download-artifact@v4
-        with:
-          name: opsml_server
-          path: target/debug/
-
-      - name: Make opsml_server executable
-        run: chmod +x target/debug/opsml-server
-
-      - name: Run opsml_server in the background
-        run: target/debug/opsml-server &
-        env:
-          OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
-          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
+      - name: Set up Rust
+        run: rustup override set stable && rustup update
 
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.gcs.client
+          make test.storage.gcs.server
         env:
           RUST_BACKTRACE: 1
-          OPSML_TRACKING_URI: http://0.0.0.0:3000
-
-      - name: Shutdown background processes
-        run: |
-          lsof -ti tcp:3000 | xargs kill -9
 
   azure-client-test:
     needs: gcs-client-test
@@ -141,6 +100,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
       - name: "Az CLI login"
         uses: azure/login@v2
         with:
@@ -151,35 +113,12 @@ jobs:
       - name: Set up Rust
         run: rustup override set stable && rustup update
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-
-      - name: Download opsml_server binary
-        uses: actions/download-artifact@v4
-        with:
-          name: opsml_server
-          path: target/debug/
-
-      - name: Make opsml_server executable
-        run: chmod +x target/debug/opsml-server
-
-      - name: Run opsml_server in the background
-        run: target/debug/opsml-server &
-        env:
-          OPSML_STORAGE_URI: ${{ env.OPSML_STORAGE_URI }}
-          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
-
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.azure.client
+          make test.storage.azure.server
         env:
           RUST_BACKTRACE: 1
-          OPSML_TRACKING_URI: http://0.0.0.0:3000
-
-      - name: Shutdown background processes
-        run: |
-          lsof -ti tcp:3000 | xargs kill -9
 
   local-client-test:
     needs: azure-client-test
@@ -196,28 +135,9 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
 
-      - name: Download opsml_server binary
-        uses: actions/download-artifact@v4
-        with:
-          name: opsml_server
-          path: target/debug/
-
-      - name: Make opsml_server executable
-        run: chmod +x target/debug/opsml-server
-
-      - name: Run opsml_server in the background
-        run: target/debug/opsml-server &
-        env:
-          OPSML_SERVER_PORT: ${{ env.OPSML_SERVER_PORT }}
-
       - name: Tests
         working-directory: ./crates
         run: |
-          make test.storage.local.client
+          make test.storage.local.server
         env:
           RUST_BACKTRACE: 1
-          OPSML_TRACKING_URI: http://0.0.0.0:3000
-
-      - name: Shutdown background processes
-        run: |
-          lsof -ti tcp:3000 | xargs kill -9

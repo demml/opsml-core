@@ -943,7 +943,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aws_storage_client() -> Result<(), StorageError> {
+    async fn test_aws_storage_server() -> Result<(), StorageError> {
         let rand_name = uuid::Uuid::new_v4().to_string();
         let filename = format!("file-{}.txt", rand_name);
 
@@ -1016,7 +1016,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aws_storage_client_trees() -> Result<(), StorageError> {
+    async fn test_aws_storage_server_trees() -> Result<(), StorageError> {
         let rand_name = uuid::Uuid::new_v4().to_string();
 
         let tmp_dir = TempDir::new().unwrap();
