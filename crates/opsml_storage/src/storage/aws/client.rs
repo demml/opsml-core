@@ -40,6 +40,8 @@ impl AWSCreds {
     pub async fn new() -> Result<Self, StorageError> {
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
 
+        println!("AWS Config: {:?}", config);
+
         Ok(Self { config })
     }
 }

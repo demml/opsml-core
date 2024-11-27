@@ -45,6 +45,7 @@ jobs:
 
       - name: List
         run: |
+          printenv | cut -d= -f1 | sort
           aws s3 ls ${{ secrets.AWS_CLOUD_BUCKET_NAME }}
 
       - name: Set up Rust
