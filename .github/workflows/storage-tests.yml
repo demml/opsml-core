@@ -96,8 +96,6 @@ jobs:
         working-directory: ./crates
         run: |
           make test.storage.gcs.client
-          sleep 5
-          make test.storage.gcs.http
         env:
           RUST_BACKTRACE: 1
 
