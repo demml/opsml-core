@@ -22,3 +22,21 @@ impl SqlClient for PostgresClient {
         Self { pool }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[tokio::test]
+    async fn test_postgres() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+        };
+
+        let client = PostgresClient::new(&config).await;
+        // Add assertions or further test logic here
+    }
+}

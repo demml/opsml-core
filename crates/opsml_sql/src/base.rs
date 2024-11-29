@@ -4,4 +4,5 @@ use opsml_settings::config::OpsmlDatabaseSettings;
 #[async_trait]
 pub trait SqlClient {
     async fn new(settings: &OpsmlDatabaseSettings) -> Self;
+    async fn run_migration(&self, migration: &str) -> Result<(), sqlx::Error>;
 }

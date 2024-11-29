@@ -18,6 +18,15 @@ impl SqlClient for SqliteClient {
 
         Self { pool }
     }
+
+    async fn run_migration(&self, migration: &str) -> Result<(), sqlx::Error> {
+        sqlx::migrate!("./migrations")
+            .run(&self.pool)
+            .await
+            .expect("Failed to run migration");
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
