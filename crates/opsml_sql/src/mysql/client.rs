@@ -50,6 +50,7 @@ impl SqlClient for MySqlClient {
 mod tests {
 
     use super::*;
+    use opsml_settings::config::SqlType;
     use std::env;
 
     #[tokio::test]
@@ -58,6 +59,7 @@ mod tests {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
+            sql_type: SqlType::MySql,
         };
 
         let _client = MySqlClient::new(&config).await;

@@ -50,6 +50,7 @@ impl SqlClient for PostgresClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opsml_settings::config::SqlType;
     use std::env;
 
     #[tokio::test]
@@ -58,6 +59,7 @@ mod tests {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
+            sql_type: SqlType::Postgres,
         };
 
         let _client = PostgresClient::new(&config).await;

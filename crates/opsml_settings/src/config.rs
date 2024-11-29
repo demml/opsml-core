@@ -14,6 +14,13 @@ pub enum StorageType {
     Azure,
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SqlType {
+    Postgres,
+    Sqlite,
+    MySql,
+}
+
 /// ApiSettings for use with ApiClient
 #[derive(Debug, Clone)]
 #[pyclass]
@@ -44,6 +51,7 @@ pub struct OpsmlStorageSettings {
 pub struct OpsmlDatabaseSettings {
     pub connection_uri: String,
     pub max_connections: u32,
+    pub sql_type: SqlType,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -210,6 +218,17 @@ impl OpsmlConfig {
             StorageType::Local
         }
     }
+
+    fn get_sql_type(&self) -> SqlType {
+        let tracking_uri_lower = self.opsml_tracking_uri.to_lowercase();
+        if tracking_uri_lower.starts_with("postgres") {
+            SqlType::Postgres
+        } else if tracking_uri_lower.starts_with("mysql") {
+            SqlType::MySql
+        } else {
+            SqlType::Sqlite
+        }
+    }
 }
 
 #[pymethods]
@@ -251,9 +270,11 @@ impl OpsmlConfig {
     }
 
     pub fn database_settings(&self) -> OpsmlDatabaseSettings {
+        let sql_type = self.get_sql_type();
         OpsmlDatabaseSettings {
             connection_uri: self.opsml_tracking_uri.clone(),
             max_connections: self.opsml_max_pool_connections,
+            sql_type,
         }
     }
 }

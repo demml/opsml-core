@@ -47,12 +47,14 @@ impl SqlClient for SqliteClient {
 mod tests {
 
     use super::*;
+    use opsml_settings::config::SqlType;
 
     #[tokio::test]
     async fn test_sqlite() {
         let config = OpsmlDatabaseSettings {
             connection_uri: "sqlite::memory:".to_string(),
             max_connections: 1,
+            sql_type: SqlType::Sqlite,
         };
 
         let _client = SqliteClient::new(&config).await;
