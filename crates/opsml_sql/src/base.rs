@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use opsml_settings::config::OpsmlStorageSettings;
+use opsml_settings::config::OpsmlDatabaseSettings;
 
 #[async_trait]
-pub trait FileSystem {
-    async fn new(settings: &OpsmlStorageSettings) -> Self;
+pub trait SqlClient {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Self;
 }
