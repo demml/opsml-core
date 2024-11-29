@@ -6,12 +6,12 @@ use sqlx::{
     Pool,
 };
 
-pub struct SqlLiteClient {
+pub struct PostgresClient {
     pub pool: Pool<Postgres>,
 }
 
 #[async_trait]
-impl SqlClient for SqlLiteClient {
+impl SqlClient for PostgresClient {
     async fn new(settings: &OpsmlDatabaseSettings) -> Self {
         let pool = PgPoolOptions::new()
             .max_connections(settings.max_connections)

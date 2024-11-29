@@ -6,12 +6,12 @@ use sqlx::{
     Pool,
 };
 
-pub struct SqlLiteClient {
+pub struct MySqlClient {
     pub pool: Pool<MySql>,
 }
 
 #[async_trait]
-impl SqlClient for SqlLiteClient {
+impl SqlClient for MySqlClient {
     async fn new(settings: &OpsmlDatabaseSettings) -> Self {
         let pool = MySqlPoolOptions::new()
             .max_connections(settings.max_connections)
@@ -20,5 +20,21 @@ impl SqlClient for SqlLiteClient {
             .expect("Failed to connect to Postgres database");
 
         Self { pool }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_mysql() -> () {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite://:memory:".to_string(),
+            max_connections: 1,
+        };
+
+        let client = MySqlClient::new(&config).await;
     }
 }
