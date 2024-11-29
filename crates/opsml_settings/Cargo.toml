@@ -1,0 +1,16 @@
+[package]
+name = "opsml-settings"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+license = "MIT"
+description = "Opsml settings rust and python bindings"
+
+[dependencies]
+opsml-error = { workspace = true }
+
+colored = { workspace = true}
+pyo3 = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
