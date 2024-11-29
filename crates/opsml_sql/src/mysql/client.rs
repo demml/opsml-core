@@ -1,10 +1,13 @@
 use crate::base::SqlClient;
 use async_trait::async_trait;
+use opsml_error::error::SqlError;
+use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
 use sqlx::{
     mysql::{MySql, MySqlPoolOptions},
     Pool,
 };
+use tracing::info;
 
 pub struct MySqlClient {
     pub pool: Pool<MySql>,
@@ -19,7 +22,27 @@ impl SqlClient for MySqlClient {
             .await
             .expect("Failed to connect to Postgres database");
 
-        Self { pool }
+        // attempt to start logging, silently fail if it fails
+        let _ = (setup_logging().await).is_ok();
+
+        let client = Self { pool };
+
+        // run migrations
+        client
+            .run_migrations()
+            .await
+            .expect("Failed to run migrations");
+
+        client
+    }
+    async fn run_migrations(&self) -> Result<(), SqlError> {
+        info!("Running migrations");
+        sqlx::migrate!("src/mysql/migrations")
+            .run(&self.pool)
+            .await
+            .map_err(|e| SqlError::MigrationError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -27,14 +50,16 @@ impl SqlClient for MySqlClient {
 mod tests {
 
     use super::*;
+    use std::env;
 
     #[tokio::test]
-    async fn test_mysql() -> () {
+    async fn test_mysql() {
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite://:memory:".to_string(),
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
         };
 
-        let client = MySqlClient::new(&config).await;
+        let _client = MySqlClient::new(&config).await;
     }
 }

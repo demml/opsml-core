@@ -1,10 +1,13 @@
 use crate::base::SqlClient;
 use async_trait::async_trait;
+use opsml_error::error::SqlError;
+use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
 use sqlx::{
     postgres::{PgPoolOptions, Postgres},
     Pool,
 };
+use tracing::info;
 
 pub struct PostgresClient {
     pub pool: Pool<Postgres>,
@@ -19,7 +22,28 @@ impl SqlClient for PostgresClient {
             .await
             .expect("Failed to connect to Postgres database");
 
-        Self { pool }
+        // attempt to start logging, silently fail if it fails
+        let _ = (setup_logging().await).is_ok();
+
+        let client = Self { pool };
+
+        // run migrations
+        client
+            .run_migrations()
+            .await
+            .expect("Failed to run migrations");
+
+        client
+    }
+
+    async fn run_migrations(&self) -> Result<(), SqlError> {
+        info!("Running migrations");
+        sqlx::migrate!("src/postgres/migrations")
+            .run(&self.pool)
+            .await
+            .map_err(|e| SqlError::MigrationError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -36,7 +60,7 @@ mod tests {
             max_connections: 1,
         };
 
-        let client = PostgresClient::new(&config).await;
+        let _client = PostgresClient::new(&config).await;
         // Add assertions or further test logic here
     }
 }
