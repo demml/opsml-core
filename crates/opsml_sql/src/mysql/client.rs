@@ -1,3 +1,4 @@
+use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
@@ -42,6 +43,16 @@ impl SqlClient for MySqlClient {
             .await
             .map_err(|e| SqlError::MigrationError(format!("{}", e)))?;
 
+        Ok(())
+    }
+
+    async fn get_versions(
+        &self,
+        table: CardSQLTableNames,
+        name: &str,
+        repository: &str,
+        version: Option<&str>,
+    ) -> Result<(), SqlError> {
         Ok(())
     }
 }

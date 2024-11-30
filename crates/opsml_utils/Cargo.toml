@@ -13,5 +13,6 @@ opsml-error = { workspace = true }
 colored = { workspace = true}
 colored_json = { workspace = true}
 pyo3 = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

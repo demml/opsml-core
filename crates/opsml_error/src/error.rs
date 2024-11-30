@@ -91,3 +91,15 @@ pub enum SqlError {
     #[error("Failed to run sql migrations: {0}")]
     MigrationError(String),
 }
+
+#[derive(Error, Debug)]
+pub enum VersionError {
+    #[error("SemVer failed: {0}")]
+    SemVerError(String),
+
+    #[error("Invalid version: {0}")]
+    InvalidVersion(String),
+
+    #[error("Invalid pre release: {0}")]
+    InvalidPreRelease(String),
+}

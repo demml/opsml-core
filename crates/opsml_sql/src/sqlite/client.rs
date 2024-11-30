@@ -1,10 +1,14 @@
+use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
+use crate::queries::shared::Queries;
+use crate::sqlite::schema::VersionResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
+
 pub struct SqliteClient {
     pub pool: Pool<Sqlite>,
 }
@@ -38,6 +42,44 @@ impl SqlClient for SqliteClient {
             .run(&self.pool)
             .await
             .map_err(|e| SqlError::MigrationError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_versions(
+        &self,
+        table: CardSQLTableNames,
+        name: &str,
+        repository: &str,
+        version: Option<&str>,
+    ) -> Result<(), SqlError> {
+        let query = Queries::GetVersions.get_query();
+
+        let built_query = if version.is_some() {
+            let query = format!(
+                "{} AND version like '%{}%' ORDER BY timestamp, version",
+                query.sql,
+                version.unwrap()
+            );
+
+            sqlx::query_as::<_, VersionResult>(&query)
+                .bind(&table.to_string())
+                .bind(&name)
+                .bind(&repository)
+                .bind(version.unwrap())
+                .fetch_all(&self.pool)
+                .await
+        } else {
+            let query = format!("{} ORDER BY timestamp, version", query.sql);
+            sqlx::query_as::<_, VersionResult>(&query)
+                .bind(&table.to_string())
+                .bind(&name)
+                .bind(&repository)
+                .fetch_all(&self.pool)
+                .await
+        };
+
+        //
 
         Ok(())
     }
