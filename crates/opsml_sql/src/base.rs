@@ -1,3 +1,4 @@
+use crate::schemas::schema::VersionResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
@@ -34,5 +35,5 @@ pub trait SqlClient {
         name: &str,
         repository: &str,
         version: Option<&str>,
-    ) -> Result<(), SqlError>;
+    ) -> Result<Vec<VersionResult>, SqlError>;
 }

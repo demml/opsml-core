@@ -1,12 +1,9 @@
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 
-use sqlx::sqlite::SqliteRow;
-use sqlx::FromRow;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct VersionResult {
-    pub date: NaiveDateTime,
+    pub date: String,
     pub timestamp: i64,
     pub name: String,
     pub repository: String,

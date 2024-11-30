@@ -1,11 +1,13 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
-use crate::queries::shared::Queries;
-use crate::sqlite::schema::VersionResult;
+use crate::schemas::schema::VersionResult;
+use crate::sqlite::queries::helper::Queries;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use sqlx::sqlite::SqliteRow;
+use sqlx::FromRow;
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
 
@@ -52,36 +54,39 @@ impl SqlClient for SqliteClient {
         name: &str,
         repository: &str,
         version: Option<&str>,
-    ) -> Result<(), SqlError> {
-        let query = Queries::GetVersions.get_query();
+    ) -> Result<Vec<VersionResult>, SqlError> {
+        // if version is None, get the latest version
+        let cards = match version {
+            Some(_) => {
+                let query = Queries::GetCardsWithVersion.get_query();
+                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
+                    .bind(table.to_string())
+                    .bind(name)
+                    .bind(repository)
+                    .bind(version)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-        let built_query = if version.is_some() {
-            let query = format!(
-                "{} AND version like '%{}%' ORDER BY timestamp, version",
-                query.sql,
-                version.unwrap()
-            );
+                result
+            }
+            None => {
+                let query = Queries::GetCardsWithoutVersion.get_query();
+                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
+                    .bind(table.to_string())
+                    .bind(name)
+                    .bind(repository)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-            sqlx::query_as::<_, VersionResult>(&query)
-                .bind(&table.to_string())
-                .bind(&name)
-                .bind(&repository)
-                .bind(version.unwrap())
-                .fetch_all(&self.pool)
-                .await
-        } else {
-            let query = format!("{} ORDER BY timestamp, version", query.sql);
-            sqlx::query_as::<_, VersionResult>(&query)
-                .bind(&table.to_string())
-                .bind(&name)
-                .bind(&repository)
-                .fetch_all(&self.pool)
-                .await
+                result
+            }
         };
 
-        //
+        Ok(cards)
 
-        Ok(())
+        //
     }
 }
 

@@ -90,6 +90,9 @@ pub enum ServerError {
 pub enum SqlError {
     #[error("Failed to run sql migrations: {0}")]
     MigrationError(String),
+
+    #[error("Failed to run sql query: {0}")]
+    QueryError(String),
 }
 
 #[derive(Error, Debug)]

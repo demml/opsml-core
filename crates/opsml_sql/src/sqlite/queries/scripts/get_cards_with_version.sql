@@ -22,4 +22,5 @@ ORDER BY
     CASE
       WHEN INSTR(version, '-') > 0 THEN SUBSTR(version, INSTR(version, '-') + 1)
       ELSE ''
-    END DESC;
+    END DESC
+LIMIT 20;
