@@ -27,3 +27,7 @@ format:
 .PHONY: lints
 lints:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+.PHONY: test.utils
+test.utils:
+	cargo test -p opsml-utils -- --nocapture

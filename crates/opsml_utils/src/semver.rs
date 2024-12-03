@@ -141,8 +141,38 @@ impl VersionParser {
     }
 
     pub fn remove_version_prefix(&self, version: &str) -> String {
+        // break version into parts
         match self {
-            VersionParser::Star => version.replace("*", ""),
+            VersionParser::Star => {
+                // split into part. Check if each part has the special character
+                // if there is a special character, remove it
+                // once special character is removed, check if the part is empty or a number
+                // if empty, replace with 0
+                let parts = version.split(".").into_iter().map(|p| {
+                    if p.contains('*') {
+                        // remove the * with empty string
+                        let p = p.replace("*", "");
+
+                        // if p is empty, replace with 0
+                        if p.is_empty() {
+                            "0".to_string()
+                        } else {
+                            p
+                        }
+                    } else {
+                        p.to_string()
+                    }
+                });
+
+                let collected = parts.collect::<Vec<String>>().join(".");
+
+                // gotcha for the case where a * defualts to 0, It should default to ""
+                if collected == "0" && version == "*" {
+                    "".to_string()
+                } else {
+                    collected
+                }
+            }
             VersionParser::Caret => version.replace("^", ""),
             VersionParser::Tilde => version.replace("~", ""),
             VersionParser::Exact => version.to_string(),
@@ -151,16 +181,19 @@ impl VersionParser {
 
     pub fn get_version_to_search(&self, version: &str) -> Result<VersionBounds, VersionError> {
         let parser = VersionParser::new(version)?;
+
         let cleaned_version = parser.remove_version_prefix(version);
 
-        println!("cleaned_version: {}", cleaned_version);
-
         // determine number of "." in the version and split into int parts
-        let version_parts = cleaned_version
-            .split(".")
-            .map(|v| v.parse::<u64>())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?;
+        let version_parts = if !cleaned_version.is_empty() {
+            cleaned_version
+                .split(".")
+                .map(|v| v.parse::<u64>())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| VersionError::InvalidVersion(e.to_string()))?
+        } else {
+            vec![]
+        };
 
         let num_parts = version_parts.len();
 
@@ -168,9 +201,9 @@ impl VersionParser {
             VersionParser::Star => {
                 if num_parts == 0 {
                     Ok(VersionBounds {
-                        lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                        lower_bound: Version::parse(&format!("0.0.0"))
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
-                        upper_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                        upper_bound: Version::parse(&format!("0.0.0"))
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: true,
                         parser_type: VersionParser::Star,
@@ -207,7 +240,7 @@ impl VersionParser {
                 }
             }
             VersionParser::Tilde => {
-                if num_parts == 0 {
+                if num_parts == 1 {
                     Ok(VersionBounds {
                         lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
@@ -216,7 +249,7 @@ impl VersionParser {
                         no_upper_bound: false,
                         parser_type: VersionParser::Tilde,
                     })
-                } else if num_parts == 1 {
+                } else if num_parts == 2 {
                     Ok(VersionBounds {
                         lower_bound: Version::parse(&format!(
                             "{}.{}.0",
@@ -232,7 +265,7 @@ impl VersionParser {
                         no_upper_bound: false,
                         parser_type: VersionParser::Tilde,
                     })
-                } else if num_parts == 2 {
+                } else if num_parts >= 3 {
                     Ok(VersionBounds {
                         lower_bound: Version::parse(&format!(
                             "{}.{}.{}",
@@ -256,6 +289,7 @@ impl VersionParser {
             }
             VersionParser::Caret => {
                 // must bea  full semver version for caret
+
                 if num_parts >= 2 {
                     Ok(VersionBounds {
                         lower_bound: Version::parse(&format!(
@@ -395,6 +429,9 @@ mod tests {
     #[test]
     fn test_version_parser_remove_version_prefix() {
         assert_eq!(VersionParser::Star.remove_version_prefix("*"), "");
+        assert_eq!(VersionParser::Star.remove_version_prefix("*1"), "1");
+        assert_eq!(VersionParser::Star.remove_version_prefix("1.*"), "1.0");
+        assert_eq!(VersionParser::Star.remove_version_prefix("1.2.*"), "1.2.0");
         assert_eq!(
             VersionParser::Caret.remove_version_prefix("^1.2.3"),
             "1.2.3"
@@ -411,5 +448,21 @@ mod tests {
         let bounds = VersionParser::Star.get_version_to_search("*").unwrap();
         assert_eq!(bounds.lower_bound, Version::parse("0.0.0").unwrap());
         assert!(bounds.no_upper_bound);
+
+        let bounds = VersionParser::Star.get_version_to_search("1.*").unwrap();
+        assert_eq!(bounds.lower_bound, Version::parse("1.0.0").unwrap());
+        assert_eq!(bounds.upper_bound, Version::parse("1.1.0").unwrap());
+
+        let bounds = VersionParser::Caret
+            .get_version_to_search("^1.2.3")
+            .unwrap();
+        assert_eq!(bounds.lower_bound, Version::parse("1.2.3").unwrap());
+        assert_eq!(bounds.upper_bound, Version::parse("1.3.0").unwrap());
+
+        let bounds = VersionParser::Tilde
+            .get_version_to_search("~1.2.3")
+            .unwrap();
+        assert_eq!(bounds.lower_bound, Version::parse("1.2.3").unwrap());
+        assert_eq!(bounds.upper_bound, Version::parse("1.3.0").unwrap());
     }
 }
