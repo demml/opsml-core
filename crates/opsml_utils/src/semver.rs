@@ -1,3 +1,4 @@
+use core::num;
 use opsml_error::error::VersionError;
 use semver::{BuildMetadata, Prerelease, Version};
 use std::str::FromStr;
@@ -110,6 +111,14 @@ impl VersionValidator {
     }
 }
 
+pub struct VersionBounds {
+    pub lower_bound: Version,
+    pub upper_bound: Version,
+    pub no_upper_bound: bool,
+    pub parser_type: VersionParser,
+}
+
+#[derive(PartialEq, Debug)]
 pub enum VersionParser {
     Star,
     Caret,
@@ -130,47 +139,277 @@ impl VersionParser {
             Ok(VersionParser::Exact)
         }
     }
-    pub fn get_version_to_search(&self, version: &str) -> Result<String, VersionError> {
+
+    pub fn remove_version_prefix(&self, version: &str) -> String {
         match self {
+            VersionParser::Star => version.replace("*", ""),
+            VersionParser::Caret => version.replace("^", ""),
+            VersionParser::Tilde => version.replace("~", ""),
+            VersionParser::Exact => version.to_string(),
+        }
+    }
+
+    pub fn get_version_to_search(&self, version: &str) -> Result<VersionBounds, VersionError> {
+        let parser = VersionParser::new(version)?;
+        let cleaned_version = parser.remove_version_prefix(version);
+
+        println!("cleaned_version: {}", cleaned_version);
+
+        // determine number of "." in the version and split into int parts
+        let version_parts = cleaned_version
+            .split(".")
+            .map(|v| v.parse::<u64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?;
+
+        let num_parts = version_parts.len();
+
+        match parser {
             VersionParser::Star => {
-                // remove star, create version and return major
-                // *1.2.0 -> 1.2.0 -> 1
-                let cleaned = version.replace("*", "");
-                match Version::parse(&cleaned) {
-                    Ok(_) => Ok("".to_string()),
-                    Err(e) => Err(VersionError::SemVerError(e.to_string())),
+                if num_parts == 0 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: true,
+                        parser_type: VersionParser::Star,
+                    })
+                } else if num_parts == 1 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!("{}.0.0", version_parts[0] + 1))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Star,
+                    })
+                } else if num_parts == 2 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0], version_parts[1]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0],
+                            version_parts[1] + 1
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Star,
+                    })
+                } else {
+                    Err(VersionError::InvalidVersion(
+                        "Invalid version provided with * syntax".to_string(),
+                    ))
                 }
             }
             VersionParser::Tilde => {
-                // remove star, create version and return major
-                // *1.2.0 -> 1.2.0 -> 1
-                let cleaned = version.replace("~", "");
-
-                match Version::parse(&cleaned) {
-                    Ok(v) => {
-                        let version = format!("{}.{}", v.major, v.minor);
-                        Ok(version)
-                    }
-                    Err(e) => Err(VersionError::SemVerError(e.to_string())),
+                if num_parts == 0 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!("{}.0.0", version_parts[0] + 1))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Tilde,
+                    })
+                } else if num_parts == 1 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0], version_parts[1]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0],
+                            version_parts[1] + 1
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Tilde,
+                    })
+                } else if num_parts == 2 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0], version_parts[1], version_parts[2]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0],
+                            version_parts[1] + 1,
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Tilde,
+                    })
+                } else {
+                    Err(VersionError::InvalidVersion(
+                        "Invalid version provided with ~ syntax".to_string(),
+                    ))
                 }
             }
             VersionParser::Caret => {
-                // remove star, create version and return major
-                // *1.2.0 -> 1.2.0 -> 1
-                let cleaned = version.replace("^", "");
-
-                match Version::parse(&cleaned) {
-                    Ok(v) => {
-                        let version = format!("{}", v.major);
-                        Ok(version)
-                    }
-                    Err(e) => Err(VersionError::SemVerError(e.to_string())),
+                // must bea  full semver version for caret
+                if num_parts >= 2 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0], version_parts[1], version_parts[2]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0],
+                            version_parts[1] + 1,
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Caret,
+                    })
+                } else {
+                    Err(VersionError::InvalidVersion(
+                        "Invalid version provided with ^ syntax".to_string(),
+                    ))
                 }
             }
-            VersionParser::Exact => match Version::parse(version) {
-                Ok(v) => Ok(v.to_string()),
-                Err(e) => Err(VersionError::SemVerError(e.to_string())),
-            },
+            VersionParser::Exact => Version::parse(&cleaned_version)
+                .map(|v| VersionBounds {
+                    lower_bound: v.clone(),
+                    upper_bound: v,
+                    no_upper_bound: true,
+                    parser_type: VersionParser::Exact,
+                })
+                .map_err(|e| VersionError::InvalidVersion(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use semver::Version;
+
+    #[test]
+    fn test_version_validator_validate_version() {
+        assert!(VersionValidator::validate_version("1.2.3").is_ok());
+        assert!(VersionValidator::validate_version("invalid.version").is_err());
+    }
+
+    #[test]
+    fn test_version_validator_bump_version() {
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::Major,
+            pre: None,
+            build: None,
+        };
+        assert_eq!(VersionValidator::bump_version(&args).unwrap(), "2.0.0");
+
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::Minor,
+            pre: None,
+            build: None,
+        };
+        assert_eq!(VersionValidator::bump_version(&args).unwrap(), "1.3.0");
+
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::Patch,
+            pre: None,
+            build: None,
+        };
+        assert_eq!(VersionValidator::bump_version(&args).unwrap(), "1.2.4");
+
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::Pre,
+            pre: Some("alpha".to_string()),
+            build: None,
+        };
+        assert_eq!(
+            VersionValidator::bump_version(&args).unwrap(),
+            "1.2.3-alpha"
+        );
+
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::Build,
+            pre: None,
+            build: Some("001".to_string()),
+        };
+        assert_eq!(VersionValidator::bump_version(&args).unwrap(), "1.2.3+001");
+
+        let args = VersionArgs {
+            version: "1.2.3".to_string(),
+            version_type: VersionType::PreBuild,
+            pre: Some("alpha".to_string()),
+            build: Some("001".to_string()),
+        };
+        assert_eq!(
+            VersionValidator::bump_version(&args).unwrap(),
+            "1.2.3-alpha+001"
+        );
+    }
+
+    #[test]
+    fn test_version_validator_sort_versions() {
+        let versions = vec![
+            "1.2.1".to_string(),
+            "1.3.0".to_string(),
+            "1.2.2".to_string(),
+            "1.2.3-alpha+001".to_string(),
+            "1.2.3+001".to_string(),
+            "1.2.3+0b1".to_string(),
+            "1.2.3".to_string(),
+        ];
+        let sorted_versions = VersionValidator::sort_versions(versions).unwrap();
+        assert_eq!(
+            sorted_versions,
+            vec![
+                "1.2.1",
+                "1.2.2",
+                "1.2.3-alpha+001",
+                "1.2.3",
+                "1.2.3+001",
+                "1.2.3+0b1",
+                "1.3.0"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_version_parser_new() {
+        assert_eq!(VersionParser::new("*").unwrap(), VersionParser::Star);
+        assert_eq!(VersionParser::new("^1.2.3").unwrap(), VersionParser::Caret);
+        assert_eq!(VersionParser::new("~1.2.3").unwrap(), VersionParser::Tilde);
+        assert_eq!(VersionParser::new("1.2.3").unwrap(), VersionParser::Exact);
+    }
+
+    #[test]
+    fn test_version_parser_remove_version_prefix() {
+        assert_eq!(VersionParser::Star.remove_version_prefix("*"), "");
+        assert_eq!(
+            VersionParser::Caret.remove_version_prefix("^1.2.3"),
+            "1.2.3"
+        );
+        assert_eq!(
+            VersionParser::Tilde.remove_version_prefix("~1.2.3"),
+            "1.2.3"
+        );
+        assert_eq!(VersionParser::Exact.remove_version_prefix("1.2.3"), "1.2.3");
+    }
+
+    #[test]
+    fn test_version_parser_get_version_to_search() {
+        let bounds = VersionParser::Star.get_version_to_search("*").unwrap();
+        assert_eq!(bounds.lower_bound, Version::parse("0.0.0").unwrap());
+        assert!(bounds.no_upper_bound);
     }
 }
