@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS opsml_data_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     contact TEXT,
     tags TEXT,
     data_type TEXT,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS opsml_model_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     contact TEXT,
     tags TEXT,
     datacard_uid TEXT,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     contact TEXT,
     tags TEXT,
     datacard_uids TEXT,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS opsml_audit_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     contact TEXT,
     tags TEXT,
     approved BOOLEAN,
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     contact TEXT,
     tags TEXT,
     pipeline_code_uri TEXT,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     minor INT NOT NULL,
     patch INT NOT NULL,
     pre_tag VARCHAR(255),
-    build_tag VARCHAR(255)
+    build_tag VARCHAR(255),
     timestamp INTEGER
 );
 

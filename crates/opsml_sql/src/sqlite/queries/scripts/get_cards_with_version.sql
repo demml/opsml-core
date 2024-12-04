@@ -8,9 +8,11 @@ SELECT
     patch,
     pre_tag,
     build_tag,
-    contact
-FROM $1
+    contact,
+    uid
+FROM {}
 WHERE 
+    1=1
     AND name = $2
     AND repository = $3
     AND (major = $4 AND minor >= $5)

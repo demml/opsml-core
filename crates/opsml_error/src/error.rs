@@ -96,6 +96,9 @@ pub enum SqlError {
 
     #[error("Failed to parse version: {0}")]
     VersionError(String),
+
+    #[error("File error: {0}")]
+    FileError(String),
 }
 
 #[derive(Error, Debug)]

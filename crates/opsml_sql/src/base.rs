@@ -32,8 +32,8 @@ pub trait SqlClient {
     async fn get_versions(
         &self,
         table: CardSQLTableNames,
-        name: &str,
-        repository: &str,
+        name: Option<&str>,
+        repository: Option<&str>,
         version: Option<&str>,
     ) -> Result<Vec<VersionResult>, SqlError>;
 }

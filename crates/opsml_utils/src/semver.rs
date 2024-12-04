@@ -111,6 +111,7 @@ impl VersionValidator {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct VersionBounds {
     pub lower_bound: Version,
     pub upper_bound: Version,

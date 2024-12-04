@@ -1,9 +1,12 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
+use crate::schemas::schema::VersionResult;
+use crate::sqlite::queries::helper::Queries;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_utils::semver::VersionParser;
 use sqlx::{
     mysql::{MySql, MySqlPoolOptions},
     Pool,
@@ -49,11 +52,57 @@ impl SqlClient for MySqlClient {
     async fn get_versions(
         &self,
         table: CardSQLTableNames,
-        name: &str,
-        repository: &str,
+        name: Option<&str>,
+        repository: Option<&str>,
         version: Option<&str>,
-    ) -> Result<(), SqlError> {
-        Ok(())
+    ) -> Result<Vec<VersionResult>, SqlError> {
+        // if version is None, get the latest version
+        let cards = match version {
+            Some(version) => {
+                let version_bounds = VersionParser::get_version_to_search(version)
+                    .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+                let upper_bound = if version_bounds.no_upper_bound {
+                    "".to_string()
+                } else {
+                    format!(
+                        "AND (major = {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor,
+                    )
+                };
+
+                let query = Queries::GetCardsWithVersion.get_query();
+                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
+                    .bind(table.to_string())
+                    .bind(name)
+                    .bind(repository)
+                    .bind(version)
+                    .bind(version_bounds.upper_bound.major.to_string())
+                    .bind(version_bounds.upper_bound.minor.to_string())
+                    .bind(upper_bound)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                result
+            }
+            None => {
+                let query = Queries::GetCardsWithoutVersion.get_query();
+                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
+                    .bind(table.to_string())
+                    .bind(name)
+                    .bind(repository)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                result
+            }
+        };
+
+        Ok(cards)
+
+        //
     }
 }
 
