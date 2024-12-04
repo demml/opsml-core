@@ -96,7 +96,11 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
-    version VARCHAR(64) NOT NULL,
+    major INT NOT NULL,
+    minor INT NOT NULL,
+    patch INT NOT NULL,
+    pre_tag VARCHAR(64),
+    build_tag VARCHAR(64),
     contact VARCHAR(64),
     tags JSON,
     pipeline_code_uri VARCHAR(256),
@@ -111,7 +115,11 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     name VARCHAR(128),
     repository VARCHAR(128),
     project_id INT PRIMARY KEY AUTO_INCREMENT,
-    version VARCHAR(64) NOT NULL,
+    major INT NOT NULL,
+    minor INT NOT NULL,
+    patch INT NOT NULL,
+    pre_tag VARCHAR(64),
+    build_tag VARCHAR(64),
     timestamp BIGINT
 );
 

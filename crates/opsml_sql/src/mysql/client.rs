@@ -76,11 +76,11 @@ impl SqlClient for MySqlClient {
         builder.push(format!(" FROM {} ", table.to_string()));
 
         // add where clause due to multiple combinations
-        builder.push(" WHERE 1==1");
-        builder.push(" AND name == ");
+        builder.push(" WHERE 1=1");
+        builder.push(" AND name = ");
         builder.push_bind(name);
 
-        builder.push(" AND repository == ");
+        builder.push(" AND repository = ");
         builder.push_bind(repository);
         if let Some(version) = version {
             let version_bounds = VersionParser::get_version_to_search(version)
@@ -103,26 +103,26 @@ impl SqlClient for MySqlClient {
                     ));
                 } else if version_bounds.num_parts == 2 {
                     builder.push(format!(
-                        " AND (major == {} AND minor < {})",
+                        " AND (major = {} AND minor < {})",
                         version_bounds.upper_bound.major, version_bounds.upper_bound.minor
                     ));
                 } else if version_bounds.num_parts == 3
                     && version_bounds.parser_type == VersionParser::Tilde
                 {
                     builder.push(format!(
-                        " AND (major == {} AND minor < {})",
+                        " AND (major = {} AND minor < {})",
                         version_bounds.upper_bound.major, version_bounds.upper_bound.minor
                     ));
                 } else if version_bounds.num_parts == 3
                     && version_bounds.parser_type == VersionParser::Caret
                 {
                     builder.push(format!(
-                        " AND (major == {} AND minor < {})",
+                        " AND (major = {} AND minor < {})",
                         version_bounds.upper_bound.major, version_bounds.upper_bound.minor
                     ));
                 } else {
                     builder.push(format!(
-                        " AND (major == {} AND minor == {} AND patch < {})",
+                        " AND (major = {} AND minor = {} AND patch < {})",
                         version_bounds.upper_bound.major,
                         version_bounds.upper_bound.minor,
                         version_bounds.upper_bound.patch
@@ -163,6 +163,27 @@ mod tests {
     use opsml_settings::config::SqlType;
     use std::env;
 
+    pub async fn cleanup(pool: &Pool<MySql>) {
+        sqlx::raw_sql(
+            r#"
+            DELETE 
+            FROM opsml_data_registry;
+
+            DELETE 
+            FROM opsml_model_registry;
+
+            DELETE
+            FROM opsml_run_registry;
+
+            DELETE
+            FROM opsml_audit_registry;
+            "#,
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn test_mysql() {
         let config = OpsmlDatabaseSettings {
@@ -173,5 +194,79 @@ mod tests {
         };
 
         let _client = MySqlClient::new(&config).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_versions() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+
+        let client = MySqlClient::new(&config).await;
+
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        // query all versions
+        // get versions (should return 1)
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", None)
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        // check star pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1.1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 1);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("^2.0.0"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        cleanup(&client.pool).await;
     }
 }
