@@ -1,6 +1,10 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
-use crate::schemas::schema::VersionResult;
+use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::{
+    AuditCardResult, DataCardResult, ModelCardResult, PipelineCardResult, RunCardResult,
+};
+use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
@@ -8,10 +12,10 @@ use opsml_settings::config::OpsmlDatabaseSettings;
 use opsml_utils::semver::VersionParser;
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
+use sqlx::query;
 use sqlx::{query_builder::QueryBuilder, Execute};
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
-
 pub struct SqliteClient {
     pub pool: Pool<Sqlite>,
 }
@@ -163,6 +167,74 @@ impl SqlClient for SqliteClient {
         // sort semvers
         VersionValidator::sort_semver_versions(versions, true)
             .map_err(|e| SqlError::VersionError(format!("{}", e)))
+    }
+
+    async fn query_cards(
+        &self,
+        table: CardSQLTableNames,
+        query_args: &CardQueryArgs,
+    ) -> Result<CardResults, SqlError> {
+        let query = format!("SELECT * FROM {}", table);
+
+        let mut builder = QueryBuilder::<Sqlite>::new(query);
+        builder.push(" WHERE 1==1");
+
+        if query_args.uid.is_some() {
+            builder.push(format!(" AND uid == {}", query_args.uid.as_ref().unwrap()));
+
+            let sql = builder.sql().into();
+
+            match table {
+                CardSQLTableNames::Data => {
+                    let card: Vec<DataCardResult> = sqlx::query_as(sql)
+                        .fetch_all(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                    return Ok(CardResults::Data(card));
+                }
+                CardSQLTableNames::Model => {
+                    let card: Vec<ModelCardResult> = sqlx::query_as(sql)
+                        .fetch_all(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                    return Ok(CardResults::Model(card));
+                }
+                CardSQLTableNames::Run => {
+                    let card: Vec<RunCardResult> = sqlx::query_as(sql)
+                        .fetch_all(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                    return Ok(CardResults::Run(card));
+                }
+
+                CardSQLTableNames::Audit => {
+                    let card: Vec<AuditCardResult> = sqlx::query_as(sql)
+                        .fetch_all(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                    return Ok(CardResults::Audit(card));
+                }
+                CardSQLTableNames::Pipeline => {
+                    let card: Vec<PipelineCardResult> = sqlx::query_as(sql)
+                        .fetch_all(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                    return Ok(CardResults::Pipeline(card));
+                }
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid table name for query".to_string(),
+                    ));
+                }
+            }
+        }
+
+        unimplemented!()
     }
 }
 

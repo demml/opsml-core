@@ -5,6 +5,7 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyList, PyLong, PyString};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use uuid::Uuid;
 pub struct PyHelperFuncs {}
 
 impl PyHelperFuncs {
@@ -183,5 +184,21 @@ pub fn pyobject_to_json(_py: Python, obj: &PyAny) -> PyResult<Value> {
             "Unsupported type: {}",
             obj.get_type().name()?
         )))
+    }
+}
+
+/// Check if a string is a valid UUIDv4
+///
+/// # Arguments
+///
+/// * `uid` - A string slice that holds the UUID
+///
+/// # Returns
+///
+/// * `bool` - A boolean indicating if the UUID is valid
+pub fn is_valid_uuid4(uid: &str) -> Result<bool, UtilError> {
+    match Uuid::parse_str(uid) {
+        Ok(uuid) => Ok(uuid.get_version_num() == 4),
+        Err(_) => Err(UtilError::UuidError),
     }
 }

@@ -2964,6 +2964,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]

@@ -57,6 +57,9 @@ pub enum UtilError {
 
     #[error("Failed to write to file")]
     WriteError,
+
+    #[error("Failed to validate uuid")]
+    UuidError,
 }
 
 impl From<UtilError> for PyErr {

@@ -1,8 +1,10 @@
+use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::CardResults;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use std::collections::HashMap;
 use std::fmt;
-
 pub enum CardSQLTableNames {
     Data,
     Model,
@@ -37,4 +39,10 @@ pub trait SqlClient {
         repository: &str,
         version: Option<&str>,
     ) -> Result<Vec<String>, SqlError>;
+
+    async fn query_cards(
+        &self,
+        table: CardSQLTableNames,
+        query_args: &CardQueryArgs,
+    ) -> Result<CardResults, SqlError>;
 }

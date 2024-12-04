@@ -1,6 +1,7 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
-use crate::schemas::schema::VersionResult;
+use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
@@ -144,6 +145,14 @@ impl SqlClient for MySqlClient {
         // sort semvers
         VersionValidator::sort_semver_versions(versions, true)
             .map_err(|e| SqlError::VersionError(format!("{}", e)))
+    }
+
+    async fn query_cards(
+        &self,
+        table: CardSQLTableNames,
+        query_args: &CardQueryArgs,
+    ) -> Result<CardResults, SqlError> {
+        unimplemented!()
     }
 }
 
