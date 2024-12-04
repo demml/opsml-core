@@ -12,6 +12,7 @@ chrono = { workspace = true }
 opsml-error = { workspace = true }
 opsml-logging = { workspace = true }
 opsml-settings = { workspace = true }
+opsml-utils = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }

@@ -7,5 +7,9 @@ pub struct VersionResult {
     pub timestamp: i64,
     pub name: String,
     pub repository: String,
-    pub version: String,
+    pub major: i32,
+    pub minor: i32,
+    pub patch: i32,
+    pub pre_tag: Option<String>,
+    pub build_tag: Option<String>,
 }

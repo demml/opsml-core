@@ -3,7 +3,11 @@ SELECT
     timestamp,
     name,
     repository,
-    version,
+    major,
+    minor,
+    patch,
+    pre_release,
+    build,
     contact
 FROM $1
 WHERE 

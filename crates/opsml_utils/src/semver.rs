@@ -179,7 +179,7 @@ impl VersionParser {
         }
     }
 
-    pub fn get_version_to_search(&self, version: &str) -> Result<VersionBounds, VersionError> {
+    pub fn get_version_to_search(version: &str) -> Result<VersionBounds, VersionError> {
         let parser = VersionParser::new(version)?;
 
         let cleaned_version = parser.remove_version_prefix(version);
@@ -445,23 +445,19 @@ mod tests {
 
     #[test]
     fn test_version_parser_get_version_to_search() {
-        let bounds = VersionParser::Star.get_version_to_search("*").unwrap();
+        let bounds = VersionParser::get_version_to_search("*").unwrap();
         assert_eq!(bounds.lower_bound, Version::parse("0.0.0").unwrap());
         assert!(bounds.no_upper_bound);
 
-        let bounds = VersionParser::Star.get_version_to_search("1.*").unwrap();
+        let bounds = VersionParser::get_version_to_search("1.*").unwrap();
         assert_eq!(bounds.lower_bound, Version::parse("1.0.0").unwrap());
         assert_eq!(bounds.upper_bound, Version::parse("1.1.0").unwrap());
 
-        let bounds = VersionParser::Caret
-            .get_version_to_search("^1.2.3")
-            .unwrap();
+        let bounds = VersionParser::get_version_to_search("^1.2.3").unwrap();
         assert_eq!(bounds.lower_bound, Version::parse("1.2.3").unwrap());
         assert_eq!(bounds.upper_bound, Version::parse("1.3.0").unwrap());
 
-        let bounds = VersionParser::Tilde
-            .get_version_to_search("~1.2.3")
-            .unwrap();
+        let bounds = VersionParser::get_version_to_search("~1.2.3").unwrap();
         assert_eq!(bounds.lower_bound, Version::parse("1.2.3").unwrap());
         assert_eq!(bounds.upper_bound, Version::parse("1.3.0").unwrap());
     }
