@@ -189,9 +189,9 @@ impl VersionParser {
             VersionParser::Star => {
                 if num_parts == 0 {
                     Ok(VersionBounds {
-                        lower_bound: Version::parse(&format!("0.0.0"))
+                        lower_bound: Version::parse("0.0.0")
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
-                        upper_bound: Version::parse(&format!("0.0.0"))
+                        upper_bound: Version::parse("0.0.0")
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: true,
                         parser_type: VersionParser::Star,

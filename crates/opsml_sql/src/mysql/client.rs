@@ -73,7 +73,7 @@ impl SqlClient for MySqlClient {
         let query = "SELECT date, timestamp, name, repository, major, minor, patch, pre_tag, build_tag, contact, uid";
 
         let mut builder = QueryBuilder::<MySql>::new(query);
-        builder.push(format!(" FROM {} ", table.to_string()));
+        builder.push(format!(" FROM {} ", table));
 
         // add where clause due to multiple combinations
         builder.push(" WHERE 1=1");
@@ -101,20 +101,11 @@ impl SqlClient for MySqlClient {
                         " AND (major < {})",
                         version_bounds.upper_bound.major
                     ));
-                } else if version_bounds.num_parts == 2 {
-                    builder.push(format!(
-                        " AND (major = {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                    ));
-                } else if version_bounds.num_parts == 3
-                    && version_bounds.parser_type == VersionParser::Tilde
-                {
-                    builder.push(format!(
-                        " AND (major = {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                    ));
-                } else if version_bounds.num_parts == 3
-                    && version_bounds.parser_type == VersionParser::Caret
+                } else if version_bounds.num_parts == 2
+                    || version_bounds.num_parts == 3
+                        && version_bounds.parser_type == VersionParser::Tilde
+                    || version_bounds.num_parts == 3
+                        && version_bounds.parser_type == VersionParser::Caret
                 {
                     builder.push(format!(
                         " AND (major = {} AND minor < {})",
@@ -135,7 +126,7 @@ impl SqlClient for MySqlClient {
         builder.push(" ORDER BY timestamp DESC LIMIT 20;");
         let sql = builder.build().sql();
 
-        let cards: Vec<VersionResult> = sqlx::query_as(&sql)
+        let cards: Vec<VersionResult> = sqlx::query_as(sql)
             .bind(name)
             .bind(repository)
             .fetch_all(&self.pool)
