@@ -1,15 +1,15 @@
 -- Populate opsml_data_registry
 INSERT INTO opsml_data_registry (uid, date, timestamp, app_env, name, repository, major, minor, patch, pre_tag, build_tag, contact, tags, data_type, runcard_uid, pipelinecard_uid, auditcard_uid, interface_type) VALUES 
 ('data1', '2023-11-29', 1701264000, 'development', 'Data1', 'repo1', 1, 0, 0, 'alpha', 'build1', 'contact1', 'tag1,tag2', 'type1', 'runcard1', 'pipelinecard1', 'auditcard1', 'typeA'),
-('data2', '2023-11-29', 1701264001, 'development', 'Data2', 'repo2', 1, 0, 1, 'beta', 'build2', 'contact2', 'tag3,tag4', 'type2', 'runcard2', 'pipelinecard2', 'auditcard2', 'typeB'),
-('data3', '2023-11-29', 1701264002, 'development', 'Data3', 'repo3', 1, 1, 0, 'gamma', 'build3', 'contact3', 'tag5,tag6', 'type3', 'runcard3', 'pipelinecard3', 'auditcard3', 'typeC'),
-('data4', '2023-11-29', 1701264003, 'development', 'Data4', 'repo4', 1, 1, 1, 'delta', 'build4', 'contact4', 'tag7,tag8', 'type4', 'runcard4', 'pipelinecard4', 'auditcard4', 'typeD'),
-('data5', '2023-11-29', 1701264004, 'development', 'Data5', 'repo5', 2, 0, 0, 'epsilon', 'build5', 'contact5', 'tag9,tag10', 'type5', 'runcard5', 'pipelinecard5', 'auditcard5', 'typeE'),
-('data6', '2023-11-29', 1701264005, 'development', 'Data6', 'repo6', 2, 0, 1, 'zeta', 'build6', 'contact6', 'tag11,tag12', 'type6', 'runcard6', 'pipelinecard6', 'auditcard6', 'typeF'),
-('data7', '2023-11-29', 1701264006, 'development', 'Data7', 'repo7', 2, 1, 0, 'eta', 'build7', 'contact7', 'tag13,tag14', 'type7', 'runcard7', 'pipelinecard7', 'auditcard7', 'typeG'),
-('data8', '2023-11-29', 1701264007, 'development', 'Data8', 'repo8', 2, 1, 1, 'theta', 'build8', 'contact8', 'tag15,tag16', 'type8', 'runcard8', 'pipelinecard8', 'auditcard8', 'typeH'),
-('data9', '2023-11-29', 1701264008, 'development', 'Data9', 'repo9', 3, 0, 0, 'iota', 'build9', 'contact9', 'tag17,tag18', 'type9', 'runcard9', 'pipelinecard9', 'auditcard9', 'typeI'),
-('data10', '2023-11-29', 1701264009, 'development', 'Data10', 'repo10', 3, 0, 1, 'kappa', 'build10', 'contact10', 'tag19,tag20', 'type10', 'runcard10', 'pipelinecard10', 'auditcard10', 'typeJ');
+('data2', '2023-11-29', 1701264001, 'development', 'Data1', 'repo1', 1, 0, 1, 'beta', 'build2', 'contact2', 'tag3,tag4', 'type2', 'runcard2', 'pipelinecard2', 'auditcard2', 'typeB'),
+('data3', '2023-11-29', 1701264002, 'development', 'Data1', 'repo1', 1, 1, 0, 'gamma', 'build3', 'contact3', 'tag5,tag6', 'type3', 'runcard3', 'pipelinecard3', 'auditcard3', 'typeC'),
+('data4', '2023-11-29', 1701264003, 'development', 'Data1', 'repo1', 1, 1, 1, 'delta', 'build4', 'contact4', 'tag7,tag8', 'type4', 'runcard4', 'pipelinecard4', 'auditcard4', 'typeD'),
+('data5', '2023-11-29', 1701264004, 'development', 'Data1', 'repo1', 2, 0, 0, 'epsilon', 'build5', 'contact5', 'tag9,tag10', 'type5', 'runcard5', 'pipelinecard5', 'auditcard5', 'typeE'),
+('data6', '2023-11-29', 1701264005, 'development', 'Data1', 'repo1', 2, 0, 1, 'zeta', 'build6', 'contact6', 'tag11,tag12', 'type6', 'runcard6', 'pipelinecard6', 'auditcard6', 'typeF'),
+('data7', '2023-11-29', 1701264006, 'development', 'Data1', 'repo1', 2, 1, 0, 'eta', 'build7', 'contact7', 'tag13,tag14', 'type7', 'runcard7', 'pipelinecard7', 'auditcard7', 'typeG'),
+('data8', '2023-11-29', 1701264007, 'development', 'Data1', 'repo1', 2, 1, 1, 'theta', 'build8', 'contact8', 'tag15,tag16', 'type8', 'runcard8', 'pipelinecard8', 'auditcard8', 'typeH'),
+('data9', '2023-11-29', 1701264008, 'development', 'Data1', 'repo1', 3, 0, 0, 'iota', 'build9', 'contact9', 'tag17,tag18', 'type9', 'runcard9', 'pipelinecard9', 'auditcard9', 'typeI'),
+('data10', '2023-11-29', 1701264009, 'development', 'Data1', 'repo1', 3, 0, 1, 'kappa', 'build10', 'contact10', 'tag19,tag20', 'type10', 'runcard10', 'pipelinecard10', 'auditcard10', 'typeJ');
 
 -- Populate opsml_model_registry
 INSERT INTO opsml_model_registry (uid, date, timestamp, app_env, name, repository, major, minor, patch, pre_tag, build_tag, contact, tags, datacard_uid, sample_data_type, model_type, runcard_uid, pipelinecard_uid, auditcard_uid, interface_type, task_type) VALUES 

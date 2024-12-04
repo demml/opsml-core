@@ -1,13 +1,13 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use crate::schemas::schema::VersionResult;
-use crate::sqlite::queries::helper::Queries;
 use async_trait::async_trait;
-use chrono::format;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
 use opsml_utils::semver::VersionParser;
+use opsml_utils::semver::VersionValidator;
+use semver::Version;
 use sqlx::{query_builder::QueryBuilder, Execute};
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
@@ -68,78 +68,110 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
+    /// Primary query for retrieving versions from the database. Mainly used to get most recent version when determining version increment
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `name` - The name of the card
+    /// * `repository` - The repository of the card
+    /// * `version` - The version of the card
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<String>` - A vector of strings representing the sorted (desc) versions of the card
     async fn get_versions(
         &self,
         table: CardSQLTableNames,
-        name: Option<&str>,
-        repository: Option<&str>,
+        name: &str,
+        repository: &str,
         version: Option<&str>,
-    ) -> Result<Vec<VersionResult>, SqlError> {
+    ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let query = Queries::GetCardsWithoutVersion.get_query();
+        let query = "SELECT date, timestamp, name, repository, major, minor, patch, pre_tag, build_tag, contact, uid";
 
-        let mut builder = QueryBuilder::<Sqlite>::new(&query.sql);
+        let mut builder = QueryBuilder::<Sqlite>::new(query);
         builder.push(format!(" FROM {} ", table.to_string()));
 
-        if let Some(name) = name {
-            builder.push(" WHERE 1==1 AND name == ");
-            builder.push_bind(name);
-        }
+        // add where clause due to multiple combinations
+        builder.push(" WHERE 1==1");
+        builder.push(" AND name == ");
+        builder.push_bind(name);
 
-        if let Some(repository) = repository {
-            builder.push(" AND repository == ");
-            builder.push_bind(repository);
-        }
+        builder.push(" AND repository == ");
+        builder.push_bind(repository);
 
         if let Some(version) = version {
             let version_bounds = VersionParser::get_version_to_search(version)
                 .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
 
-            // construct lower bound
-            builder.push(format!(" AND (major == ",));
-            builder.push_bind(version_bounds.lower_bound.major as i32);
-
-            builder.push(format!(" AND minor >= ",));
-            builder.push_bind(version_bounds.lower_bound.minor as i32);
-            builder.push(")");
-
-            // AND minor >= {})
+            // construct lower bound (already validated)
+            builder.push(format!(
+                " AND (major >= {} AND minor >= {} and patch >= {})",
+                version_bounds.lower_bound.major,
+                version_bounds.lower_bound.minor,
+                version_bounds.lower_bound.patch
+            ));
 
             if !version_bounds.no_upper_bound {
-                builder.push(format!(" AND (major == ",));
-                builder.push_bind(version_bounds.upper_bound.major as i32);
-
-                builder.push(format!(" AND minor < ",));
-                builder.push_bind(version_bounds.upper_bound.minor as i32);
-                builder.push(")");
+                // construct upper bound based on number of components
+                if version_bounds.num_parts == 1 {
+                    builder.push(format!(
+                        " AND (major < {})",
+                        version_bounds.upper_bound.major
+                    ));
+                } else if version_bounds.num_parts == 2 {
+                    builder.push(format!(
+                        " AND (major == {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
+                } else if version_bounds.num_parts == 3
+                    && version_bounds.parser_type == VersionParser::Tilde
+                {
+                    builder.push(format!(
+                        " AND (major == {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
+                } else if version_bounds.num_parts == 3
+                    && version_bounds.parser_type == VersionParser::Caret
+                {
+                    builder.push(format!(
+                        " AND (major == {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
+                } else {
+                    builder.push(format!(
+                        " AND (major == {} AND minor == {} AND patch < {})",
+                        version_bounds.upper_bound.major,
+                        version_bounds.upper_bound.minor,
+                        version_bounds.upper_bound.patch
+                    ));
+                }
             }
-            let sql = builder.build().sql();
-
-            let cards: Vec<VersionResult> = sqlx::query_as(&sql)
-                .bind(name)
-                .bind(repository)
-                .bind(version_bounds.lower_bound.major.to_string())
-                .bind(version_bounds.lower_bound.minor.to_string())
-                .bind(version_bounds.upper_bound.major.to_string())
-                .bind(version_bounds.upper_bound.minor.to_string())
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
-
-            Ok(cards)
-        } else {
-            let sql = builder.build().sql();
-            let cards: Vec<VersionResult> = sqlx::query_as(&sql)
-                .bind(name)
-                .bind(repository)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
-
-            Ok(cards)
         }
 
-        //
+        // order by timestamp and limit 20
+        builder.push(" ORDER BY timestamp DESC LIMIT 20;");
+        let sql = builder.build().sql();
+
+        let cards: Vec<VersionResult> = sqlx::query_as(&sql)
+            .bind(name)
+            .bind(repository)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        let versions = cards
+            .iter()
+            .map(|c| {
+                c.to_version()
+                    .map_err(|e| SqlError::VersionError(format!("{}", e)))
+            })
+            .collect::<Result<Vec<Version>, SqlError>>()?;
+
+        // sort semvers
+        VersionValidator::sort_semver_versions(versions, true)
+            .map_err(|e| SqlError::VersionError(format!("{}", e)))
     }
 }
 
@@ -182,28 +214,75 @@ mod tests {
         let client = SqliteClient::new(&config).await;
 
         // Run the SQL script to populate the database
-        let script = std::fs::read_to_string("tests/populate_test_data.sql").unwrap();
+        let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
         sqlx::query(&script).execute(&client.pool).await.unwrap();
 
+        // query all versions
         // get versions (should return 1)
         let versions = client
-            .get_versions(
-                CardSQLTableNames::Data,
-                Some("Data10"),
-                Some("repo10"),
-                Some("~3.0.0"),
-            )
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", None)
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        // get versions (should return 1)
+        //let versions = client
+        //    .get_versions(
+        //        CardSQLTableNames::Data,
+        //        Some("Data10"),
+        //        Some("repo10"),
+        //        Some("~3.0.0"),
+        //    )
+        //    .await
+        //    .unwrap();
+        //assert_eq!(versions.len(), 1);
+
+        // check star pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1.1"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 1);
 
-        // check start version
-        //let versions = client
-        //    .get_versions(CardSQLTableNames::Data, Some("Data10"), None, Some("1.0.0"))
-        //    .await
-        //    .unwrap();
-        //
-        // delete ./test.db
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("^2.0.0"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
         cleanup();
     }
 }

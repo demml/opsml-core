@@ -1,4 +1,3 @@
-use core::num;
 use opsml_error::error::VersionError;
 use semver::{BuildMetadata, Prerelease, Version};
 use std::str::FromStr;
@@ -99,13 +98,28 @@ impl VersionValidator {
         Ok(new_version.to_string())
     }
 
-    pub fn sort_versions(versions: Vec<String>) -> Result<Vec<String>, VersionError> {
+    pub fn sort_string_versions(versions: Vec<String>) -> Result<Vec<String>, VersionError> {
         let mut versions: Vec<Version> = versions
             .iter()
             .map(|v| Version::parse(v).map_err(|e| VersionError::InvalidVersion(e.to_string())))
             .collect::<Result<Vec<_>, _>>()?;
 
         versions.sort();
+
+        Ok(versions.iter().map(|v| v.to_string()).collect())
+    }
+
+    pub fn sort_semver_versions(
+        versions: Vec<Version>,
+        reverse: bool,
+    ) -> Result<Vec<String>, VersionError> {
+        let mut versions = versions.clone();
+
+        versions.sort();
+
+        if reverse {
+            versions.reverse();
+        }
 
         Ok(versions.iter().map(|v| v.to_string()).collect())
     }
@@ -117,6 +131,7 @@ pub struct VersionBounds {
     pub upper_bound: Version,
     pub no_upper_bound: bool,
     pub parser_type: VersionParser,
+    pub num_parts: usize,
 }
 
 #[derive(PartialEq, Debug)]
@@ -144,36 +159,7 @@ impl VersionParser {
     pub fn remove_version_prefix(&self, version: &str) -> String {
         // break version into parts
         match self {
-            VersionParser::Star => {
-                // split into part. Check if each part has the special character
-                // if there is a special character, remove it
-                // once special character is removed, check if the part is empty or a number
-                // if empty, replace with 0
-                let parts = version.split(".").into_iter().map(|p| {
-                    if p.contains('*') {
-                        // remove the * with empty string
-                        let p = p.replace("*", "");
-
-                        // if p is empty, replace with 0
-                        if p.is_empty() {
-                            "0".to_string()
-                        } else {
-                            p
-                        }
-                    } else {
-                        p.to_string()
-                    }
-                });
-
-                let collected = parts.collect::<Vec<String>>().join(".");
-
-                // gotcha for the case where a * defualts to 0, It should default to ""
-                if collected == "0" && version == "*" {
-                    "".to_string()
-                } else {
-                    collected
-                }
-            }
+            VersionParser::Star => version.replace("*", ""),
             VersionParser::Caret => version.replace("^", ""),
             VersionParser::Tilde => version.replace("~", ""),
             VersionParser::Exact => version.to_string(),
@@ -189,6 +175,7 @@ impl VersionParser {
         let version_parts = if !cleaned_version.is_empty() {
             cleaned_version
                 .split(".")
+                .filter(|v| !v.is_empty())
                 .map(|v| v.parse::<u64>())
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| VersionError::InvalidVersion(e.to_string()))?
@@ -208,6 +195,7 @@ impl VersionParser {
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: true,
                         parser_type: VersionParser::Star,
+                        num_parts,
                     })
                 } else if num_parts == 1 {
                     Ok(VersionBounds {
@@ -217,6 +205,7 @@ impl VersionParser {
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Star,
+                        num_parts,
                     })
                 } else if num_parts == 2 {
                     Ok(VersionBounds {
@@ -233,6 +222,25 @@ impl VersionParser {
                         .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Star,
+                        num_parts,
+                    })
+                } else if num_parts == 3 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0], version_parts[1], version_parts[2]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0],
+                            version_parts[1],
+                            version_parts[2] + 1
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Star,
+                        num_parts,
                     })
                 } else {
                     Err(VersionError::InvalidVersion(
@@ -249,6 +257,7 @@ impl VersionParser {
                             .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Tilde,
+                        num_parts,
                     })
                 } else if num_parts == 2 {
                     Ok(VersionBounds {
@@ -265,6 +274,7 @@ impl VersionParser {
                         .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Tilde,
+                        num_parts,
                     })
                 } else if num_parts >= 3 {
                     Ok(VersionBounds {
@@ -281,6 +291,7 @@ impl VersionParser {
                         .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Tilde,
+                        num_parts,
                     })
                 } else {
                     Err(VersionError::InvalidVersion(
@@ -306,6 +317,7 @@ impl VersionParser {
                         .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
                         no_upper_bound: false,
                         parser_type: VersionParser::Caret,
+                        num_parts,
                     })
                 } else {
                     Err(VersionError::InvalidVersion(
@@ -319,6 +331,7 @@ impl VersionParser {
                     upper_bound: v,
                     no_upper_bound: true,
                     parser_type: VersionParser::Exact,
+                    num_parts,
                 })
                 .map_err(|e| VersionError::InvalidVersion(e.to_string())),
         }
@@ -404,7 +417,7 @@ mod tests {
             "1.2.3+0b1".to_string(),
             "1.2.3".to_string(),
         ];
-        let sorted_versions = VersionValidator::sort_versions(versions).unwrap();
+        let sorted_versions = VersionValidator::sort_string_versions(versions).unwrap();
         assert_eq!(
             sorted_versions,
             vec![

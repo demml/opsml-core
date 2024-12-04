@@ -111,4 +111,7 @@ pub enum VersionError {
 
     #[error("Invalid pre release: {0}")]
     InvalidPreRelease(String),
+
+    #[error("Invalid build: {0}")]
+    InvalidBuild(String),
 }

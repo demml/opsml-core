@@ -1,15 +1,16 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use crate::schemas::schema::VersionResult;
-use crate::sqlite::queries::helper::Queries;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
 use opsml_utils::semver::VersionParser;
+use opsml_utils::semver::VersionValidator;
+use semver::Version;
 use sqlx::{
     postgres::{PgPoolOptions, Postgres},
-    Pool,
+    Execute, Pool, QueryBuilder,
 };
 use tracing::info;
 
@@ -49,60 +50,110 @@ impl SqlClient for PostgresClient {
 
         Ok(())
     }
+    /// Primary query for retrieving versions from the database. Mainly used to get most recent version when determining version increment
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `name` - The name of the card
+    /// * `repository` - The repository of the card
+    /// * `version` - The version of the card
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<String>` - A vector of strings representing the sorted (desc) versions of the card
     async fn get_versions(
         &self,
         table: CardSQLTableNames,
-        name: Option<&str>,
-        repository: Option<&str>,
+        name: &str,
+        repository: &str,
         version: Option<&str>,
-    ) -> Result<Vec<VersionResult>, SqlError> {
+    ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let cards = match version {
-            Some(version) => {
-                let version_bounds = VersionParser::get_version_to_search(version)
-                    .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+        let query = "SELECT date, timestamp, name, repository, major, minor, patch, pre_tag, build_tag, contact, uid";
 
-                let upper_bound = if version_bounds.no_upper_bound {
-                    "".to_string()
+        let mut builder = QueryBuilder::<Postgres>::new(query);
+        builder.push(format!(" FROM {} ", table.to_string()));
+
+        // add where clause due to multiple combinations
+        builder.push(" WHERE 1=1");
+        builder.push(" AND name = ");
+        builder.push_bind(name);
+
+        builder.push(" AND repository = ");
+        builder.push_bind(repository);
+
+        if let Some(version) = version {
+            let version_bounds = VersionParser::get_version_to_search(version)
+                .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+            // construct lower bound (already validated)
+            builder.push(format!(
+                " AND (major >= {} AND minor >= {} and patch >= {})",
+                version_bounds.lower_bound.major,
+                version_bounds.lower_bound.minor,
+                version_bounds.lower_bound.patch
+            ));
+
+            if !version_bounds.no_upper_bound {
+                // construct upper bound based on number of components
+                if version_bounds.num_parts == 1 {
+                    builder.push(format!(
+                        " AND (major < {})",
+                        version_bounds.upper_bound.major
+                    ));
+                } else if version_bounds.num_parts == 2 {
+                    builder.push(format!(
+                        " AND (major = {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
+                } else if version_bounds.num_parts == 3
+                    && version_bounds.parser_type == VersionParser::Tilde
+                {
+                    builder.push(format!(
+                        " AND (major = {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
+                } else if version_bounds.num_parts == 3
+                    && version_bounds.parser_type == VersionParser::Caret
+                {
+                    builder.push(format!(
+                        " AND (major = {} AND minor < {})",
+                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                    ));
                 } else {
-                    format!(
-                        "AND (major = {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor,
-                    )
-                };
-
-                let query = Queries::GetCardsWithVersion.get_query();
-                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
-                    .bind(table.to_string())
-                    .bind(name)
-                    .bind(repository)
-                    .bind(version)
-                    .bind(version_bounds.upper_bound.major.to_string())
-                    .bind(version_bounds.upper_bound.minor.to_string())
-                    .bind(upper_bound)
-                    .fetch_all(&self.pool)
-                    .await
-                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
-
-                result
+                    builder.push(format!(
+                        " AND (major = {} AND minor = {} AND patch < {})",
+                        version_bounds.upper_bound.major,
+                        version_bounds.upper_bound.minor,
+                        version_bounds.upper_bound.patch
+                    ));
+                }
             }
-            None => {
-                let query = Queries::GetCardsWithoutVersion.get_query();
-                let result: Vec<VersionResult> = sqlx::query_as(&query.sql)
-                    .bind(table.to_string())
-                    .bind(name)
-                    .bind(repository)
-                    .fetch_all(&self.pool)
-                    .await
-                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+        }
 
-                result
-            }
-        };
+        // order by timestamp and limit 20
+        builder.push(" ORDER BY timestamp DESC LIMIT 20;");
+        let sql = builder.build().sql();
 
-        Ok(cards)
+        let cards: Vec<VersionResult> = sqlx::query_as(&sql)
+            .bind(name)
+            .bind(repository)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-        //
+        let versions = cards
+            .iter()
+            .map(|c| {
+                c.to_version()
+                    .map_err(|e| SqlError::VersionError(format!("{}", e)))
+            })
+            .collect::<Result<Vec<Version>, SqlError>>()?;
+
+        // sort semvers
+        VersionValidator::sort_semver_versions(versions, true)
+            .map_err(|e| SqlError::VersionError(format!("{}", e)))
     }
 }
 
@@ -111,6 +162,27 @@ mod tests {
     use super::*;
     use opsml_settings::config::SqlType;
     use std::env;
+
+    pub async fn cleanup(pool: &Pool<Postgres>) {
+        sqlx::raw_sql(
+            r#"
+            DELETE 
+            FROM opsml_data_registry;
+
+            DELETE 
+            FROM opsml_model_registry;
+
+            DELETE
+            FROM opsml_run_registry;
+
+            DELETE
+            FROM opsml_audit_registry;
+            "#,
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap();
+    }
 
     #[tokio::test]
     async fn test_postgres() {
@@ -123,5 +195,79 @@ mod tests {
 
         let _client = PostgresClient::new(&config).await;
         // Add assertions or further test logic here
+    }
+
+    #[tokio::test]
+    async fn test_postgres_versions() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+
+        let client = PostgresClient::new(&config).await;
+
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        // query all versions
+        // get versions (should return 1)
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", None)
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        // check star pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 10);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.1.*"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 4);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        // check tilde pattern
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1.1"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 1);
+
+        let versions = client
+            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("^2.0.0"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 2);
+
+        cleanup(&client.pool).await;
     }
 }
