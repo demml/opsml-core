@@ -84,9 +84,9 @@ CREATE TABLE IF NOT EXISTS opsml_audit_registry (
     contact VARCHAR(64),
     tags JSONB,
     approved BOOLEAN,
-    datacards JSONB,
-    modelcards JSONB,
-    runcards JSONB
+    datacard_uids JSONB,
+    modelcard_uids JSONB,
+    runcard_uids JSONB
 );
 
 -- PipelineSchema

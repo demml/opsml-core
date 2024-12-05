@@ -193,7 +193,10 @@ impl SqlClient for SqliteClient {
             is_valid_uuid4(query_args.uid.as_ref().unwrap())
                 .map_err(|e| SqlError::GeneralError(e.to_string()))?;
 
-            builder.push(format!(" AND uid == {}", query_args.uid.as_ref().unwrap()));
+            builder.push(format!(
+                " AND uid == '{}'",
+                query_args.uid.as_ref().unwrap()
+            ));
         } else {
             // add where clause due to multiple combinations
             if query_args.name.is_some() {
@@ -518,6 +521,6 @@ mod tests {
 
         assert_eq!(results.len(), 5);
 
-        //cleanup();
+        cleanup();
     }
 }
