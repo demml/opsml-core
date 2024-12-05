@@ -208,6 +208,34 @@ impl ModelCardRecord {
     }
 }
 
+impl Default for ModelCardRecord {
+    fn default() -> Self {
+        ModelCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            date: get_utc_date(),
+            timestamp: get_utc_timestamp(),
+            app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
+            name: CommonKwargs::Undefined.as_str().to_string(),
+            repository: CommonKwargs::Undefined.as_str().to_string(),
+            major: 0,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            contact: CommonKwargs::Undefined.as_str().to_string(),
+            tags: Json(HashMap::new()),
+            datacard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            sample_data_type: CommonKwargs::Undefined.as_str().to_string(),
+            model_type: CommonKwargs::Undefined.as_str().to_string(),
+            runcard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            auditcard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            interface_type: CommonKwargs::Undefined.as_str().to_string(),
+            task_type: CommonKwargs::Undefined.as_str().to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct RunCardRecord {
     pub uid: String,
@@ -229,6 +257,32 @@ pub struct RunCardRecord {
     pub project: String,
     pub artifact_uris: Json<HashMap<String, String>>,
     pub compute_environment: Json<HashMap<String, String>>,
+}
+
+impl Default for RunCardRecord {
+    fn default() -> Self {
+        RunCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            date: get_utc_date(),
+            timestamp: get_utc_timestamp(),
+            app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
+            name: CommonKwargs::Undefined.as_str().to_string(),
+            repository: CommonKwargs::Undefined.as_str().to_string(),
+            major: 0,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            contact: CommonKwargs::Undefined.as_str().to_string(),
+            tags: Json(HashMap::new()),
+            datacard_uids: Json(Vec::new()),
+            modelcard_uids: Json(Vec::new()),
+            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            project: CommonKwargs::Undefined.as_str().to_string(),
+            artifact_uris: Json(HashMap::new()),
+            compute_environment: Json(HashMap::new()),
+        }
+    }
 }
 
 impl RunCardRecord {
@@ -335,6 +389,30 @@ impl AuditCardRecord {
     }
 }
 
+impl Default for AuditCardRecord {
+    fn default() -> Self {
+        AuditCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            date: get_utc_date(),
+            timestamp: get_utc_timestamp(),
+            app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
+            name: CommonKwargs::Undefined.as_str().to_string(),
+            repository: CommonKwargs::Undefined.as_str().to_string(),
+            major: 0,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            contact: CommonKwargs::Undefined.as_str().to_string(),
+            tags: Json(HashMap::new()),
+            approved: false,
+            datacard_uids: Json(Vec::new()),
+            modelcard_uids: Json(Vec::new()),
+            runcard_uids: Json(Vec::new()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PipelineCardRecord {
     pub uid: String,
@@ -391,6 +469,30 @@ impl PipelineCardRecord {
             datacard_uids: Json(datacard_uids.unwrap_or_default()),
             modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
             runcard_uids: Json(runcard_uids.unwrap_or_default()),
+        }
+    }
+}
+
+impl Default for PipelineCardRecord {
+    fn default() -> Self {
+        PipelineCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            date: get_utc_date(),
+            timestamp: get_utc_timestamp(),
+            app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
+            name: CommonKwargs::Undefined.as_str().to_string(),
+            repository: CommonKwargs::Undefined.as_str().to_string(),
+            major: 0,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            contact: CommonKwargs::Undefined.as_str().to_string(),
+            tags: Json(HashMap::new()),
+            pipeline_code_uri: CommonKwargs::Undefined.as_str().to_string(),
+            datacard_uids: Json(Vec::new()),
+            modelcard_uids: Json(Vec::new()),
+            runcard_uids: Json(Vec::new()),
         }
     }
 }

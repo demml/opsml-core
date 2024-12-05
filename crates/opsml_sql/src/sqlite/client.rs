@@ -592,6 +592,98 @@ mod tests {
 
         assert_eq!(results.len(), 1);
 
+        // insert modelcard
+        let model_card = ModelCardRecord::default();
+        let card = Card::Model(model_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Model, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(model_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Model, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // insert runcard
+        let run_card = RunCardRecord::default();
+        let card = Card::Run(run_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Run, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(run_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Run, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // insert auditcard
+
+        let audit_card = AuditCardRecord::default();
+        let card = Card::Audit(audit_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Audit, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(audit_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // check pipeline card
+        let pipeline_card = PipelineCardRecord::default();
+        let card = Card::Pipeline(pipeline_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Pipeline, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(pipeline_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
         cleanup();
     }
 }
