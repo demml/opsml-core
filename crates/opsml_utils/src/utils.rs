@@ -225,3 +225,11 @@ pub fn get_epoch_time_to_search(max_date: &str) -> Result<i64, UtilError> {
 
     Ok(timestamp)
 }
+
+pub fn get_utc_date() -> String {
+    chrono::Utc::now().format("%Y-%m-%d").to_string()
+}
+
+pub fn get_utc_timestamp() -> i64 {
+    chrono::Utc::now().timestamp()
+}

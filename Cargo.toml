@@ -26,6 +26,7 @@ opsml-server = { path = "crates/opsml_server" }
 opsml-settings = { path = "crates/opsml_settings" }
 opsml-sql = { path = "crates/opsml_sql" }
 opsml-storage = { path = "crates/opsml_storage" }
+opsml-types = { path = "crates/opsml_types" }
 opsml-utils = { path = "crates/opsml_utils" }
 
 
