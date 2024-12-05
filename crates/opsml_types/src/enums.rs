@@ -404,3 +404,104 @@ impl PresignableTypes {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_uri_names_from_str() {
+        assert_eq!(
+            UriNames::from_str("trained_model_uri"),
+            Some(UriNames::TrainedModelUri)
+        );
+        assert_eq!(
+            UriNames::from_str("sample_data_uri"),
+            Some(UriNames::SampleDataUri)
+        );
+        assert_eq!(UriNames::from_str("invalid_uri"), None);
+    }
+
+    #[test]
+    fn test_uri_names_as_str() {
+        assert_eq!(UriNames::TrainedModelUri.as_str(), "trained_model_uri");
+        assert_eq!(UriNames::SampleDataUri.as_str(), "sample_data_uri");
+    }
+
+    #[test]
+    fn test_common_kwargs_from_str() {
+        assert_eq!(
+            CommonKwargs::from_str("is_pipeline"),
+            Some(CommonKwargs::IsPipeline)
+        );
+        assert_eq!(
+            CommonKwargs::from_str("model_type"),
+            Some(CommonKwargs::ModelType)
+        );
+        assert_eq!(CommonKwargs::from_str("invalid_kwarg"), None);
+    }
+
+    #[test]
+    fn test_common_kwargs_as_str() {
+        assert_eq!(CommonKwargs::IsPipeline.as_str(), "is_pipeline");
+        assert_eq!(CommonKwargs::ModelType.as_str(), "model_type");
+    }
+
+    #[test]
+    fn test_save_name_from_str() {
+        assert_eq!(SaveName::from_str("card"), Some(SaveName::Card));
+        assert_eq!(SaveName::from_str("audit"), Some(SaveName::Audit));
+        assert_eq!(SaveName::from_str("invalid_save_name"), None);
+    }
+
+    #[test]
+    fn test_save_name_as_str() {
+        assert_eq!(SaveName::Card.as_str(), "card");
+        assert_eq!(SaveName::Audit.as_str(), "audit");
+    }
+
+    #[test]
+    fn test_suffix_from_str() {
+        assert_eq!(Suffix::from_str(".onnx"), Some(Suffix::Onnx));
+        assert_eq!(Suffix::from_str(".parquet"), Some(Suffix::Parquet));
+        assert_eq!(Suffix::from_str(".invalid_suffix"), None);
+    }
+
+    #[test]
+    fn test_suffix_as_str() {
+        assert_eq!(Suffix::Onnx.as_str(), ".onnx");
+        assert_eq!(Suffix::Parquet.as_str(), ".parquet");
+    }
+
+    #[test]
+    fn test_artifact_class_from_str() {
+        assert_eq!(ArtifactClass::from_str("data"), Some(ArtifactClass::Data));
+        assert_eq!(ArtifactClass::from_str("other"), Some(ArtifactClass::Other));
+        assert_eq!(ArtifactClass::from_str("invalid_class"), None);
+    }
+
+    #[test]
+    fn test_artifact_class_as_str() {
+        assert_eq!(ArtifactClass::Data.as_str(), "data");
+        assert_eq!(ArtifactClass::Other.as_str(), "other");
+    }
+
+    #[test]
+    fn test_presignable_types_from_str() {
+        assert_eq!(
+            PresignableTypes::from_str(".jpeg"),
+            Some(PresignableTypes::Jpeg)
+        );
+        assert_eq!(
+            PresignableTypes::from_str(".jpg"),
+            Some(PresignableTypes::Jpg)
+        );
+        assert_eq!(PresignableTypes::from_str(".invalid_type"), None);
+    }
+
+    #[test]
+    fn test_presignable_types_as_str() {
+        assert_eq!(PresignableTypes::Jpeg.as_str(), ".jpeg");
+        assert_eq!(PresignableTypes::Jpg.as_str(), ".jpg");
+    }
+}
