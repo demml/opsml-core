@@ -1,13 +1,16 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::{
+    AuditCardResult, DataCardResult, ModelCardResult, PipelineCardResult, RunCardResult,
+};
 use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
-use opsml_utils::semver::VersionParser;
-use opsml_utils::semver::VersionValidator;
+use opsml_utils::semver::{VersionParser, VersionValidator};
+use opsml_utils::utils::is_valid_uuid4;
 use semver::Version;
 use sqlx::{
     mysql::{MySql, MySqlPoolOptions},
@@ -147,12 +150,168 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::VersionError(format!("{}", e)))
     }
 
+    /// Query cards based on the query arguments
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `query_args` - The query arguments
+    ///
+    /// # Returns
+    ///
+    /// * `CardResults` - The results of the query
     async fn query_cards(
         &self,
         table: CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        unimplemented!()
+        let query = format!("SELECT * FROM {}", table);
+        let mut builder = QueryBuilder::<MySql>::new(query);
+        builder.push(" WHERE 1=1");
+
+        // check for uid. If uid is present, we only return that card
+        if query_args.uid.is_some() {
+            // validate uid
+            is_valid_uuid4(query_args.uid.as_ref().unwrap())
+                .map_err(|e| SqlError::GeneralError(e.to_string()))?;
+
+            builder.push(format!(" AND uid = '{}'", query_args.uid.as_ref().unwrap()));
+        } else {
+            // add where clause due to multiple combinations
+            if query_args.name.is_some() {
+                builder.push(format!(
+                    " AND name = '{}'",
+                    query_args.name.as_ref().unwrap()
+                ));
+            }
+
+            if query_args.repository.is_some() {
+                builder.push(format!(
+                    " AND repository = '{}'",
+                    query_args.repository.as_ref().unwrap()
+                ));
+            }
+
+            if query_args.version.is_some() {
+                let version_bounds =
+                    VersionParser::get_version_to_search(query_args.version.as_ref().unwrap())
+                        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+                // construct lower bound (already validated)
+                builder.push(format!(
+                    " AND (major >= {} AND minor >= {} and patch >= {})",
+                    version_bounds.lower_bound.major,
+                    version_bounds.lower_bound.minor,
+                    version_bounds.lower_bound.patch
+                ));
+
+                if !version_bounds.no_upper_bound {
+                    // construct upper bound based on number of components
+                    if version_bounds.num_parts == 1 {
+                        builder.push(format!(
+                            " AND (major < {})",
+                            version_bounds.upper_bound.major
+                        ));
+                    } else if version_bounds.num_parts == 2
+                        || version_bounds.num_parts == 3
+                            && version_bounds.parser_type == VersionParser::Tilde
+                        || version_bounds.num_parts == 3
+                            && version_bounds.parser_type == VersionParser::Caret
+                    {
+                        builder.push(format!(
+                            " AND (major = {} AND minor < {})",
+                            version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+                        ));
+                    } else {
+                        builder.push(format!(
+                            " AND (major = {} AND minor = {} AND patch < {})",
+                            version_bounds.upper_bound.major,
+                            version_bounds.upper_bound.minor,
+                            version_bounds.upper_bound.patch
+                        ));
+                    }
+                }
+            }
+
+            if query_args.max_date.is_some() {
+                builder.push(format!(
+                    " AND DATE(date) <= STR_TO_DATE('{}', '%Y-%m-%d')",
+                    query_args.max_date.as_ref().unwrap()
+                ));
+            }
+
+            if query_args.tags.is_some() {
+                let tags = query_args.tags.as_ref().unwrap();
+                for (key, value) in tags.iter() {
+                    builder.push(format!(
+                        " AND JSON_EXTRACT(tags, '$.{}') = '{}'",
+                        key, value
+                    ));
+                }
+            }
+
+            if query_args.sort_by_timestamp.unwrap_or(false) {
+                builder.push(" ORDER BY timestamp DESC");
+            } else {
+                // sort by major, minor, patch
+                builder.push(" ORDER BY major DESC, minor DESC, patch DESC");
+            }
+
+            if query_args.limit.is_some() {
+                builder.push(format!(" LIMIT {}", query_args.limit.unwrap()));
+            }
+        }
+
+        let sql = builder.sql().into();
+
+        match table {
+            CardSQLTableNames::Data => {
+                let card: Vec<DataCardResult> = sqlx::query_as(sql)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Data(card));
+            }
+            CardSQLTableNames::Model => {
+                let card: Vec<ModelCardResult> = sqlx::query_as(sql)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Model(card));
+            }
+            CardSQLTableNames::Run => {
+                let card: Vec<RunCardResult> = sqlx::query_as(sql)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Run(card));
+            }
+
+            CardSQLTableNames::Audit => {
+                let card: Vec<AuditCardResult> = sqlx::query_as(sql)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Audit(card));
+            }
+            CardSQLTableNames::Pipeline => {
+                let card: Vec<PipelineCardResult> = sqlx::query_as(sql)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Pipeline(card));
+            }
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for query".to_string(),
+                ));
+            }
+        }
     }
 }
 
@@ -177,6 +336,9 @@ mod tests {
 
             DELETE
             FROM opsml_audit_registry;
+
+            DELETE
+            FROM opsml_pipeline_registry;
             "#,
         )
         .fetch_all(pool)
@@ -211,7 +373,7 @@ mod tests {
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
-        sqlx::query(&script).execute(&client.pool).await.unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
 
         // query all versions
         // get versions (should return 1)
@@ -266,6 +428,108 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(versions.len(), 2);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_query_cards() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+
+        let client = MySqlClient::new(&config).await;
+
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // query all versions
+        // get versions (should return 1)
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 10);
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Model1".to_string()),
+            repository: Some("repo1".to_string()),
+            version: Some("~1.0.0".to_string()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Model, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // max_date
+        let card_args = CardQueryArgs {
+            max_date: Some("2023-11-28".to_string()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Run, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+
+        // try tags
+        let tags = [("key1".to_string(), "value1".to_string())]
+            .iter()
+            .cloned()
+            .collect();
+        let card_args = CardQueryArgs {
+            tags: Some(tags),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        let card_args = CardQueryArgs {
+            sort_by_timestamp: Some(true),
+            limit: Some(5),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 5);
+
+        // test uid
+        let card_args = CardQueryArgs {
+            uid: Some("550e8400-e29b-41d4-a716-446655440000".to_string()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
 
         cleanup(&client.pool).await;
     }

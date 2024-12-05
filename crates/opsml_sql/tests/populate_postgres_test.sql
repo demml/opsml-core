@@ -12,16 +12,15 @@ INSERT INTO opsml_data_registry (uid, date, timestamp, app_env, name, repository
 
 -- Populate opsml_model_registry
 INSERT INTO opsml_model_registry (uid, date, timestamp, app_env, name, repository, major, minor, patch, pre_tag, build_tag, contact, tags, datacard_uid, sample_data_type, model_type, runcard_uid, pipelinecard_uid, auditcard_uid, interface_type, task_type) VALUES 
-('550e8400-e29b-41d4-a716-446655440000', '2023-11-29', 1701264000, 'development', 'Model1', 'repo1', 1, 0, 0, 'alpha', 'build1', 'contact1', '{}', 'datacard1', 'sample1', 'type1', 'runcard1', 'pipelinecard1', 'auditcard1', 'typeA', 'task1'),
-('550e8400-e29b-41d4-a716-446655440001', '2023-11-29', 1701264001, 'development', 'Model2', 'repo2', 1, 0, 1, 'beta', 'build2', 'contact2', '{}', 'datacard2', 'sample2', 'type2', 'runcard2', 'pipelinecard2', 'auditcard2', 'typeB', 'task2'),
-('550e8400-e29b-41d4-a716-446655440002', '2023-11-29', 1701264002, 'development', 'Model3', 'repo3', 1, 1, 0, 'gamma', 'build3', 'contact3', '{}', 'datacard3', 'sample3', 'type3', 'runcard3', 'pipelinecard3', 'auditcard3', 'typeC', 'task3'),
-('550e8400-e29b-41d4-a716-446655440003', '2023-11-29', 1701264003, 'development', 'Model4', 'repo4', 1, 1, 1, 'delta', 'build4', 'contact4', '{}', 'datacard4', 'sample4', 'type4', 'runcard4', 'pipelinecard4', 'auditcard4', 'typeD', 'task4'),
-('550e8400-e29b-41d4-a716-446655440004', '2023-11-29', 1701264004, 'development', 'Model5', 'repo5', 2, 0, 0, 'epsilon', 'build5', 'contact5', '{}', 'datacard5', 'sample5', 'type5', 'runcard5', 'pipelinecard5', 'auditcard5', 'typeE', 'task5'),
-('550e8400-e29b-41d4-a716-446655440005', '2023-11-29', 1701264005, 'development', 'Model6', 'repo6', 2, 0, 1, 'zeta', 'build6', 'contact6', '{}', 'datacard6', 'sample6', 'type6', 'runcard6', 'pipelinecard6', 'auditcard6', 'typeF', 'task6'),
-('550e8400-e29b-41d4-a716-446655440006', '2023-11-29', 1701264006, 'development', 'Model7', 'repo7', 2, 1, 0, 'eta', 'build7', 'contact7', '{}', 'datacard7', 'sample7', 'type7', 'runcard7', 'pipelinecard7', 'auditcard7', 'typeG', 'task7'),
-('550e8400-e29b-41d4-a716-446655440007', '2023-11-29', 1701264007, 'development', 'Model8', 'repo8', 2, 1, 1, 'theta', 'build8', 'contact8', '{}', 'datacard8', 'sample8', 'type8', 'runcard8', 'pipelinecard8', 'auditcard8', 'typeH', 'task8'),
-('550e8400-e29b-41d4-a716-446655440008', '2023-11-29', 1701264008, 'development', 'Model9', 'repo9', 3, 0, 0, 'iota', 'build9', 'contact9', '{}', 'datacard9', 'sample9', 'type9', 'runcard9', 'pipelinecard9', 'auditcard9', 'typeI', 'task9'),
-('550e8400-e29b-41d4-a716-446655440009', '2023-11-29', 1701264009, 'development', 'Model10', 'repo10', 3, 0, 1, 'kappa', 'build10', 'contact10', '{}', 'datacard10', 'sample10', 'type10', 'runcard10', 'pipelinecard10', 'auditcard10', 'typeJ', 'task10');
+('550e8400-e29b-41d4-a716-446655440000', '2023-11-29', 1701264000, 'development', 'Model1', 'repo1', 1, 0, 0, 'alpha', 'build1', 'contact1', '{}'::jsonb, 'datacard1', 'sample1', 'type1', 'runcard1', 'pipelinecard1', 'auditcard1', 'typeA', 'task1'),
+('550e8400-e29b-41d4-a716-446655440001', '2023-11-29', 1701264001, 'development', 'Model2', 'repo2', 1, 0, 1, 'beta', 'build2', 'contact2', '{}'::jsonb, 'datacard2', 'sample2', 'type2', 'runcard2', 'pipelinecard2', 'auditcard2', 'typeB', 'task2'),
+('550e8400-e29b-41d4-a716-446655440003', '2023-11-29', 1701264003, 'development', 'Model4', 'repo4', 1, 1, 1, 'delta', 'build4', 'contact4', '{}'::jsonb, 'datacard4', 'sample4', 'type4', 'runcard4', 'pipelinecard4', 'auditcard4', 'typeD', 'task4'),
+('550e8400-e29b-41d4-a716-446655440004', '2023-11-29', 1701264004, 'development', 'Model5', 'repo5', 2, 0, 0, 'epsilon', 'build5', 'contact5', '{}'::jsonb, 'datacard5', 'sample5', 'type5', 'runcard5', 'pipelinecard5', 'auditcard5', 'typeE', 'task5'),
+('550e8400-e29b-41d4-a716-446655440005', '2023-11-29', 1701264005, 'development', 'Model6', 'repo6', 2, 0, 1, 'zeta', 'build6', 'contact6', '{}'::jsonb, 'datacard6', 'sample6', 'type6', 'runcard6', 'pipelinecard6', 'auditcard6', 'typeF', 'task6'),
+('550e8400-e29b-41d4-a716-446655440006', '2023-11-29', 1701264006, 'development', 'Model7', 'repo7', 2, 1, 0, 'eta', 'build7', 'contact7', '{}'::jsonb, 'datacard7', 'sample7', 'type7', 'runcard7', 'pipelinecard7', 'auditcard7', 'typeG', 'task7'),
+('550e8400-e29b-41d4-a716-446655440007', '2023-11-29', 1701264007, 'development', 'Model8', 'repo8', 2, 1, 1, 'theta', 'build8', 'contact8', '{}'::jsonb, 'datacard8', 'sample8', 'type8', 'runcard8', 'pipelinecard8', 'auditcard8', 'typeH', 'task8'),
+('550e8400-e29b-41d4-a716-446655440008', '2023-11-29', 1701264008, 'development', 'Model9', 'repo9', 3, 0, 0, 'iota', 'build9', 'contact9', '{}'::jsonb, 'datacard9', 'sample9', 'type9', 'runcard9', 'pipelinecard9', 'auditcard9', 'typeI', 'task9'),
+('550e8400-e29b-41d4-a716-446655440009', '2023-11-29', 1701264009, 'development', 'Model10', 'repo10', 3, 0, 1, 'kappa', 'build10', 'contact10', '{}'::jsonb, 'datacard10', 'sample10', 'type10', 'runcard10', 'pipelinecard10', 'auditcard10', 'typeJ', 'task10');
 
 
 -- Populate opsml_run_registry

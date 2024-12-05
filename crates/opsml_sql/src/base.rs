@@ -3,7 +3,6 @@ use crate::schemas::schema::CardResults;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
-use std::collections::HashMap;
 use std::fmt;
 pub enum CardSQLTableNames {
     Data,
