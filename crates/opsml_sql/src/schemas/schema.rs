@@ -1,6 +1,5 @@
-use chrono::NaiveDateTime;
 use opsml_error::error::VersionError;
-use opsml_settings::config::OpsmlConfig;
+use opsml_types::enums::CommonKwargs;
 use opsml_utils::utils::{get_utc_date, get_utc_timestamp};
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
@@ -54,11 +53,11 @@ pub struct DataCardRecord {
     pub pre_tag: Option<String>,
     pub build_tag: Option<String>,
     pub contact: String,
-    pub tags: Option<Json<HashMap<String, String>>>,
+    pub tags: Json<HashMap<String, String>>,
     pub data_type: String,
-    pub runcard_uid: Option<String>,
-    pub pipelinecard_uid: Option<String>,
-    pub auditcard_uid: Option<String>,
+    pub runcard_uid: String,
+    pub pipelinecard_uid: String,
+    pub auditcard_uid: String,
     pub interface_type: String,
 }
 
@@ -93,12 +92,16 @@ impl DataCardRecord {
             pre_tag: version.pre.to_string().parse().ok(),
             build_tag: version.build.to_string().parse().ok(),
             contact,
-            tags: tags.map(Json),
+            tags: Json(tags.unwrap_or_default()),
             data_type,
-            runcard_uid,
-            pipelinecard_uid,
-            auditcard_uid,
-            interface_type: interface_type.unwrap_or_else(|| "data".to_string()),
+            runcard_uid: runcard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            pipelinecard_uid: pipelinecard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            auditcard_uid: auditcard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            interface_type: interface_type
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
         }
     }
 }
@@ -117,15 +120,67 @@ pub struct ModelCardRecord {
     pub pre_tag: Option<String>,
     pub build_tag: Option<String>,
     pub contact: String,
-    pub tags: Option<Json<HashMap<String, String>>>,
+    pub tags: Json<HashMap<String, String>>,
     pub datacard_uid: String,
     pub sample_data_type: String,
     pub model_type: String,
-    pub runcard_uid: Option<String>,
-    pub pipelinecard_uid: Option<String>,
-    pub auditcard_uid: Option<String>,
+    pub runcard_uid: String,
+    pub pipelinecard_uid: String,
+    pub auditcard_uid: String,
     pub interface_type: String,
     pub task_type: String,
+}
+
+impl ModelCardRecord {
+    pub fn new(
+        name: String,
+        repository: String,
+        version: Version,
+        contact: String,
+        tags: Option<HashMap<String, String>>,
+        datacard_uid: Option<String>,
+        sample_data_type: String,
+        model_type: String,
+        runcard_uid: Option<String>,
+        pipelinecard_uid: Option<String>,
+        auditcard_uid: Option<String>,
+        interface_type: Option<String>,
+        task_type: Option<String>,
+    ) -> Self {
+        let date = get_utc_date();
+        let timestamp = get_utc_timestamp();
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        let uid = Uuid::new_v4().to_string();
+
+        ModelCardRecord {
+            uid,
+            date,
+            timestamp,
+            app_env,
+            name,
+            repository,
+            major: version.major as i32,
+            minor: version.minor as i32,
+            patch: version.patch as i32,
+            pre_tag: version.pre.to_string().parse().ok(),
+            build_tag: version.build.to_string().parse().ok(),
+            contact,
+            tags: Json(tags.unwrap_or_default()),
+            datacard_uid: datacard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            sample_data_type,
+            model_type,
+            runcard_uid: runcard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            pipelinecard_uid: pipelinecard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            auditcard_uid: auditcard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            interface_type: interface_type
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            task_type: task_type.unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -151,6 +206,50 @@ pub struct RunCardRecord {
     pub compute_environment: Json<HashMap<String, String>>,
 }
 
+impl RunCardRecord {
+    pub fn new(
+        name: String,
+        repository: String,
+        version: Version,
+        contact: String,
+        tags: Option<HashMap<String, String>>,
+        datacard_uids: Option<Vec<String>>,
+        modelcard_uids: Option<Vec<String>>,
+        pipelinecard_uid: Option<String>,
+        project: String,
+        artifact_uris: Option<HashMap<String, String>>,
+        compute_environment: Option<HashMap<String, String>>,
+    ) -> Self {
+        let date = get_utc_date();
+        let timestamp = get_utc_timestamp();
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        let uid = Uuid::new_v4().to_string();
+
+        RunCardRecord {
+            uid,
+            date,
+            timestamp,
+            app_env,
+            name,
+            repository,
+            major: version.major as i32,
+            minor: version.minor as i32,
+            patch: version.patch as i32,
+            pre_tag: version.pre.to_string().parse().ok(),
+            build_tag: version.build.to_string().parse().ok(),
+            contact,
+            tags: Json(tags.unwrap_or_default()),
+            datacard_uids: Json(datacard_uids.unwrap_or_default()),
+            modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
+            pipelinecard_uid: pipelinecard_uid
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+            project,
+            artifact_uris: Json(artifact_uris.unwrap_or_default()),
+            compute_environment: Json(compute_environment.unwrap_or_default()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct AuditCardRecord {
     pub uid: String,
@@ -172,6 +271,45 @@ pub struct AuditCardRecord {
     pub runcard_uids: Json<Vec<String>>,
 }
 
+impl AuditCardRecord {
+    pub fn new(
+        name: String,
+        repository: String,
+        version: Version,
+        contact: String,
+        tags: Option<HashMap<String, String>>,
+        approved: bool,
+        datacard_uids: Option<Vec<String>>,
+        modelcard_uids: Option<Vec<String>>,
+        runcard_uids: Option<Vec<String>>,
+    ) -> Self {
+        let date = get_utc_date();
+        let timestamp = get_utc_timestamp();
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        let uid = Uuid::new_v4().to_string();
+
+        AuditCardRecord {
+            uid,
+            date,
+            timestamp,
+            app_env,
+            name,
+            repository,
+            major: version.major as i32,
+            minor: version.minor as i32,
+            patch: version.patch as i32,
+            pre_tag: version.pre.to_string().parse().ok(),
+            build_tag: version.build.to_string().parse().ok(),
+            contact,
+            tags: Json(tags.unwrap_or_default()),
+            approved,
+            datacard_uids: Json(datacard_uids.unwrap_or_default()),
+            modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
+            runcard_uids: Json(runcard_uids.unwrap_or_default()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PipelineCardRecord {
     pub uid: String,
@@ -191,6 +329,45 @@ pub struct PipelineCardRecord {
     pub datacard_uids: Json<Vec<String>>,
     pub modelcard_uids: Json<Vec<String>>,
     pub runcard_uids: Json<Vec<String>>,
+}
+
+impl PipelineCardRecord {
+    pub fn new(
+        name: String,
+        repository: String,
+        version: Version,
+        contact: String,
+        tags: Option<HashMap<String, String>>,
+        pipeline_code_uri: String,
+        datacard_uids: Option<Vec<String>>,
+        modelcard_uids: Option<Vec<String>>,
+        runcard_uids: Option<Vec<String>>,
+    ) -> Self {
+        let date = get_utc_date();
+        let timestamp = get_utc_timestamp();
+        let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        let uid = Uuid::new_v4().to_string();
+
+        PipelineCardRecord {
+            uid,
+            date,
+            timestamp,
+            app_env,
+            name,
+            repository,
+            major: version.major as i32,
+            minor: version.minor as i32,
+            patch: version.patch as i32,
+            pre_tag: version.pre.to_string().parse().ok(),
+            build_tag: version.build.to_string().parse().ok(),
+            contact,
+            tags: Json(tags.unwrap_or_default()),
+            pipeline_code_uri,
+            datacard_uids: Json(datacard_uids.unwrap_or_default()),
+            modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
+            runcard_uids: Json(runcard_uids.unwrap_or_default()),
+        }
+    }
 }
 
 // create enum that takes vec of cards

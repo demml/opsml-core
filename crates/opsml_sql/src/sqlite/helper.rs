@@ -19,6 +19,10 @@ impl SqliteHelper {
             "contact",
             "data_type",
             "interface_type",
+            "tags",
+            "runcard_uid",
+            "pipelinecard_uid",
+            "auditcard_uid",
         ];
         let mut values = vec![
             format!("'{}'", card.uid),
@@ -33,6 +37,10 @@ impl SqliteHelper {
             format!("'{}'", card.contact),
             format!("'{}'", card.data_type),
             format!("'{}'", card.interface_type),
+            format!("'{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("'{}'", card.runcard_uid),
+            format!("'{}'", card.pipelinecard_uid),
+            format!("'{}'", card.auditcard_uid),
         ];
 
         if let Some(pre_tag) = &card.pre_tag {
@@ -43,26 +51,6 @@ impl SqliteHelper {
         if let Some(build_tag) = &card.build_tag {
             columns.push("build_tag");
             values.push(format!("'{}'", build_tag));
-        }
-
-        if let Some(tags) = &card.tags {
-            columns.push("tags");
-            values.push(format!("'{}'", serde_json::to_string(tags).unwrap()));
-        }
-
-        if let Some(runcard_uid) = &card.runcard_uid {
-            columns.push("runcard_uid");
-            values.push(format!("'{}'", runcard_uid));
-        }
-
-        if let Some(pipelinecard_uid) = &card.pipelinecard_uid {
-            columns.push("pipelinecard_uid");
-            values.push(format!("'{}'", pipelinecard_uid));
-        }
-
-        if let Some(auditcard_uid) = &card.auditcard_uid {
-            columns.push("auditcard_uid");
-            values.push(format!("'{}'", auditcard_uid));
         }
 
         format!(
@@ -89,6 +77,10 @@ impl SqliteHelper {
             "model_type",
             "interface_type",
             "task_type",
+            "tags",
+            "runcard_uid",
+            "pipelinecard_uid",
+            "auditcard_uid",
         ];
         let mut values = vec![
             format!("'{}'", card.uid),
@@ -106,6 +98,10 @@ impl SqliteHelper {
             format!("'{}'", card.model_type),
             format!("'{}'", card.interface_type),
             format!("'{}'", card.task_type),
+            format!("'{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("'{}'", card.runcard_uid),
+            format!("'{}'", card.pipelinecard_uid),
+            format!("'{}'", card.auditcard_uid),
         ];
 
         if let Some(pre_tag) = &card.pre_tag {
@@ -116,26 +112,6 @@ impl SqliteHelper {
         if let Some(build_tag) = &card.build_tag {
             columns.push("build_tag");
             values.push(format!("'{}'", build_tag));
-        }
-
-        if let Some(tags) = &card.tags {
-            columns.push("tags");
-            values.push(format!("'{}'", serde_json::to_string(tags).unwrap()));
-        }
-
-        if let Some(runcard_uid) = &card.runcard_uid {
-            columns.push("runcard_uid");
-            values.push(format!("'{}'", runcard_uid));
-        }
-
-        if let Some(pipelinecard_uid) = &card.pipelinecard_uid {
-            columns.push("pipelinecard_uid");
-            values.push(format!("'{}'", pipelinecard_uid));
-        }
-
-        if let Some(auditcard_uid) = &card.auditcard_uid {
-            columns.push("auditcard_uid");
-            values.push(format!("'{}'", auditcard_uid));
         }
 
         format!(
@@ -158,6 +134,12 @@ impl SqliteHelper {
             "patch",
             "contact",
             "project",
+            "tags",
+            "datacard_uids",
+            "modelcard_uids",
+            "pipelinecard_uid",
+            "artifact_uris",
+            "compute_environment",
         ];
         let mut values = vec![
             format!("'{}'", card.uid),
@@ -171,6 +153,15 @@ impl SqliteHelper {
             format!("{}", card.patch),
             format!("'{}'", card.contact),
             format!("'{}'", card.project),
+            format!("'{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.datacard_uids).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.modelcard_uids).unwrap()),
+            format!("'{}'", card.pipelinecard_uid),
+            format!("'{}'", serde_json::to_string(&card.artifact_uris).unwrap()),
+            format!(
+                "'{}'",
+                serde_json::to_string(&card.compute_environment).unwrap()
+            ),
         ];
 
         if let Some(pre_tag) = &card.pre_tag {
@@ -181,48 +172,6 @@ impl SqliteHelper {
         if let Some(build_tag) = &card.build_tag {
             columns.push("build_tag");
             values.push(format!("'{}'", build_tag));
-        }
-
-        if let Some(tags) = &card.tags {
-            columns.push("tags");
-            values.push(format!("'{}'", serde_json::to_string(tags).unwrap()));
-        }
-
-        if let Some(datacard_uids) = &card.datacard_uids {
-            columns.push("datacard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(datacard_uids).unwrap()
-            ));
-        }
-
-        if let Some(modelcard_uids) = &card.modelcard_uids {
-            columns.push("modelcard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(modelcard_uids).unwrap()
-            ));
-        }
-
-        if let Some(pipelinecard_uid) = &card.pipelinecard_uid {
-            columns.push("pipelinecard_uid");
-            values.push(format!("'{}'", pipelinecard_uid));
-        }
-
-        if let Some(artifact_uris) = &card.artifact_uris {
-            columns.push("artifact_uris");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(artifact_uris).unwrap()
-            ));
-        }
-
-        if let Some(compute_environment) = &card.compute_environment {
-            columns.push("compute_environment");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(compute_environment).unwrap()
-            ));
         }
 
         format!(
@@ -244,6 +193,11 @@ impl SqliteHelper {
             "minor",
             "patch",
             "contact",
+            "tags",
+            "approved",
+            "datacard_uids",
+            "modelcard_uids",
+            "runcard_uids",
         ];
         let mut values = vec![
             format!("'{}'", card.uid),
@@ -256,6 +210,11 @@ impl SqliteHelper {
             format!("{}", card.minor),
             format!("{}", card.patch),
             format!("'{}'", card.contact),
+            format!("'{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("{}", card.approved),
+            format!("'{}'", serde_json::to_string(&card.datacard_uids).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.modelcard_uids).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.runcard_uids).unwrap()),
         ];
 
         if let Some(pre_tag) = &card.pre_tag {
@@ -266,40 +225,6 @@ impl SqliteHelper {
         if let Some(build_tag) = &card.build_tag {
             columns.push("build_tag");
             values.push(format!("'{}'", build_tag));
-        }
-
-        if let Some(tags) = &card.tags {
-            columns.push("tags");
-            values.push(format!("'{}'", serde_json::to_string(tags).unwrap()));
-        }
-
-        if let Some(approved) = card.approved {
-            columns.push("approved");
-            values.push(format!("{}", approved));
-        }
-
-        if let Some(datacard_uids) = &card.datacard_uids {
-            columns.push("datacard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(datacard_uids).unwrap()
-            ));
-        }
-
-        if let Some(modelcard_uids) = &card.modelcard_uids {
-            columns.push("modelcard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(modelcard_uids).unwrap()
-            ));
-        }
-
-        if let Some(runcard_uids) = &card.runcard_uids {
-            columns.push("runcard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(runcard_uids).unwrap()
-            ));
         }
 
         format!(
@@ -321,6 +246,11 @@ impl SqliteHelper {
             "minor",
             "patch",
             "contact",
+            "tags",
+            "pipeline_code_uri",
+            "datacard_uids",
+            "modelcard_uids",
+            "runcard_uids",
         ];
         let mut values = vec![
             format!("'{}'", card.uid),
@@ -333,6 +263,11 @@ impl SqliteHelper {
             format!("{}", card.minor),
             format!("{}", card.patch),
             format!("'{}'", card.contact),
+            format!("'{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("'{}'", card.pipeline_code_uri),
+            format!("'{}'", serde_json::to_string(&card.datacard_uids).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.modelcard_uids).unwrap()),
+            format!("'{}'", serde_json::to_string(&card.runcard_uids).unwrap()),
         ];
 
         if let Some(pre_tag) = &card.pre_tag {
@@ -343,40 +278,6 @@ impl SqliteHelper {
         if let Some(build_tag) = &card.build_tag {
             columns.push("build_tag");
             values.push(format!("'{}'", build_tag));
-        }
-
-        if let Some(tags) = &card.tags {
-            columns.push("tags");
-            values.push(format!("'{}'", serde_json::to_string(tags).unwrap()));
-        }
-
-        if let Some(pipeline_code_uri) = &card.pipeline_code_uri {
-            columns.push("pipeline_code_uri");
-            values.push(format!("'{}'", pipeline_code_uri));
-        }
-
-        if let Some(datacard_uids) = &card.datacard_uids {
-            columns.push("datacard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(datacard_uids).unwrap()
-            ));
-        }
-
-        if let Some(modelcard_uids) = &card.modelcard_uids {
-            columns.push("modelcard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(modelcard_uids).unwrap()
-            ));
-        }
-
-        if let Some(runcard_uids) = &card.runcard_uids {
-            columns.push("runcard_uids");
-            values.push(format!(
-                "'{}'",
-                serde_json::to_string(runcard_uids).unwrap()
-            ));
         }
 
         format!(
