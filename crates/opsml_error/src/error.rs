@@ -57,6 +57,12 @@ pub enum UtilError {
 
     #[error("Failed to write to file")]
     WriteError,
+
+    #[error("Failed to validate uuid")]
+    UuidError,
+
+    #[error("Failed to parse date")]
+    DateError,
 }
 
 impl From<UtilError> for PyErr {
@@ -84,4 +90,37 @@ pub enum ServerError {
 
     #[error("Failed to list files: {0}")]
     ListFileError(String),
+}
+
+#[derive(Error, Debug)]
+pub enum SqlError {
+    #[error("Failed to run sql migrations: {0}")]
+    MigrationError(String),
+
+    #[error("Failed to run sql query: {0}")]
+    QueryError(String),
+
+    #[error("Failed to parse version: {0}")]
+    VersionError(String),
+
+    #[error("File error: {0}")]
+    FileError(String),
+
+    #[error("Error - {0}")]
+    GeneralError(String),
+}
+
+#[derive(Error, Debug)]
+pub enum VersionError {
+    #[error("SemVer failed: {0}")]
+    SemVerError(String),
+
+    #[error("Invalid version: {0}")]
+    InvalidVersion(String),
+
+    #[error("Invalid pre release: {0}")]
+    InvalidPreRelease(String),
+
+    #[error("Invalid build: {0}")]
+    InvalidBuild(String),
 }

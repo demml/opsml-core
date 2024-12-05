@@ -14,6 +14,13 @@ pub enum StorageType {
     Azure,
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SqlType {
+    Postgres,
+    Sqlite,
+    MySql,
+}
+
 /// ApiSettings for use with ApiClient
 #[derive(Debug, Clone)]
 #[pyclass]
@@ -38,6 +45,15 @@ pub struct OpsmlStorageSettings {
     pub storage_type: StorageType,
 }
 
+/// DatabaseSettings for used with all database clients
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct OpsmlDatabaseSettings {
+    pub connection_uri: String,
+    pub max_connections: u32,
+    pub sql_type: SqlType,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct OpsmlAuthSettings {
     pub opsml_auth: bool,
@@ -54,6 +70,7 @@ pub struct OpsmlConfig {
     pub app_version: String,
     pub opsml_storage_uri: String,
     pub opsml_tracking_uri: String,
+    pub opsml_max_pool_connections: u32,
     pub opsml_prod_token: String,
     pub opsml_proxy_root: String,
     pub opsml_registry_path: String,
@@ -109,6 +126,10 @@ impl Default for OpsmlConfig {
 
             opsml_username: env::var("OPSML_USERNAME").ok(),
             opsml_password: env::var("OPSML_PASSWORD").ok(),
+            opsml_max_pool_connections: env::var("OPSML_MAX_POOL_CONNECTIONS")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .unwrap_or(10),
             scouter_server_uri: env::var("SCOUTER_SERVER_URI").ok(),
             scouter_username: env::var("SCOUTER_USERNAME").ok(),
             scouter_password: env::var("SCOUTER_PASSWORD").ok(),
@@ -197,6 +218,17 @@ impl OpsmlConfig {
             StorageType::Local
         }
     }
+
+    fn get_sql_type(&self) -> SqlType {
+        let tracking_uri_lower = self.opsml_tracking_uri.to_lowercase();
+        if tracking_uri_lower.starts_with("postgres") {
+            SqlType::Postgres
+        } else if tracking_uri_lower.starts_with("mysql") {
+            SqlType::MySql
+        } else {
+            SqlType::Sqlite
+        }
+    }
 }
 
 #[pymethods]
@@ -234,6 +266,15 @@ impl OpsmlConfig {
                 auth_token: "".to_string(),
                 prod_token: self.opsml_prod_token.clone(),
             },
+        }
+    }
+
+    pub fn database_settings(&self) -> OpsmlDatabaseSettings {
+        let sql_type = self.get_sql_type();
+        OpsmlDatabaseSettings {
+            connection_uri: self.opsml_tracking_uri.clone(),
+            max_connections: self.opsml_max_pool_connections,
+            sql_type,
         }
     }
 }
