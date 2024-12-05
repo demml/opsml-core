@@ -521,6 +521,18 @@ mod tests {
 
         assert_eq!(results.len(), 5);
 
+        // test uid
+        let card_args = CardQueryArgs {
+            uid: Some("550e8400-e29b-41d4-a716-446655440000".to_string()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
         cleanup();
     }
 }
