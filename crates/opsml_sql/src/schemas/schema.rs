@@ -106,6 +106,31 @@ impl DataCardRecord {
     }
 }
 
+impl Default for DataCardRecord {
+    fn default() -> Self {
+        DataCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            date: get_utc_date(),
+            timestamp: get_utc_timestamp(),
+            app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
+            name: CommonKwargs::Undefined.as_str().to_string(),
+            repository: CommonKwargs::Undefined.as_str().to_string(),
+            major: 0,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            contact: CommonKwargs::Undefined.as_str().to_string(),
+            tags: Json(HashMap::new()),
+            data_type: CommonKwargs::Undefined.as_str().to_string(),
+            runcard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            auditcard_uid: CommonKwargs::Undefined.as_str().to_string(),
+            interface_type: CommonKwargs::Undefined.as_str().to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ModelCardRecord {
     pub uid: String,

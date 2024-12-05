@@ -1,6 +1,8 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
+use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::Card;
 use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
 };
@@ -17,6 +19,45 @@ use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
 pub struct SqliteClient {
     pub pool: Pool<Sqlite>,
+}
+
+fn add_version_bounds(builder: &mut QueryBuilder<Sqlite>, version: &str) -> Result<(), SqlError> {
+    let version_bounds = VersionParser::get_version_to_search(version)
+        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+    // construct lower bound (already validated)
+    builder.push(format!(
+        " AND (major >= {} AND minor >= {} and patch >= {})",
+        version_bounds.lower_bound.major,
+        version_bounds.lower_bound.minor,
+        version_bounds.lower_bound.patch
+    ));
+
+    if !version_bounds.no_upper_bound {
+        // construct upper bound based on number of components
+        if version_bounds.num_parts == 1 {
+            builder.push(format!(
+                " AND (major < {})",
+                version_bounds.upper_bound.major
+            ));
+        } else if version_bounds.num_parts == 2
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Tilde
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Caret
+        {
+            builder.push(format!(
+                " AND (major == {} AND minor < {})",
+                version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+            ));
+        } else {
+            builder.push(format!(
+                " AND (major == {} AND minor == {} AND patch < {})",
+                version_bounds.upper_bound.major,
+                version_bounds.upper_bound.minor,
+                version_bounds.upper_bound.patch
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[async_trait]
@@ -105,43 +146,7 @@ impl SqlClient for SqliteClient {
         builder.push_bind(repository);
 
         if let Some(version) = version {
-            let version_bounds = VersionParser::get_version_to_search(version)
-                .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-            // construct lower bound (already validated)
-            builder.push(format!(
-                " AND (major >= {} AND minor >= {} and patch >= {})",
-                version_bounds.lower_bound.major,
-                version_bounds.lower_bound.minor,
-                version_bounds.lower_bound.patch
-            ));
-
-            if !version_bounds.no_upper_bound {
-                // construct upper bound based on number of components
-                if version_bounds.num_parts == 1 {
-                    builder.push(format!(
-                        " AND (major < {})",
-                        version_bounds.upper_bound.major
-                    ));
-                } else if version_bounds.num_parts == 2
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Tilde
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Caret
-                {
-                    builder.push(format!(
-                        " AND (major == {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                    ));
-                } else {
-                    builder.push(format!(
-                        " AND (major == {} AND minor == {} AND patch < {})",
-                        version_bounds.upper_bound.major,
-                        version_bounds.upper_bound.minor,
-                        version_bounds.upper_bound.patch
-                    ));
-                }
-            }
+            add_version_bounds(&mut builder, version)?;
         }
 
         // order by timestamp and limit 20
@@ -214,44 +219,7 @@ impl SqlClient for SqliteClient {
             }
 
             if query_args.version.is_some() {
-                let version_bounds =
-                    VersionParser::get_version_to_search(query_args.version.as_ref().unwrap())
-                        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-                // construct lower bound (already validated)
-                builder.push(format!(
-                    " AND (major >= {} AND minor >= {} and patch >= {})",
-                    version_bounds.lower_bound.major,
-                    version_bounds.lower_bound.minor,
-                    version_bounds.lower_bound.patch
-                ));
-
-                if !version_bounds.no_upper_bound {
-                    // construct upper bound based on number of components
-                    if version_bounds.num_parts == 1 {
-                        builder.push(format!(
-                            " AND (major < {})",
-                            version_bounds.upper_bound.major
-                        ));
-                    } else if version_bounds.num_parts == 2
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Tilde
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Caret
-                    {
-                        builder.push(format!(
-                            " AND (major == {} AND minor < {})",
-                            version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                        ));
-                    } else {
-                        builder.push(format!(
-                            " AND (major == {} AND minor == {} AND patch < {})",
-                            version_bounds.upper_bound.major,
-                            version_bounds.upper_bound.minor,
-                            version_bounds.upper_bound.patch
-                        ));
-                    }
-                }
+                add_version_bounds(&mut builder, query_args.version.as_ref().unwrap())?;
             }
 
             if query_args.max_date.is_some() {
@@ -333,6 +301,63 @@ impl SqlClient for SqliteClient {
                 ));
             }
         }
+    }
+
+    async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+        let query = match table {
+            CardSQLTableNames::Data => match card {
+                Card::Data(data) => SqlHelper::get_datacard_insert_query(data),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Model => match card {
+                Card::Model(model) => SqlHelper::get_modelcard_insert_query(model),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Run => match card {
+                Card::Run(run) => SqlHelper::get_runcard_insert_query(run),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Audit => match card {
+                Card::Audit(audit) => SqlHelper::get_auditcard_insert_query(audit),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Pipeline => match card {
+                Card::Pipeline(pipeline) => SqlHelper::get_pipelinecard_insert_query(pipeline),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for insert".to_string(),
+                ));
+            }
+        };
+
+        sqlx::query(&query)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -524,6 +549,40 @@ mod tests {
         // test uid
         let card_args = CardQueryArgs {
             uid: Some("550e8400-e29b-41d4-a716-446655440000".to_string()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_insert_cards() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+        let data_card = DataCardRecord::default();
+        let card = Card::Data(data_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Data, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(data_card.uid),
             ..Default::default()
         };
         let results = client

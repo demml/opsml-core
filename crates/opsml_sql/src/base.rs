@@ -1,5 +1,5 @@
 use crate::schemas::arguments::CardQueryArgs;
-use crate::schemas::schema::CardResults;
+use crate::schemas::schema::{Card, CardResults};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
@@ -44,4 +44,6 @@ pub trait SqlClient {
         table: CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError>;
+
+    async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
 }

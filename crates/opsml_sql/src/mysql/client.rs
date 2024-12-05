@@ -1,6 +1,7 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use crate::schemas::arguments::CardQueryArgs;
+use crate::schemas::schema::Card;
 use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
 };
@@ -312,6 +313,10 @@ impl SqlClient for MySqlClient {
                 ));
             }
         }
+    }
+
+    async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+        unimplemented!()
     }
 }
 
