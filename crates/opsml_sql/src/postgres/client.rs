@@ -260,7 +260,7 @@ impl SqlClient for PostgresClient {
             }
         }
 
-        let sql = builder.sql().into();
+        let sql = builder.sql();
 
         match table {
             CardSQLTableNames::Data => {

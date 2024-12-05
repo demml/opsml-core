@@ -262,7 +262,7 @@ impl SqlClient for MySqlClient {
             }
         }
 
-        let sql = builder.sql().into();
+        let sql = builder.sql();
 
         match table {
             CardSQLTableNames::Data => {

@@ -283,7 +283,7 @@ impl SqlClient for SqliteClient {
             }
         }
 
-        let sql = builder.sql().into();
+        let sql = builder.sql();
 
         match table {
             CardSQLTableNames::Data => {

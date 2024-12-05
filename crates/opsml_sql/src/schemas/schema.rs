@@ -168,6 +168,15 @@ impl CardResults {
             CardResults::Pipeline(cards) => cards.len(),
         }
     }
+    pub fn is_empty(&self) -> bool {
+        match self {
+            CardResults::Data(cards) => cards.is_empty(),
+            CardResults::Model(cards) => cards.is_empty(),
+            CardResults::Run(cards) => cards.is_empty(),
+            CardResults::Audit(cards) => cards.is_empty(),
+            CardResults::Pipeline(cards) => cards.is_empty(),
+        }
+    }
     pub fn to_json(&self) -> Vec<String> {
         match self {
             CardResults::Data(cards) => cards
