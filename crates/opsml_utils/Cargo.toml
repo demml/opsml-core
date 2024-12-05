@@ -9,7 +9,7 @@ doctest = false
 
 [dependencies]
 opsml-error = { workspace = true }
-
+chrono = { workspace = true }
 colored = { workspace = true}
 colored_json = { workspace = true}
 pyo3 = { workspace = true }

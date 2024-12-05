@@ -2957,6 +2957,7 @@ dependencies = [
 name = "opsml-utils"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "colored",
  "colored_json",
  "opsml-error",

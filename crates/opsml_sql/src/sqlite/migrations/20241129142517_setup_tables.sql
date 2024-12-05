@@ -87,9 +87,9 @@ CREATE TABLE IF NOT EXISTS opsml_audit_registry (
     contact TEXT,
     tags TEXT,
     approved BOOLEAN,
-    datacards TEXT,
-    modelcards TEXT,
-    runcards TEXT
+    datacard_uids TEXT,
+    modelcard_uids TEXT,
+    runcard_uids TEXT
 );
 
 -- PipelineSchema

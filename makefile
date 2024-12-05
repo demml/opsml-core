@@ -1,14 +1,14 @@
 .PHONY: test.sql.sqlite
 test.sql.sqlite:
-	cargo test -p opsml-sql test_sqlite -- --nocapture
+	cargo test -p opsml-sql test_sqlite -- --nocapture --test-threads=1
 
 .PHONY: test.sql.postgres
 test.sql.postgres:
-	cargo test -p opsml-sql test_postgres -- --nocapture
+	cargo test -p opsml-sql test_postgres -- --nocapture --test-threads=1
 
 .PHONY: test.sql.mysql
 test.sql.mysql:
-	cargo test -p opsml-sql test_mysql -- --nocapture
+	cargo test -p opsml-sql test_mysql -- --nocapture --test-threads=1
 
 .PHONY: build.postgres
 build.postgres:

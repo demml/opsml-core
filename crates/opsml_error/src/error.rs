@@ -60,6 +60,9 @@ pub enum UtilError {
 
     #[error("Failed to validate uuid")]
     UuidError,
+
+    #[error("Failed to parse date")]
+    DateError,
 }
 
 impl From<UtilError> for PyErr {
@@ -102,6 +105,9 @@ pub enum SqlError {
 
     #[error("File error: {0}")]
     FileError(String),
+
+    #[error("Error - {0}")]
+    GeneralError(String),
 }
 
 #[derive(Error, Debug)]

@@ -1,5 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
+/// Arguments for querying cards
+///
+/// # Fields
+///
+/// * `uid` - The unique identifier of the card
+/// * `name` - The name of the card
+/// * `repository` - The repository of the card
+/// * `version` - The version of the card
+/// * `max_date` - The maximum date of the card
+/// * `tags` - The tags of the card
+/// * `limit` - The maximum number of cards to return
+/// * `query_terms` - The query terms to search for
+/// * `sort_by_timestamp` - Whether to sort by timestamp
+
+#[derive(Debug)]
 pub struct CardQueryArgs {
     pub uid: Option<String>,
     pub name: Option<String>,
@@ -8,6 +23,20 @@ pub struct CardQueryArgs {
     pub max_date: Option<String>,
     pub tags: Option<HashMap<String, String>>,
     pub limit: Option<i32>,
-    pub query_terms: Option<HashMap<String, String>>,
     pub sort_by_timestamp: Option<bool>,
+}
+
+impl Default for CardQueryArgs {
+    fn default() -> Self {
+        Self {
+            uid: None,
+            name: None,
+            repository: None,
+            version: None,
+            max_date: None,
+            tags: None,
+            limit: None,
+            sort_by_timestamp: None,
+        }
+    }
 }

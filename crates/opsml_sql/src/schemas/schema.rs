@@ -97,8 +97,8 @@ pub struct RunCardResult {
     pub build_tag: Option<String>,
     pub contact: String,
     pub tags: Json<HashMap<String, String>>,
-    pub datacard_uids: Json<HashMap<String, String>>,
-    pub modelcard_uids: Json<HashMap<String, String>>,
+    pub datacard_uids: Json<Vec<String>>,
+    pub modelcard_uids: Json<Vec<String>>,
     pub pipelinecard_uid: String,
     pub project: String,
     pub artifact_uris: Json<HashMap<String, String>>,
@@ -121,9 +121,9 @@ pub struct AuditCardResult {
     pub contact: String,
     pub tags: Json<HashMap<String, String>>,
     pub approved: bool,
-    pub datacards: Json<HashMap<String, String>>,
-    pub modelcards: Json<HashMap<String, String>>,
-    pub runcards: Json<HashMap<String, String>>,
+    pub datacard_uids: Json<Vec<String>>,
+    pub modelcard_uids: Json<Vec<String>>,
+    pub runcard_uids: Json<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -142,16 +142,54 @@ pub struct PipelineCardResult {
     pub contact: String,
     pub tags: Json<HashMap<String, String>>,
     pub pipeline_code_uri: String,
-    pub datacard_uids: Json<HashMap<String, String>>,
-    pub modelcard_uids: Json<HashMap<String, String>>,
-    pub runcard_uids: Json<HashMap<String, String>>,
+    pub datacard_uids: Json<Vec<String>>,
+    pub modelcard_uids: Json<Vec<String>>,
+    pub runcard_uids: Json<Vec<String>>,
 }
 
 // create enum that takes vec of cards
+
+#[derive(Debug)]
 pub enum CardResults {
     Data(Vec<DataCardResult>),
     Model(Vec<ModelCardResult>),
     Run(Vec<RunCardResult>),
     Audit(Vec<AuditCardResult>),
     Pipeline(Vec<PipelineCardResult>),
+}
+
+impl CardResults {
+    pub fn len(&self) -> usize {
+        match self {
+            CardResults::Data(cards) => cards.len(),
+            CardResults::Model(cards) => cards.len(),
+            CardResults::Run(cards) => cards.len(),
+            CardResults::Audit(cards) => cards.len(),
+            CardResults::Pipeline(cards) => cards.len(),
+        }
+    }
+    pub fn to_json(&self) -> Vec<String> {
+        match self {
+            CardResults::Data(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
+            CardResults::Model(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
+            CardResults::Run(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
+            CardResults::Audit(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
+            CardResults::Pipeline(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
+        }
+    }
 }
