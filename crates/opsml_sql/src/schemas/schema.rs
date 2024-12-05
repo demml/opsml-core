@@ -36,7 +36,7 @@ impl VersionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DataCardResult {
+pub struct DataCardRecord {
     pub uid: String,
     pub date: String,
     pub timestamp: i64,
@@ -58,7 +58,7 @@ pub struct DataCardResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ModelCardResult {
+pub struct ModelCardRecord {
     pub uid: String,
     pub date: String,
     pub timestamp: i64,
@@ -83,7 +83,7 @@ pub struct ModelCardResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct RunCardResult {
+pub struct RunCardRecord {
     pub uid: String,
     pub date: String,
     pub timestamp: i64,
@@ -106,7 +106,7 @@ pub struct RunCardResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct AuditCardResult {
+pub struct AuditCardRecord {
     pub uid: String,
     pub date: String,
     pub timestamp: i64,
@@ -127,7 +127,7 @@ pub struct AuditCardResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PipelineCardResult {
+pub struct PipelineCardRecord {
     pub uid: String,
     pub date: String,
     pub timestamp: i64,
@@ -151,11 +151,11 @@ pub struct PipelineCardResult {
 
 #[derive(Debug)]
 pub enum CardResults {
-    Data(Vec<DataCardResult>),
-    Model(Vec<ModelCardResult>),
-    Run(Vec<RunCardResult>),
-    Audit(Vec<AuditCardResult>),
-    Pipeline(Vec<PipelineCardResult>),
+    Data(Vec<DataCardRecord>),
+    Model(Vec<ModelCardRecord>),
+    Run(Vec<RunCardRecord>),
+    Audit(Vec<AuditCardRecord>),
+    Pipeline(Vec<PipelineCardRecord>),
 }
 
 impl CardResults {

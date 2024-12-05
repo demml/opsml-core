@@ -2,7 +2,7 @@ use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::{
-    AuditCardResult, DataCardResult, ModelCardResult, PipelineCardResult, RunCardResult,
+    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
@@ -264,7 +264,7 @@ impl SqlClient for PostgresClient {
 
         match table {
             CardSQLTableNames::Data => {
-                let card: Vec<DataCardResult> = sqlx::query_as(sql)
+                let card: Vec<DataCardRecord> = sqlx::query_as(sql)
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -272,7 +272,7 @@ impl SqlClient for PostgresClient {
                 return Ok(CardResults::Data(card));
             }
             CardSQLTableNames::Model => {
-                let card: Vec<ModelCardResult> = sqlx::query_as(sql)
+                let card: Vec<ModelCardRecord> = sqlx::query_as(sql)
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -280,7 +280,7 @@ impl SqlClient for PostgresClient {
                 return Ok(CardResults::Model(card));
             }
             CardSQLTableNames::Run => {
-                let card: Vec<RunCardResult> = sqlx::query_as(sql)
+                let card: Vec<RunCardRecord> = sqlx::query_as(sql)
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -289,7 +289,7 @@ impl SqlClient for PostgresClient {
             }
 
             CardSQLTableNames::Audit => {
-                let card: Vec<AuditCardResult> = sqlx::query_as(sql)
+                let card: Vec<AuditCardRecord> = sqlx::query_as(sql)
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -297,7 +297,7 @@ impl SqlClient for PostgresClient {
                 return Ok(CardResults::Audit(card));
             }
             CardSQLTableNames::Pipeline => {
-                let card: Vec<PipelineCardResult> = sqlx::query_as(sql)
+                let card: Vec<PipelineCardRecord> = sqlx::query_as(sql)
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
