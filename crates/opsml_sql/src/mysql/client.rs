@@ -1,5 +1,6 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
+use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::{
@@ -18,6 +19,45 @@ use sqlx::{
     Execute, Pool, QueryBuilder,
 };
 use tracing::info;
+
+fn add_version_bounds(builder: &mut QueryBuilder<MySql>, version: &str) -> Result<(), SqlError> {
+    let version_bounds = VersionParser::get_version_to_search(version)
+        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+    // construct lower bound (already validated)
+    builder.push(format!(
+        " AND (major >= {} AND minor >= {} and patch >= {})",
+        version_bounds.lower_bound.major,
+        version_bounds.lower_bound.minor,
+        version_bounds.lower_bound.patch
+    ));
+
+    if !version_bounds.no_upper_bound {
+        // construct upper bound based on number of components
+        if version_bounds.num_parts == 1 {
+            builder.push(format!(
+                " AND (major < {})",
+                version_bounds.upper_bound.major
+            ));
+        } else if version_bounds.num_parts == 2
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Tilde
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Caret
+        {
+            builder.push(format!(
+                " AND (major = {} AND minor < {})",
+                version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+            ));
+        } else {
+            builder.push(format!(
+                " AND (major = {} AND minor = {} AND patch < {})",
+                version_bounds.upper_bound.major,
+                version_bounds.upper_bound.minor,
+                version_bounds.upper_bound.patch
+            ));
+        }
+    }
+    Ok(())
+}
 
 pub struct MySqlClient {
     pub pool: Pool<MySql>,
@@ -87,44 +127,9 @@ impl SqlClient for MySqlClient {
 
         builder.push(" AND repository = ");
         builder.push_bind(repository);
+
         if let Some(version) = version {
-            let version_bounds = VersionParser::get_version_to_search(version)
-                .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-            // construct lower bound (already validated)
-            builder.push(format!(
-                " AND (major >= {} AND minor >= {} and patch >= {})",
-                version_bounds.lower_bound.major,
-                version_bounds.lower_bound.minor,
-                version_bounds.lower_bound.patch
-            ));
-
-            if !version_bounds.no_upper_bound {
-                // construct upper bound based on number of components
-                if version_bounds.num_parts == 1 {
-                    builder.push(format!(
-                        " AND (major < {})",
-                        version_bounds.upper_bound.major
-                    ));
-                } else if version_bounds.num_parts == 2
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Tilde
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Caret
-                {
-                    builder.push(format!(
-                        " AND (major = {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                    ));
-                } else {
-                    builder.push(format!(
-                        " AND (major = {} AND minor = {} AND patch < {})",
-                        version_bounds.upper_bound.major,
-                        version_bounds.upper_bound.minor,
-                        version_bounds.upper_bound.patch
-                    ));
-                }
-            }
+            add_version_bounds(&mut builder, version)?;
         }
 
         // order by timestamp and limit 20
@@ -194,44 +199,7 @@ impl SqlClient for MySqlClient {
             }
 
             if query_args.version.is_some() {
-                let version_bounds =
-                    VersionParser::get_version_to_search(query_args.version.as_ref().unwrap())
-                        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-                // construct lower bound (already validated)
-                builder.push(format!(
-                    " AND (major >= {} AND minor >= {} and patch >= {})",
-                    version_bounds.lower_bound.major,
-                    version_bounds.lower_bound.minor,
-                    version_bounds.lower_bound.patch
-                ));
-
-                if !version_bounds.no_upper_bound {
-                    // construct upper bound based on number of components
-                    if version_bounds.num_parts == 1 {
-                        builder.push(format!(
-                            " AND (major < {})",
-                            version_bounds.upper_bound.major
-                        ));
-                    } else if version_bounds.num_parts == 2
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Tilde
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Caret
-                    {
-                        builder.push(format!(
-                            " AND (major = {} AND minor < {})",
-                            version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                        ));
-                    } else {
-                        builder.push(format!(
-                            " AND (major = {} AND minor = {} AND patch < {})",
-                            version_bounds.upper_bound.major,
-                            version_bounds.upper_bound.minor,
-                            version_bounds.upper_bound.patch
-                        ));
-                    }
-                }
+                add_version_bounds(&mut builder, query_args.version.as_ref().unwrap())?;
             }
 
             if query_args.max_date.is_some() {
@@ -316,7 +284,60 @@ impl SqlClient for MySqlClient {
     }
 
     async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
-        unimplemented!()
+        let query = match table {
+            CardSQLTableNames::Data => match card {
+                Card::Data(data) => SqlHelper::get_datacard_insert_query(data),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Model => match card {
+                Card::Model(model) => SqlHelper::get_modelcard_insert_query(model),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Run => match card {
+                Card::Run(run) => SqlHelper::get_runcard_insert_query(run),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Audit => match card {
+                Card::Audit(audit) => SqlHelper::get_auditcard_insert_query(audit),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Pipeline => match card {
+                Card::Pipeline(pipeline) => SqlHelper::get_pipelinecard_insert_query(pipeline),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for insert".to_string(),
+                ));
+            }
+        };
+
+        sqlx::query(&query)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -531,6 +552,134 @@ mod tests {
         };
         let results = client
             .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_insert_cards() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+
+        let client = MySqlClient::new(&config).await;
+
+        cleanup(&client.pool).await;
+
+        let data_card = DataCardRecord::default();
+        let card = Card::Data(data_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Data, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(data_card.uid),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // insert modelcard
+        let model_card = ModelCardRecord::default();
+        let card = Card::Model(model_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Model, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(model_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Model, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // insert runcard
+        let run_card = RunCardRecord::default();
+        let card = Card::Run(run_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Run, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(run_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Run, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // insert auditcard
+
+        let audit_card = AuditCardRecord::default();
+        let card = Card::Audit(audit_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Audit, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(audit_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // check pipeline card
+        let pipeline_card = PipelineCardRecord::default();
+        let card = Card::Pipeline(pipeline_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Pipeline, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+
+        let card_args = CardQueryArgs {
+            uid: Some(pipeline_card.uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Pipeline, &card_args)
             .await
             .unwrap();
 
