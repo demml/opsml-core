@@ -6,7 +6,7 @@ use crate::schemas::schema::Card;
 use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
 };
-use crate::schemas::schema::{CardResults, VersionResult};
+use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
@@ -395,6 +395,29 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(())
+    }
+
+    /// Get unique repository names
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<String>` - A vector of unique repository names
+    async fn get_unique_repository_names(
+        &self,
+        table: CardSQLTableNames,
+    ) -> Result<Vec<String>, SqlError> {
+        let query = format!("SELECT DISTINCT repository FROM {}", table);
+
+        let repos: Vec<Repository> = sqlx::query_as(&query)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(repos.iter().map(|r| r.repository.clone()).collect())
     }
 }
 
@@ -962,6 +985,34 @@ mod tests {
         if let CardResults::Pipeline(cards) = updated_results {
             assert_eq!(cards[0].name, "UpdatedPipelineName");
         }
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_unique_repos() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+
+        let client = MySqlClient::new(&config).await;
+
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // get unique repository names
+        let repos = client
+            .get_unique_repository_names(CardSQLTableNames::Model)
+            .await
+            .unwrap();
+
+        assert_eq!(repos.len(), 10);
 
         cleanup(&client.pool).await;
     }
