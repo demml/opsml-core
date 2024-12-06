@@ -1,5 +1,5 @@
 use crate::schemas::arguments::CardQueryArgs;
-use crate::schemas::schema::{Card, CardResults};
+use crate::schemas::schema::{Card, CardResults, QueryStats};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
@@ -51,4 +51,9 @@ pub trait SqlClient {
         &self,
         table: CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError>;
+    async fn query_stats(
+        &self,
+        table: CardSQLTableNames,
+        search_term: Option<&str>,
+    ) -> Result<QueryStats, SqlError>;
 }

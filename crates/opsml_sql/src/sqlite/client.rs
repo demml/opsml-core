@@ -4,7 +4,7 @@ use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::{
-    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
+    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, QueryStats, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -437,6 +437,54 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(repos.iter().map(|r| r.repository.clone()).collect())
+    }
+
+    /// Query stats for a table
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `search_term` - The search term to query
+    ///
+    /// # Returns
+    ///
+    /// * `HashMap<String, i32>` - A hashmap of the stats
+    ///
+    async fn query_stats(
+        &self,
+        table: CardSQLTableNames,
+        search_term: Option<&str>,
+    ) -> Result<QueryStats, SqlError> {
+        let base_query = format!(
+            "SELECT 
+                COALESCE(COUNT(DISTINCT name), 0) AS nbr_names, 
+                COALESCE(COUNT(version), 0) AS nbr_versions, 
+                COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
+            FROM {}",
+            table
+        );
+
+        let query = if let Some(term) = search_term {
+            format!("{} WHERE name LIKE ? OR repository LIKE ?", base_query)
+        } else {
+            base_query
+        };
+
+        let stats: QueryStats = if let Some(term) = search_term {
+            sqlx::query_as(&query)
+                .bind(format!("%{}%", term))
+                .bind(format!("%{}%", term))
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        } else {
+            sqlx::query_as(&query)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        };
+
+        Ok(stats)
     }
 }
 

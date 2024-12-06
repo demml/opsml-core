@@ -3,6 +3,7 @@ use crate::base::SqlClient;
 use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
+use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
 };
@@ -415,6 +416,14 @@ impl SqlClient for PostgresClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(repos.iter().map(|r| r.repository.clone()).collect())
+    }
+
+    async fn query_stats(
+        &self,
+        table: CardSQLTableNames,
+        search_term: Option<&str>,
+    ) -> Result<QueryStats, SqlError> {
+        unimplemented!()
     }
 }
 
