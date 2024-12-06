@@ -23,6 +23,45 @@ pub struct PostgresClient {
     pub pool: Pool<Postgres>,
 }
 
+fn add_version_bounds(builder: &mut QueryBuilder<Postgres>, version: &str) -> Result<(), SqlError> {
+    let version_bounds = VersionParser::get_version_to_search(version)
+        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
+
+    // construct lower bound (already validated)
+    builder.push(format!(
+        " AND (major >= {} AND minor >= {} and patch >= {})",
+        version_bounds.lower_bound.major,
+        version_bounds.lower_bound.minor,
+        version_bounds.lower_bound.patch
+    ));
+
+    if !version_bounds.no_upper_bound {
+        // construct upper bound based on number of components
+        if version_bounds.num_parts == 1 {
+            builder.push(format!(
+                " AND (major < {})",
+                version_bounds.upper_bound.major
+            ));
+        } else if version_bounds.num_parts == 2
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Tilde
+            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Caret
+        {
+            builder.push(format!(
+                " AND (major == {} AND minor < {})",
+                version_bounds.upper_bound.major, version_bounds.upper_bound.minor
+            ));
+        } else {
+            builder.push(format!(
+                " AND (major == {} AND minor == {} AND patch < {})",
+                version_bounds.upper_bound.major,
+                version_bounds.upper_bound.minor,
+                version_bounds.upper_bound.patch
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl SqlClient for PostgresClient {
     async fn new(settings: &OpsmlDatabaseSettings) -> Self {
@@ -89,43 +128,7 @@ impl SqlClient for PostgresClient {
         builder.push_bind(repository);
 
         if let Some(version) = version {
-            let version_bounds = VersionParser::get_version_to_search(version)
-                .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-            // construct lower bound (already validated)
-            builder.push(format!(
-                " AND (major >= {} AND minor >= {} and patch >= {})",
-                version_bounds.lower_bound.major,
-                version_bounds.lower_bound.minor,
-                version_bounds.lower_bound.patch
-            ));
-
-            if !version_bounds.no_upper_bound {
-                // construct upper bound based on number of components
-                if version_bounds.num_parts == 1 {
-                    builder.push(format!(
-                        " AND (major < {})",
-                        version_bounds.upper_bound.major
-                    ));
-                } else if version_bounds.num_parts == 2
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Tilde
-                    || version_bounds.num_parts == 3
-                        && version_bounds.parser_type == VersionParser::Caret
-                {
-                    builder.push(format!(
-                        " AND (major = {} AND minor < {})",
-                        version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                    ));
-                } else {
-                    builder.push(format!(
-                        " AND (major = {} AND minor = {} AND patch < {})",
-                        version_bounds.upper_bound.major,
-                        version_bounds.upper_bound.minor,
-                        version_bounds.upper_bound.patch
-                    ));
-                }
-            }
+            add_version_bounds(&mut builder, version)?;
         }
 
         // order by timestamp and limit 20
@@ -195,44 +198,7 @@ impl SqlClient for PostgresClient {
             }
 
             if query_args.version.is_some() {
-                let version_bounds =
-                    VersionParser::get_version_to_search(query_args.version.as_ref().unwrap())
-                        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-                // construct lower bound (already validated)
-                builder.push(format!(
-                    " AND (major >= {} AND minor >= {} and patch >= {})",
-                    version_bounds.lower_bound.major,
-                    version_bounds.lower_bound.minor,
-                    version_bounds.lower_bound.patch
-                ));
-
-                if !version_bounds.no_upper_bound {
-                    // construct upper bound based on number of components
-                    if version_bounds.num_parts == 1 {
-                        builder.push(format!(
-                            " AND (major < {})",
-                            version_bounds.upper_bound.major
-                        ));
-                    } else if version_bounds.num_parts == 2
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Tilde
-                        || version_bounds.num_parts == 3
-                            && version_bounds.parser_type == VersionParser::Caret
-                    {
-                        builder.push(format!(
-                            " AND (major = {} AND minor < {})",
-                            version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-                        ));
-                    } else {
-                        builder.push(format!(
-                            " AND (major = {} AND minor = {} AND patch < {})",
-                            version_bounds.upper_bound.major,
-                            version_bounds.upper_bound.minor,
-                            version_bounds.upper_bound.patch
-                        ));
-                    }
-                }
+                add_version_bounds(&mut builder, query_args.version.as_ref().unwrap())?;
             }
 
             if query_args.max_date.is_some() {
