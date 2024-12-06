@@ -359,6 +359,63 @@ impl SqlClient for SqliteClient {
 
         Ok(())
     }
+
+    async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+        let query = match table {
+            CardSQLTableNames::Data => match card {
+                Card::Data(data) => SqlHelper::get_datacard_update_query(data),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for update".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Model => match card {
+                Card::Model(model) => SqlHelper::get_modelcard_update_query(model),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for update".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Run => match card {
+                Card::Run(run) => SqlHelper::get_runcard_update_query(run),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for update".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Audit => match card {
+                Card::Audit(audit) => SqlHelper::get_auditcard_update_query(audit),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for update".to_string(),
+                    ));
+                }
+            },
+            CardSQLTableNames::Pipeline => match card {
+                Card::Pipeline(pipeline) => SqlHelper::get_pipelinecard_update_query(pipeline),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for update".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for update".to_string(),
+                ));
+            }
+        };
+
+        sqlx::query(&query)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -683,6 +740,226 @@ mod tests {
             .unwrap();
 
         assert_eq!(results.len(), 1);
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_update_cards() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        // Test DataCardRecord
+        let mut data_card = DataCardRecord::default();
+        let card = Card::Data(data_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Data, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(data_card.uid.clone()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // update the card
+        data_card.name = "UpdatedDataName".to_string();
+        let updated_card = Card::Data(data_card.clone());
+
+        client
+            .update_card(CardSQLTableNames::Data, &updated_card)
+            .await
+            .unwrap();
+
+        // check if the card was updated
+        let updated_results = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(updated_results.len(), 1);
+        if let CardResults::Data(cards) = updated_results {
+            assert_eq!(cards[0].name, "UpdatedDataName");
+        }
+
+        // Test ModelCardRecord
+        let mut model_card = ModelCardRecord::default();
+        let card = Card::Model(model_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Model, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(model_card.uid.clone()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Model, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // update the card
+        model_card.name = "UpdatedModelName".to_string();
+        let updated_card = Card::Model(model_card.clone());
+
+        client
+            .update_card(CardSQLTableNames::Model, &updated_card)
+            .await
+            .unwrap();
+
+        // check if the card was updated
+        let updated_results = client
+            .query_cards(CardSQLTableNames::Model, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(updated_results.len(), 1);
+        if let CardResults::Model(cards) = updated_results {
+            assert_eq!(cards[0].name, "UpdatedModelName");
+        }
+
+        // Test RunCardRecord
+        let mut run_card = RunCardRecord::default();
+        let card = Card::Run(run_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Run, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(run_card.uid.clone()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Run, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // update the card
+        run_card.name = "UpdatedRunName".to_string();
+        let updated_card = Card::Run(run_card.clone());
+
+        client
+            .update_card(CardSQLTableNames::Run, &updated_card)
+            .await
+            .unwrap();
+
+        // check if the card was updated
+        let updated_results = client
+            .query_cards(CardSQLTableNames::Run, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(updated_results.len(), 1);
+        if let CardResults::Run(cards) = updated_results {
+            assert_eq!(cards[0].name, "UpdatedRunName");
+        }
+
+        // Test AuditCardRecord
+        let mut audit_card = AuditCardRecord::default();
+        let card = Card::Audit(audit_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Audit, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(audit_card.uid.clone()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // update the card
+        audit_card.name = "UpdatedAuditName".to_string();
+        let updated_card = Card::Audit(audit_card.clone());
+
+        client
+            .update_card(CardSQLTableNames::Audit, &updated_card)
+            .await
+            .unwrap();
+
+        // check if the card was updated
+        let updated_results = client
+            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(updated_results.len(), 1);
+        if let CardResults::Audit(cards) = updated_results {
+            assert_eq!(cards[0].name, "UpdatedAuditName");
+        }
+
+        // Test PipelineCardRecord
+        let mut pipeline_card = PipelineCardRecord::default();
+        let card = Card::Pipeline(pipeline_card.clone());
+
+        client
+            .insert_card(CardSQLTableNames::Pipeline, &card)
+            .await
+            .unwrap();
+
+        // check if the card was inserted
+        let card_args = CardQueryArgs {
+            uid: Some(pipeline_card.uid.clone()),
+            ..Default::default()
+        };
+        let results = client
+            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // update the card
+        pipeline_card.name = "UpdatedPipelineName".to_string();
+        let updated_card = Card::Pipeline(pipeline_card.clone());
+
+        client
+            .update_card(CardSQLTableNames::Pipeline, &updated_card)
+            .await
+            .unwrap();
+
+        // check if the card was updated
+        let updated_results = client
+            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(updated_results.len(), 1);
+        if let CardResults::Pipeline(cards) = updated_results {
+            assert_eq!(cards[0].name, "UpdatedPipelineName");
+        }
 
         cleanup();
     }

@@ -287,4 +287,206 @@ impl SqlHelper {
             values.join(", ")
         )
     }
+
+    pub fn get_datacard_update_query(card: &DataCardRecord) -> String {
+        let mut updates = vec![
+            format!("date = '{}'", card.date),
+            format!("timestamp = {}", card.timestamp),
+            format!("app_env = '{}'", card.app_env),
+            format!("name = '{}'", card.name),
+            format!("repository = '{}'", card.repository),
+            format!("major = {}", card.major),
+            format!("minor = {}", card.minor),
+            format!("patch = {}", card.patch),
+            format!("contact = '{}'", card.contact),
+            format!("data_type = '{}'", card.data_type),
+            format!("interface_type = '{}'", card.interface_type),
+            format!("tags = '{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("runcard_uid = '{}'", card.runcard_uid),
+            format!("pipelinecard_uid = '{}'", card.pipelinecard_uid),
+            format!("auditcard_uid = '{}'", card.auditcard_uid),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            updates.push(format!("pre_tag = '{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            updates.push(format!("build_tag = '{}'", build_tag));
+        }
+
+        format!(
+            "UPDATE opsml_data_registry SET {} WHERE uid = '{}'",
+            updates.join(", "),
+            card.uid
+        )
+    }
+
+    pub fn get_modelcard_update_query(card: &ModelCardRecord) -> String {
+        let mut updates = vec![
+            format!("date = '{}'", card.date),
+            format!("timestamp = {}", card.timestamp),
+            format!("app_env = '{}'", card.app_env),
+            format!("name = '{}'", card.name),
+            format!("repository = '{}'", card.repository),
+            format!("major = {}", card.major),
+            format!("minor = {}", card.minor),
+            format!("patch = {}", card.patch),
+            format!("contact = '{}'", card.contact),
+            format!("datacard_uid = '{}'", card.datacard_uid),
+            format!("sample_data_type = '{}'", card.sample_data_type),
+            format!("model_type = '{}'", card.model_type),
+            format!("interface_type = '{}'", card.interface_type),
+            format!("task_type = '{}'", card.task_type),
+            format!("tags = '{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("runcard_uid = '{}'", card.runcard_uid),
+            format!("pipelinecard_uid = '{}'", card.pipelinecard_uid),
+            format!("auditcard_uid = '{}'", card.auditcard_uid),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            updates.push(format!("pre_tag = '{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            updates.push(format!("build_tag = '{}'", build_tag));
+        }
+
+        format!(
+            "UPDATE opsml_model_registry SET {} WHERE uid = '{}'",
+            updates.join(", "),
+            card.uid
+        )
+    }
+
+    pub fn get_runcard_update_query(card: &RunCardRecord) -> String {
+        let mut updates = vec![
+            format!("date = '{}'", card.date),
+            format!("timestamp = {}", card.timestamp),
+            format!("app_env = '{}'", card.app_env),
+            format!("name = '{}'", card.name),
+            format!("repository = '{}'", card.repository),
+            format!("major = {}", card.major),
+            format!("minor = {}", card.minor),
+            format!("patch = {}", card.patch),
+            format!("contact = '{}'", card.contact),
+            format!("project = '{}'", card.project),
+            format!("tags = '{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!(
+                "datacard_uids = '{}'",
+                serde_json::to_string(&card.datacard_uids).unwrap()
+            ),
+            format!(
+                "modelcard_uids = '{}'",
+                serde_json::to_string(&card.modelcard_uids).unwrap()
+            ),
+            format!("pipelinecard_uid = '{}'", card.pipelinecard_uid),
+            format!(
+                "artifact_uris = '{}'",
+                serde_json::to_string(&card.artifact_uris).unwrap()
+            ),
+            format!(
+                "compute_environment = '{}'",
+                serde_json::to_string(&card.compute_environment).unwrap()
+            ),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            updates.push(format!("pre_tag = '{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            updates.push(format!("build_tag = '{}'", build_tag));
+        }
+
+        format!(
+            "UPDATE opsml_run_registry SET {} WHERE uid = '{}'",
+            updates.join(", "),
+            card.uid
+        )
+    }
+
+    pub fn get_auditcard_update_query(card: &AuditCardRecord) -> String {
+        let mut updates = vec![
+            format!("date = '{}'", card.date),
+            format!("timestamp = {}", card.timestamp),
+            format!("app_env = '{}'", card.app_env),
+            format!("name = '{}'", card.name),
+            format!("repository = '{}'", card.repository),
+            format!("major = {}", card.major),
+            format!("minor = {}", card.minor),
+            format!("patch = {}", card.patch),
+            format!("contact = '{}'", card.contact),
+            format!("tags = '{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("approved = {}", card.approved),
+            format!(
+                "datacard_uids = '{}'",
+                serde_json::to_string(&card.datacard_uids).unwrap()
+            ),
+            format!(
+                "modelcard_uids = '{}'",
+                serde_json::to_string(&card.modelcard_uids).unwrap()
+            ),
+            format!(
+                "runcard_uids = '{}'",
+                serde_json::to_string(&card.runcard_uids).unwrap()
+            ),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            updates.push(format!("pre_tag = '{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            updates.push(format!("build_tag = '{}'", build_tag));
+        }
+
+        format!(
+            "UPDATE opsml_audit_registry SET {} WHERE uid = '{}'",
+            updates.join(", "),
+            card.uid
+        )
+    }
+
+    pub fn get_pipelinecard_update_query(card: &PipelineCardRecord) -> String {
+        let mut updates = vec![
+            format!("date = '{}'", card.date),
+            format!("timestamp = {}", card.timestamp),
+            format!("app_env = '{}'", card.app_env),
+            format!("name = '{}'", card.name),
+            format!("repository = '{}'", card.repository),
+            format!("major = {}", card.major),
+            format!("minor = {}", card.minor),
+            format!("patch = {}", card.patch),
+            format!("contact = '{}'", card.contact),
+            format!("tags = '{}'", serde_json::to_string(&card.tags).unwrap()),
+            format!("pipeline_code_uri = '{}'", card.pipeline_code_uri),
+            format!(
+                "datacard_uids = '{}'",
+                serde_json::to_string(&card.datacard_uids).unwrap()
+            ),
+            format!(
+                "modelcard_uids = '{}'",
+                serde_json::to_string(&card.modelcard_uids).unwrap()
+            ),
+            format!(
+                "runcard_uids = '{}'",
+                serde_json::to_string(&card.runcard_uids).unwrap()
+            ),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            updates.push(format!("pre_tag = '{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            updates.push(format!("build_tag = '{}'", build_tag));
+        }
+
+        format!(
+            "UPDATE opsml_pipeline_registry SET {} WHERE uid = '{}'",
+            updates.join(", "),
+            card.uid
+        )
+    }
 }

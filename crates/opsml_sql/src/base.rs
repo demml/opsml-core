@@ -46,4 +46,5 @@ pub trait SqlClient {
     ) -> Result<CardResults, SqlError>;
 
     async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
+    async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
 }
