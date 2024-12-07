@@ -486,6 +486,19 @@ impl SqlClient for MySqlClient {
         Ok(stats)
     }
 
+    /// Query a page of cards
+    ///
+    /// # Arguments
+    ///
+    /// * `sort_by` - The field to sort by
+    /// * `page` - The page number
+    /// * `search_term` - The search term to query
+    /// * `repository` - The repository to query
+    /// * `table` - The table to query
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<CardSummary>` - A vector of card summaries
     async fn query_page(
         &self,
         sort_by: &str,
@@ -494,27 +507,96 @@ impl SqlClient for MySqlClient {
         repository: Option<&str>,
         table: CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = SqlHelper::get_query_page(sort_by, table);
+        let versions_cte = format!(
+            "WITH versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) as row_num 
+                FROM {}
+                WHERE 1=1
+                AND (? IS NULL OR repository = ?)
+                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
+            )", table
+        );
+
+        let stats_cte = format!(
+            ", stats AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    COUNT(DISTINCT version) AS versions, 
+                    MAX(timestamp) AS updated_at, 
+                    MIN(timestamp) AS created_at 
+                FROM {}
+                WHERE 1=1
+                AND (? IS NULL OR repository = ?)
+                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
+                GROUP BY repository, name
+            )",
+            table
+        );
+
+        let filtered_versions_cte = format!(
+            ", filtered_versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    row_num
+                FROM versions 
+                WHERE row_num = 1
+            )"
+        );
+
+        let joined_cte = format!(
+            ", joined AS (
+                SELECT 
+                    stats.repository, 
+                    stats.name, 
+                    filtered_versions.version, 
+                    stats.versions, 
+                    stats.updated_at, 
+                    stats.created_at, 
+                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_num 
+                FROM stats 
+                JOIN filtered_versions 
+                ON stats.repository = filtered_versions.repository 
+                AND stats.name = filtered_versions.name
+            )",
+            sort_by
+        );
+
+        let combined_query = format!(
+            "{}{}{}{} 
+            SELECT * FROM joined 
+            WHERE row_num BETWEEN ? AND ?
+            ORDER BY updated_at DESC;",
+            versions_cte, stats_cte, filtered_versions_cte, joined_cte
+        );
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
 
-        let records: Vec<CardSummary> = sqlx::query_as(&query)
-            .bind(repository)
-            .bind(repository)
-            .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(repository)
-            .bind(repository)
-            .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(lower_bound)
+        println!("combined_query: {}", combined_query);
+
+        let records: Vec<CardSummary> = sqlx::query_as(&combined_query)
+            .bind(repository) // 1st ? in versions_cte
+            .bind(repository) // 2nd ? in versions_cte
+            .bind(search_term) // 3rd ? in versions_cte
+            .bind(search_term.map(|term| format!("%{}%", term))) // 4th ? in versions_cte
+            .bind(search_term.map(|term| format!("%{}%", term))) // 5th ? in versions_cte
+            .bind(repository) // 1st ? in stats_cte
+            .bind(repository) // 2nd ? in stats_cte
+            .bind(search_term) // 3rd ? in stats_cte
+            .bind(search_term.map(|term| format!("%{}%", term))) // 4th ? in stats_cte
+            .bind(search_term.map(|term| format!("%{}%", term))) // 5th ? in stats_cte
+            .bind(lower_bound) // 1st ? in final SELECT
             .bind(upper_bound)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+            .unwrap();
 
         Ok(records)
     }
@@ -1149,6 +1231,47 @@ mod tests {
 
         assert_eq!(stats.nbr_names, 2); // for Model1 and Model10
 
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_query_page() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+        let client = MySqlClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // query page
+        let results = client
+            .query_page("name", 0, None, None, CardSQLTableNames::Data)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // query page
+        let results = client
+            .query_page("name", 0, None, None, CardSQLTableNames::Model)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 9);
+
+        // query page
+        let results = client
+            .query_page("name", 0, None, Some("repo4"), CardSQLTableNames::Model)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
         cleanup(&client.pool).await;
     }
 }

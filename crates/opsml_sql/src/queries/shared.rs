@@ -1,4 +1,3 @@
-use crate::base::CardSQLTableNames;
 /// this file contains helper logic for generating sql queries across different databases
 use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
@@ -504,76 +503,5 @@ impl SqlHelper {
             updates.join(", "),
             card.uid
         )
-    }
-
-    pub fn get_query_page(sort_by: &str, table: CardSQLTableNames) -> String {
-        let versions_cte = format!(
-            "WITH versions AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_number 
-                FROM {}
-                WHERE (? IS NULL OR repository = ?)
-                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
-            )", table
-        );
-
-        let stats_cte = format!(
-            ", stats AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    COUNT(DISTINCT version) AS versions, 
-                    MAX(timestamp) AS updated_at, 
-                    MIN(timestamp) AS created_at 
-                FROM {}
-                WHERE (? IS NULL OR repository = ?)
-                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
-                GROUP BY repository, name
-            )",
-            table
-        );
-
-        let filtered_versions_cte = format!(
-            ", filtered_versions AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    version, 
-                    row_number 
-                FROM versions 
-                WHERE row_number = 1
-            )"
-        );
-
-        let joined_cte = format!(
-            ", joined AS (
-                SELECT 
-                    stats.repository, 
-                    stats.name, 
-                    filtered_versions.version, 
-                    stats.versions, 
-                    stats.updated_at, 
-                    stats.created_at, 
-                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_number 
-                FROM stats 
-                JOIN filtered_versions 
-                ON stats.repository = filtered_versions.repository 
-                AND stats.name = filtered_versions.name
-            )",
-            sort_by
-        );
-
-        let combined_query = format!(
-            "{}{}{}{} 
-            SELECT * FROM joined 
-            WHERE row_number BETWEEN ? AND ? 
-            ORDER BY updated_at DESC",
-            versions_cte, stats_cte, filtered_versions_cte, joined_cte
-        );
-
-        combined_query
     }
 }

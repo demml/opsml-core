@@ -193,10 +193,10 @@ impl SqlClient for SqliteClient {
             "
         SELECT * FROM {}
         WHERE 1==1
-        AND (? IS NULL OR uid = ?)
-        AND (? IS NULL OR name = ?)
-        AND (? IS NULL OR repository = ?)
-        AND (? IS NULL OR DATE(date) <= DATE(?))
+        AND (?1 IS NULL OR uid = ?1)
+        AND (?2 IS NULL OR name = ?2)
+        AND (?3 IS NULL OR repository = ?3)
+        AND (?4 IS NULL OR DATE(date) <= DATE(?4))
         ",
             table
         );
@@ -232,7 +232,7 @@ impl SqlClient for SqliteClient {
             }
         }
 
-        builder.push(" LIMIT ?");
+        builder.push(" LIMIT ?5");
 
         let sql = builder.sql();
 
@@ -240,12 +240,8 @@ impl SqlClient for SqliteClient {
             CardSQLTableNames::Data => {
                 let card: Vec<DataCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -257,12 +253,8 @@ impl SqlClient for SqliteClient {
             CardSQLTableNames::Model => {
                 let card: Vec<ModelCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -274,12 +266,8 @@ impl SqlClient for SqliteClient {
             CardSQLTableNames::Run => {
                 let card: Vec<RunCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -292,12 +280,8 @@ impl SqlClient for SqliteClient {
             CardSQLTableNames::Audit => {
                 let card: Vec<AuditCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -309,12 +293,8 @@ impl SqlClient for SqliteClient {
             CardSQLTableNames::Pipeline => {
                 let card: Vec<PipelineCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -493,14 +473,13 @@ impl SqlClient for SqliteClient {
         );
 
         let query = if let Some(_) = search_term {
-            format!("{} WHERE name LIKE ? OR repository LIKE ?", base_query)
+            format!("{} WHERE name LIKE ?1 OR repository LIKE ?1", base_query)
         } else {
             base_query
         };
 
         let stats: QueryStats = if let Some(term) = search_term {
             sqlx::query_as(&query)
-                .bind(format!("%{}%", term))
                 .bind(format!("%{}%", term))
                 .fetch_one(&self.pool)
                 .await
@@ -515,6 +494,19 @@ impl SqlClient for SqliteClient {
         Ok(stats)
     }
 
+    /// Query a page of cards
+    ///
+    /// # Arguments
+    ///
+    /// * `sort_by` - The field to sort by
+    /// * `page` - The page number
+    /// * `search_term` - The search term to query
+    /// * `repository` - The repository to query
+    /// * `table` - The table to query
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<CardSummary>` - A vector of card summaries
     async fn query_page(
         &self,
         sort_by: &str,
@@ -523,21 +515,79 @@ impl SqlClient for SqliteClient {
         repository: Option<&str>,
         table: CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = SqlHelper::get_query_page(sort_by, table);
+        let versions_cte = format!(
+            "WITH versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_number 
+                FROM {}
+                WHERE (?1 IS NULL OR repository = ?1)
+                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
+            )", table
+        );
+
+        let stats_cte = format!(
+            ", stats AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    COUNT(DISTINCT version) AS versions, 
+                    MAX(timestamp) AS updated_at, 
+                    MIN(timestamp) AS created_at 
+                FROM {}
+                WHERE (?1 IS NULL OR repository = ?1)
+                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
+                GROUP BY repository, name
+            )",
+            table
+        );
+
+        let filtered_versions_cte = format!(
+            ", filtered_versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    row_number 
+                FROM versions 
+                WHERE row_number = 1
+            )"
+        );
+
+        let joined_cte = format!(
+            ", joined AS (
+                SELECT 
+                    stats.repository, 
+                    stats.name, 
+                    filtered_versions.version, 
+                    stats.versions, 
+                    stats.updated_at, 
+                    stats.created_at, 
+                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_number 
+                FROM stats 
+                JOIN filtered_versions 
+                ON stats.repository = filtered_versions.repository 
+                AND stats.name = filtered_versions.name
+            )",
+            sort_by
+        );
+
+        let combined_query = format!(
+            "{}{}{}{} 
+            SELECT * FROM joined 
+            WHERE row_number BETWEEN ?4 AND ?5
+            ORDER BY updated_at DESC",
+            versions_cte, stats_cte, filtered_versions_cte, joined_cte
+        );
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
 
-        let records: Vec<CardSummary> = sqlx::query_as(&query)
-            .bind(repository)
-            .bind(repository)
-            .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(repository)
+        let records: Vec<CardSummary> = sqlx::query_as(&combined_query)
             .bind(repository)
             .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
             .bind(search_term.map(|term| format!("%{}%", term)))
             .bind(lower_bound)
             .bind(upper_bound)

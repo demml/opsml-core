@@ -178,10 +178,10 @@ impl SqlClient for PostgresClient {
             "
             SELECT * FROM {}
             WHERE 1=1
-            AND ($1 IS NULL OR uid = $2)
-            AND ($3 IS NULL OR name = $4)
-            AND ($5 IS NULL OR repository = $6)
-            AND ($7 IS NULL OR date::date <= TO_DATE($8, 'YYYY-MM-DD'))
+            AND ($1 IS NULL OR uid = $1)
+            AND ($2 IS NULL OR name = $2)
+            AND ($3 IS NULL OR repository = $3)
+            AND ($4 IS NULL OR date::date <= TO_DATE($4, 'YYYY-MM-DD'))
             ",
             table
         );
@@ -211,7 +211,7 @@ impl SqlClient for PostgresClient {
                 builder.push(" ORDER BY major DESC, minor DESC, patch DESC");
             }
         }
-        builder.push(" LIMIT $9");
+        builder.push(" LIMIT $5");
 
         let sql = builder.sql();
 
@@ -219,12 +219,8 @@ impl SqlClient for PostgresClient {
             CardSQLTableNames::Data => {
                 let card: Vec<DataCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -236,12 +232,8 @@ impl SqlClient for PostgresClient {
             CardSQLTableNames::Model => {
                 let card: Vec<ModelCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -253,12 +245,8 @@ impl SqlClient for PostgresClient {
             CardSQLTableNames::Run => {
                 let card: Vec<RunCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -271,12 +259,8 @@ impl SqlClient for PostgresClient {
             CardSQLTableNames::Audit => {
                 let card: Vec<AuditCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -288,12 +272,8 @@ impl SqlClient for PostgresClient {
             CardSQLTableNames::Pipeline => {
                 let card: Vec<PipelineCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
-                    .bind(query_args.uid.as_ref())
-                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
-                    .bind(query_args.repository.as_ref())
-                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -460,14 +440,13 @@ impl SqlClient for PostgresClient {
         );
 
         let query = if let Some(_) = search_term {
-            format!("{} WHERE name LIKE $1 OR repository LIKE $2", base_query)
+            format!("{} WHERE name LIKE $1 OR repository LIKE $1", base_query)
         } else {
             base_query
         };
 
         let stats: QueryStats = if let Some(term) = search_term {
             sqlx::query_as(&query)
-                .bind(format!("%{}%", term))
                 .bind(format!("%{}%", term))
                 .fetch_one(&self.pool)
                 .await
@@ -482,6 +461,19 @@ impl SqlClient for PostgresClient {
         Ok(stats)
     }
 
+    /// Query a page of cards
+    ///
+    /// # Arguments
+    ///
+    /// * `sort_by` - The field to sort by
+    /// * `page` - The page number
+    /// * `search_term` - The search term to query
+    /// * `repository` - The repository to query
+    /// * `table` - The table to query
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<CardSummary>` - A vector of card summaries
     async fn query_page(
         &self,
         sort_by: &str,
@@ -490,21 +482,79 @@ impl SqlClient for PostgresClient {
         repository: Option<&str>,
         table: CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = SqlHelper::get_query_page(sort_by, table);
+        let versions_cte = format!(
+            "WITH versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_number 
+                FROM {}
+                WHERE ($1 IS NULL OR repository = $1)
+                AND ($2 IS NULL OR name LIKE $3 OR repository LIKE $3)
+            )", table
+        );
+
+        let stats_cte = format!(
+            ", stats AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    COUNT(DISTINCT version) AS versions, 
+                    MAX(timestamp) AS updated_at, 
+                    MIN(timestamp) AS created_at 
+                FROM {}
+                WHERE ($1 IS NULL OR repository = $1)
+                AND ($2 IS NULL OR name LIKE $3 OR repository LIKE $3)
+                GROUP BY repository, name
+            )",
+            table
+        );
+
+        let filtered_versions_cte = format!(
+            ", filtered_versions AS (
+                SELECT 
+                    repository, 
+                    name, 
+                    version, 
+                    row_number 
+                FROM versions 
+                WHERE row_number = 1
+            )"
+        );
+
+        let joined_cte = format!(
+            ", joined AS (
+                SELECT 
+                    stats.repository, 
+                    stats.name, 
+                    filtered_versions.version, 
+                    stats.versions, 
+                    stats.updated_at, 
+                    stats.created_at, 
+                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_number 
+                FROM stats 
+                JOIN filtered_versions 
+                ON stats.repository = filtered_versions.repository 
+                AND stats.name = filtered_versions.name
+            )",
+            sort_by
+        );
+
+        let combined_query = format!(
+            "{}{}{}{} 
+            SELECT * FROM joined 
+            WHERE row_number BETWEEN $4 AND $5 
+            ORDER BY updated_at DESC",
+            versions_cte, stats_cte, filtered_versions_cte, joined_cte
+        );
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
 
-        let records: Vec<CardSummary> = sqlx::query_as(&query)
-            .bind(repository)
-            .bind(repository)
-            .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(search_term.map(|term| format!("%{}%", term)))
-            .bind(repository)
+        let records: Vec<CardSummary> = sqlx::query_as(&combined_query)
             .bind(repository)
             .bind(search_term)
-            .bind(search_term.map(|term| format!("%{}%", term)))
             .bind(search_term.map(|term| format!("%{}%", term)))
             .bind(lower_bound)
             .bind(upper_bound)
@@ -1143,6 +1193,47 @@ mod tests {
 
         assert_eq!(stats.nbr_names, 2); // for Model1 and Model10
 
+        // query page
+        let results = client
+            .query_page("name", 0, None, None, CardSQLTableNames::Data)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        // query page
+        let results = client
+            .query_page("name", 0, None, None, CardSQLTableNames::Model)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 9);
+
+        // query page
+        let results = client
+            .query_page("name", 0, None, Some("repo4"), CardSQLTableNames::Model)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_postgres_query_page() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+        let client = PostgresClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
         cleanup(&client.pool).await;
     }
 }
