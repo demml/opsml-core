@@ -580,6 +580,7 @@ impl CardResults {
     }
 }
 
+#[derive(Debug)]
 pub enum Card {
     Data(DataCardRecord),
     Model(ModelCardRecord),
