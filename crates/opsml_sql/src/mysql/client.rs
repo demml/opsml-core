@@ -570,7 +570,15 @@ impl SqlClient for MySqlClient {
 
         let combined_query = format!(
             "{}{}{}{} 
-            SELECT * FROM joined 
+            SELECT
+            repository,
+            name,
+            version,
+            versions,
+            updated_at,
+            created_at,
+            CAST(row_num AS SIGNED) AS row_num
+            FROM joined 
             WHERE row_num BETWEEN ? AND ?
             ORDER BY updated_at DESC;",
             versions_cte, stats_cte, filtered_versions_cte, joined_cte
@@ -1263,7 +1271,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(results.len(), 9);
+        assert_eq!(results.len(), 10);
 
         // query page
         let results = client

@@ -521,7 +521,7 @@ impl SqlClient for SqliteClient {
                     repository, 
                     name, 
                     version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_number 
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_num
                 FROM {}
                 WHERE (?1 IS NULL OR repository = ?1)
                 AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
@@ -550,9 +550,9 @@ impl SqlClient for SqliteClient {
                     repository, 
                     name, 
                     version, 
-                    row_number 
+                    row_num
                 FROM versions 
-                WHERE row_number = 1
+                WHERE row_num = 1
             )"
         );
 
@@ -565,7 +565,7 @@ impl SqlClient for SqliteClient {
                     stats.versions, 
                     stats.updated_at, 
                     stats.created_at, 
-                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_number 
+                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_num 
                 FROM stats 
                 JOIN filtered_versions 
                 ON stats.repository = filtered_versions.repository 
@@ -577,7 +577,7 @@ impl SqlClient for SqliteClient {
         let combined_query = format!(
             "{}{}{}{} 
             SELECT * FROM joined 
-            WHERE row_number BETWEEN ?4 AND ?5
+            WHERE row_num BETWEEN ?4 AND ?5
             ORDER BY updated_at DESC",
             versions_cte, stats_cte, filtered_versions_cte, joined_cte
         );
