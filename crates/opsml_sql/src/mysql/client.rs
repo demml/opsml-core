@@ -426,7 +426,36 @@ impl SqlClient for MySqlClient {
         table: CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        unimplemented!()
+        let base_query = format!(
+            "SELECT 
+                COALESCE(COUNT(DISTINCT name), 0) AS nbr_names, 
+                COALESCE(COUNT(major), 0) AS nbr_versions, 
+                COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
+            FROM {}",
+            table
+        );
+
+        let query = if let Some(_) = search_term {
+            format!("{} WHERE name LIKE ? OR repository LIKE ?", base_query)
+        } else {
+            base_query
+        };
+
+        let stats: QueryStats = if let Some(term) = search_term {
+            sqlx::query_as(&query)
+                .bind(format!("%{}%", term))
+                .bind(format!("%{}%", term))
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        } else {
+            sqlx::query_as(&query)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        };
+
+        Ok(stats)
     }
 }
 
@@ -1022,6 +1051,42 @@ mod tests {
             .unwrap();
 
         assert_eq!(repos.len(), 10);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_query_stats() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+        let client = MySqlClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // query stats
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, None)
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 10);
+        assert_eq!(stats.nbr_versions, 10);
+        assert_eq!(stats.nbr_repositories, 10);
+
+        // query stats with search term
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, Some("Model1"))
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 2); // for Model1 and Model10
 
         cleanup(&client.pool).await;
     }

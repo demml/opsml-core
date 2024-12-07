@@ -423,7 +423,36 @@ impl SqlClient for PostgresClient {
         table: CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        unimplemented!()
+        let base_query = format!(
+            "SELECT 
+                COALESCE(CAST(COUNT(DISTINCT name) AS INTEGER), 0) AS nbr_names, 
+                COALESCE(CAST(COUNT(major) AS INTEGER), 0) AS nbr_versions, 
+                COALESCE(CAST(COUNT(DISTINCT repository) AS INTEGER), 0) AS nbr_repositories 
+            FROM {}",
+            table
+        );
+
+        let query = if let Some(_) = search_term {
+            format!("{} WHERE name LIKE $1 OR repository LIKE $2", base_query)
+        } else {
+            base_query
+        };
+
+        let stats: QueryStats = if let Some(term) = search_term {
+            sqlx::query_as(&query)
+                .bind(format!("%{}%", term))
+                .bind(format!("%{}%", term))
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        } else {
+            sqlx::query_as(&query)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
+        };
+
+        Ok(stats)
     }
 }
 
@@ -1017,6 +1046,42 @@ mod tests {
             .unwrap();
 
         assert_eq!(repos.len(), 9);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_postgres_query_stats() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+        let client = PostgresClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // query stats
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, None)
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 9);
+        assert_eq!(stats.nbr_versions, 9);
+        assert_eq!(stats.nbr_repositories, 9);
+
+        // query stats with search term
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, Some("Model1"))
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 2); // for Model1 and Model10
 
         cleanup(&client.pool).await;
     }

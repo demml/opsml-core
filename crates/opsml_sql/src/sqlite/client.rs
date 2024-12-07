@@ -458,13 +458,13 @@ impl SqlClient for SqliteClient {
         let base_query = format!(
             "SELECT 
                 COALESCE(COUNT(DISTINCT name), 0) AS nbr_names, 
-                COALESCE(COUNT(version), 0) AS nbr_versions, 
+                COALESCE(COUNT(major), 0) AS nbr_versions, 
                 COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
             FROM {}",
             table
         );
 
-        let query = if let Some(term) = search_term {
+        let query = if let Some(_) = search_term {
             format!("{} WHERE name LIKE ? OR repository LIKE ?", base_query)
         } else {
             base_query
@@ -1057,6 +1057,43 @@ mod tests {
             .unwrap();
 
         assert_eq!(repos.len(), 10);
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_query_stats() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        // query stats
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, None)
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 10);
+        assert_eq!(stats.nbr_versions, 10);
+        assert_eq!(stats.nbr_repositories, 10);
+
+        // query stats with search term
+        let stats = client
+            .query_stats(CardSQLTableNames::Model, Some("Model1"))
+            .await
+            .unwrap();
+
+        assert_eq!(stats.nbr_names, 2); // for Model1 and Model10
 
         cleanup();
     }
