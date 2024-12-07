@@ -51,6 +51,17 @@ pub struct QueryStats {
     pub nbr_versions: i32,
 }
 
+#[derive(Debug, FromRow)]
+pub struct CardSummary {
+    pub repository: String,
+    pub name: String,
+    pub version: String,
+    pub versions: i64,
+    pub updated_at: i64,
+    pub created_at: i64,
+    pub row_number: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DataCardRecord {
     pub uid: String,

@@ -5,7 +5,8 @@ use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
-    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
+    AuditCardRecord, CardSummary, DataCardRecord, ModelCardRecord, PipelineCardRecord,
+    RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -173,42 +174,27 @@ impl SqlClient for PostgresClient {
         table: CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        let query = format!("SELECT * FROM {}", table);
+        let query = format!(
+            "
+            SELECT * FROM {}
+            WHERE 1=1
+            AND ($1 IS NULL OR uid = $2)
+            AND ($3 IS NULL OR name = $4)
+            AND ($5 IS NULL OR repository = $6)
+            AND ($7 IS NULL OR date::date <= TO_DATE($8, 'YYYY-MM-DD'))
+            ",
+            table
+        );
         let mut builder = QueryBuilder::<Postgres>::new(query);
-        builder.push(" WHERE 1=1");
 
         // check for uid. If uid is present, we only return that card
         if query_args.uid.is_some() {
             // validate uid
             is_valid_uuid4(query_args.uid.as_ref().unwrap())
                 .map_err(|e| SqlError::GeneralError(e.to_string()))?;
-
-            builder.push(format!(" AND uid = '{}'", query_args.uid.as_ref().unwrap()));
         } else {
-            // add where clause due to multiple combinations
-            if query_args.name.is_some() {
-                builder.push(format!(
-                    " AND name = '{}'",
-                    query_args.name.as_ref().unwrap()
-                ));
-            }
-
-            if query_args.repository.is_some() {
-                builder.push(format!(
-                    " AND repository = '{}'",
-                    query_args.repository.as_ref().unwrap()
-                ));
-            }
-
             if query_args.version.is_some() {
                 add_version_bounds(&mut builder, query_args.version.as_ref().unwrap())?;
-            }
-
-            if query_args.max_date.is_some() {
-                builder.push(format!(
-                    " AND date::date <= TO_DATE('{}', 'YYYY-MM-DD')",
-                    query_args.max_date.as_ref().unwrap()
-                ));
             }
 
             if query_args.tags.is_some() {
@@ -224,17 +210,23 @@ impl SqlClient for PostgresClient {
                 // sort by major, minor, patch
                 builder.push(" ORDER BY major DESC, minor DESC, patch DESC");
             }
-
-            if query_args.limit.is_some() {
-                builder.push(format!(" LIMIT {}", query_args.limit.unwrap()));
-            }
         }
+        builder.push(" LIMIT $9");
 
         let sql = builder.sql();
 
         match table {
             CardSQLTableNames::Data => {
                 let card: Vec<DataCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -243,6 +235,15 @@ impl SqlClient for PostgresClient {
             }
             CardSQLTableNames::Model => {
                 let card: Vec<ModelCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -251,6 +252,15 @@ impl SqlClient for PostgresClient {
             }
             CardSQLTableNames::Run => {
                 let card: Vec<RunCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -260,6 +270,15 @@ impl SqlClient for PostgresClient {
 
             CardSQLTableNames::Audit => {
                 let card: Vec<AuditCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -268,6 +287,15 @@ impl SqlClient for PostgresClient {
             }
             CardSQLTableNames::Pipeline => {
                 let card: Vec<PipelineCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
                     .await
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -281,7 +309,6 @@ impl SqlClient for PostgresClient {
             }
         }
     }
-
     async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
         let query = match table {
             CardSQLTableNames::Data => match card {
@@ -453,6 +480,39 @@ impl SqlClient for PostgresClient {
         };
 
         Ok(stats)
+    }
+
+    async fn query_page(
+        &self,
+        sort_by: &str,
+        page: i64,
+        search_term: Option<&str>,
+        repository: Option<&str>,
+        table: CardSQLTableNames,
+    ) -> Result<Vec<CardSummary>, SqlError> {
+        let query = SqlHelper::get_query_page(sort_by, table);
+
+        let lower_bound = page * 30;
+        let upper_bound = lower_bound + 30;
+
+        let records: Vec<CardSummary> = sqlx::query_as(&query)
+            .bind(repository)
+            .bind(repository)
+            .bind(search_term)
+            .bind(search_term.map(|term| format!("%{}%", term)))
+            .bind(search_term.map(|term| format!("%{}%", term)))
+            .bind(repository)
+            .bind(repository)
+            .bind(search_term)
+            .bind(search_term.map(|term| format!("%{}%", term)))
+            .bind(search_term.map(|term| format!("%{}%", term)))
+            .bind(lower_bound)
+            .bind(upper_bound)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
     }
 }
 
