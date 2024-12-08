@@ -540,6 +540,57 @@ impl Default for PipelineCardRecord {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProjectCardRecord {
+    pub uid: String,
+    pub name: String,
+    pub repository: String,
+    pub project_id: i32,
+    pub major: i32,
+    pub minor: i32,
+    pub patch: i32,
+    pub pre_tag: Option<String>,
+    pub build_tag: Option<String>,
+    pub version: String,
+    pub timestamp: i64,
+}
+
+impl Default for ProjectCardRecord {
+    fn default() -> Self {
+        ProjectCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
+            project_id: 1,
+            major: 1,
+            minor: 0,
+            patch: 0,
+            pre_tag: None,
+            build_tag: None,
+            version: Version::new(1, 0, 0).to_string(),
+            timestamp: get_utc_timestamp(),
+        }
+    }
+}
+
+impl ProjectCardRecord {
+    pub fn new(name: String, repository: String, version: Version, project_id: i32) -> Self {
+        ProjectCardRecord {
+            uid: Uuid::new_v4().to_string(),
+            name,
+            repository,
+            project_id,
+            major: version.major as i32,
+            minor: version.minor as i32,
+            patch: version.patch as i32,
+            pre_tag: version.pre.to_string().parse().ok(),
+            build_tag: version.build.to_string().parse().ok(),
+            version: version.to_string(),
+            timestamp: get_utc_timestamp(),
+        }
+    }
+}
+
 // create enum that takes vec of cards
 
 #[derive(Debug)]
@@ -549,6 +600,7 @@ pub enum CardResults {
     Run(Vec<RunCardRecord>),
     Audit(Vec<AuditCardRecord>),
     Pipeline(Vec<PipelineCardRecord>),
+    Project(Vec<ProjectCardRecord>),
 }
 
 impl CardResults {
@@ -559,6 +611,7 @@ impl CardResults {
             CardResults::Run(cards) => cards.len(),
             CardResults::Audit(cards) => cards.len(),
             CardResults::Pipeline(cards) => cards.len(),
+            CardResults::Project(cards) => cards.len(),
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -568,6 +621,7 @@ impl CardResults {
             CardResults::Run(cards) => cards.is_empty(),
             CardResults::Audit(cards) => cards.is_empty(),
             CardResults::Pipeline(cards) => cards.is_empty(),
+            CardResults::Project(cards) => cards.is_empty(),
         }
     }
     pub fn to_json(&self) -> Vec<String> {
@@ -592,6 +646,10 @@ impl CardResults {
                 .iter()
                 .map(|card| serde_json::to_string_pretty(card).unwrap())
                 .collect(),
+            CardResults::Project(cards) => cards
+                .iter()
+                .map(|card| serde_json::to_string_pretty(card).unwrap())
+                .collect(),
         }
     }
 }
@@ -603,4 +661,5 @@ pub enum Card {
     Run(RunCardRecord),
     Audit(AuditCardRecord),
     Pipeline(PipelineCardRecord),
+    Project(ProjectCardRecord),
 }

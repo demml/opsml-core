@@ -1,11 +1,52 @@
 /// this file contains helper logic for generating sql queries across different databases
 use crate::schemas::schema::{
-    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
+    AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, ProjectCardRecord,
+    RunCardRecord,
 };
 use serde_json;
 pub struct SqlHelper;
 
 impl SqlHelper {
+    pub fn get_projectcard_insert_query(card: &ProjectCardRecord) -> String {
+        let mut columns = vec![
+            "uid",
+            "name",
+            "repository",
+            "project_id",
+            "major",
+            "minor",
+            "patch",
+            "version",
+            "timestamp",
+        ];
+        let mut values = vec![
+            format!("'{}'", card.uid),
+            format!("'{}'", card.name),
+            format!("'{}'", card.repository),
+            format!("'{}'", card.project_id),
+            format!("{}", card.major),
+            format!("{}", card.minor),
+            format!("{}", card.patch),
+            format!("'{}'", card.version),
+            format!("{}", card.timestamp),
+        ];
+
+        if let Some(pre_tag) = &card.pre_tag {
+            columns.push("pre_tag");
+            values.push(format!("'{}'", pre_tag));
+        }
+
+        if let Some(build_tag) = &card.build_tag {
+            columns.push("build_tag");
+            values.push(format!("'{}'", build_tag));
+        }
+
+        format!(
+            "INSERT INTO opsml_project_registry ({}) VALUES ({})",
+            columns.join(", "),
+            values.join(", ")
+        )
+    }
     pub fn get_datacard_insert_query(card: &DataCardRecord) -> String {
         let mut columns = vec![
             "uid",

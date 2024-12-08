@@ -354,11 +354,14 @@ impl SqlClient for MySqlClient {
                     ));
                 }
             },
-            _ => {
-                return Err(SqlError::QueryError(
-                    "Invalid table name for insert".to_string(),
-                ));
-            }
+            CardSQLTableNames::Project => match card {
+                Card::Project(project) => SqlHelper::get_projectcard_insert_query(project),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
         };
 
         sqlx::query(&query)
@@ -616,12 +619,34 @@ impl SqlClient for MySqlClient {
 
         Ok(())
     }
+
+    async fn get_project_id(&self, project_name: &str, repository: &str) -> Result<i32, SqlError> {
+        let query = r#"
+            WITH max_project AS (
+                SELECT MAX(project_id) AS max_id FROM opsml_project_registry
+            )
+            SELECT COALESCE(
+                (SELECT project_id FROM opsml_project_registry WHERE name = ? AND repository = ?),
+                (SELECT COALESCE(max_id, 0) + 1 FROM max_project)
+            ) AS project_id
+        "#;
+
+        let project_id: i32 = sqlx::query_scalar(query)
+            .bind(project_name)
+            .bind(repository)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(project_id)
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use crate::schemas::schema::ProjectCardRecord;
     use opsml_settings::config::SqlType;
     use std::env;
 
@@ -642,6 +667,9 @@ mod tests {
 
             DELETE
             FROM opsml_pipeline_registry;
+
+            DELETE
+            FROM opsml_project_registry;
             "#,
         )
         .fetch_all(pool)
@@ -1363,6 +1391,46 @@ mod tests {
             .unwrap();
 
         assert_eq!(cards.len(), 9);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_project_id() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+        let client = MySqlClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // insert project id
+        let project = ProjectCardRecord::new(
+            "test".to_string(),
+            "repo".to_string(),
+            Version::new(1, 0, 0),
+            1,
+        );
+        client
+            .insert_card(CardSQLTableNames::Project, &Card::Project(project))
+            .await
+            .unwrap();
+
+        // get project id
+
+        let project_id = client.get_project_id("test", "repo").await.unwrap();
+        assert_eq!(project_id, 1);
+
+        // get next project id
+        let project_id = client.get_project_id("test1", "repo").await.unwrap();
+
+        assert_eq!(project_id, 2);
 
         cleanup(&client.pool).await;
     }

@@ -48,3 +48,4 @@ INSERT INTO opsml_audit_registry (uid, date, timestamp, app_env, name, repositor
 ('550e8400-e29b-41d4-a716-446655440007', '2023-11-29', 1701264007, 'development', 'Audit8', 'repo8', 2, 1, 1, 'theta', 'build8', '1.0.0', 'contact8', '{}', false, '[]', '[]', '[]'),
 ('550e8400-e29b-41d4-a716-446655440008', '2023-11-29', 1701264008, 'development', 'Audit9', 'repo9', 3, 0, 0, 'iota', 'build9', '1.0.0', 'contact9', '{}', true, '[]', '[]', '[]'),
 ('550e8400-e29b-41d4-a716-446655440009', '2023-11-29', 1701264009, 'development', 'Audit10', 'repo10', 3, 0, 1, 'kappa', 'build10', '1.0.0', 'contact10', '{}', false, '[]', '[]', '[]');
+
