@@ -439,7 +439,7 @@ impl SqlClient for PostgresClient {
             table
         );
 
-        let query = if let Some(_) = search_term {
+        let query = if search_term.is_some() {
             format!("{} WHERE name LIKE $1 OR repository LIKE $1", base_query)
         } else {
             base_query
@@ -511,8 +511,7 @@ impl SqlClient for PostgresClient {
             table
         );
 
-        let filtered_versions_cte = format!(
-            ", filtered_versions AS (
+        let filtered_versions_cte = ", filtered_versions AS (
                 SELECT 
                     repository, 
                     name, 
@@ -520,8 +519,7 @@ impl SqlClient for PostgresClient {
                     row_num
                 FROM versions 
                 WHERE row_num = 1
-            )"
-        );
+            )";
 
         let joined_cte = format!(
             ", joined AS (

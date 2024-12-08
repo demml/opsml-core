@@ -463,7 +463,7 @@ impl SqlClient for MySqlClient {
             table
         );
 
-        let query = if let Some(_) = search_term {
+        let query = if search_term.is_some() {
             format!("{} WHERE name LIKE ? OR repository LIKE ?", base_query)
         } else {
             base_query
@@ -538,8 +538,7 @@ impl SqlClient for MySqlClient {
             table
         );
 
-        let filtered_versions_cte = format!(
-            ", filtered_versions AS (
+        let filtered_versions_cte = ", filtered_versions AS (
                 SELECT 
                     repository, 
                     name, 
@@ -547,8 +546,7 @@ impl SqlClient for MySqlClient {
                     row_num
                 FROM versions 
                 WHERE row_num = 1
-            )"
-        );
+            )";
 
         let joined_cte = format!(
             ", joined AS (
@@ -1351,19 +1349,6 @@ mod tests {
 
         assert_eq!(results.len(), 0);
 
-        // try name and repository
-        let card_args = CardQueryArgs {
-            name: Some("Data1".to_string()),
-            repository: Some("repo1".to_string()),
-            ..Default::default()
-        };
-
-        // query all versions
-        // get versions (should return 1)
-        let cards = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
-            .await
-            .unwrap(); // try name and repository
         let card_args = CardQueryArgs {
             name: Some("Data1".to_string()),
             repository: Some("repo1".to_string()),
@@ -1376,8 +1361,6 @@ mod tests {
             .query_cards(CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
-
-        assert_eq!(cards.len(), 9);
 
         assert_eq!(cards.len(), 9);
 

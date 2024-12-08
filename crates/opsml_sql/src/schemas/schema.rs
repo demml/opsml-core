@@ -85,6 +85,7 @@ pub struct DataCardRecord {
     pub interface_type: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl DataCardRecord {
     pub fn new(
         name: String,
@@ -120,13 +121,13 @@ impl DataCardRecord {
             tags: Json(tags.unwrap_or_default()),
             data_type,
             runcard_uid: runcard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             pipelinecard_uid: pipelinecard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             auditcard_uid: auditcard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             interface_type: interface_type
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
         }
     }
 }
@@ -138,21 +139,21 @@ impl Default for DataCardRecord {
             date: get_utc_date(),
             timestamp: get_utc_timestamp(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-            name: CommonKwargs::Undefined.as_str().to_string(),
-            repository: CommonKwargs::Undefined.as_str().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
             major: 1,
             minor: 0,
             patch: 0,
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            contact: CommonKwargs::Undefined.as_str().to_string(),
+            contact: CommonKwargs::Undefined.as_string().to_string(),
             tags: Json(HashMap::new()),
-            data_type: CommonKwargs::Undefined.as_str().to_string(),
-            runcard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            auditcard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            interface_type: CommonKwargs::Undefined.as_str().to_string(),
+            data_type: CommonKwargs::Undefined.as_string().to_string(),
+            runcard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            pipelinecard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            auditcard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            interface_type: CommonKwargs::Undefined.as_string().to_string(),
         }
     }
 }
@@ -183,6 +184,7 @@ pub struct ModelCardRecord {
     pub task_type: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl ModelCardRecord {
     pub fn new(
         name: String,
@@ -220,18 +222,18 @@ impl ModelCardRecord {
             contact,
             tags: Json(tags.unwrap_or_default()),
             datacard_uid: datacard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             sample_data_type,
             model_type,
             runcard_uid: runcard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             pipelinecard_uid: pipelinecard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             auditcard_uid: auditcard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             interface_type: interface_type
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
-            task_type: task_type.unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
+            task_type: task_type.unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
         }
     }
 }
@@ -243,24 +245,24 @@ impl Default for ModelCardRecord {
             date: get_utc_date(),
             timestamp: get_utc_timestamp(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-            name: CommonKwargs::Undefined.as_str().to_string(),
-            repository: CommonKwargs::Undefined.as_str().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
             major: 1,
             minor: 0,
             patch: 0,
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            contact: CommonKwargs::Undefined.as_str().to_string(),
+            contact: CommonKwargs::Undefined.as_string().to_string(),
             tags: Json(HashMap::new()),
-            datacard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            sample_data_type: CommonKwargs::Undefined.as_str().to_string(),
-            model_type: CommonKwargs::Undefined.as_str().to_string(),
-            runcard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            auditcard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            interface_type: CommonKwargs::Undefined.as_str().to_string(),
-            task_type: CommonKwargs::Undefined.as_str().to_string(),
+            datacard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            sample_data_type: CommonKwargs::Undefined.as_string().to_string(),
+            model_type: CommonKwargs::Undefined.as_string().to_string(),
+            runcard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            pipelinecard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            auditcard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            interface_type: CommonKwargs::Undefined.as_string().to_string(),
+            task_type: CommonKwargs::Undefined.as_string().to_string(),
         }
     }
 }
@@ -296,26 +298,27 @@ impl Default for RunCardRecord {
             date: get_utc_date(),
             timestamp: get_utc_timestamp(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-            name: CommonKwargs::Undefined.as_str().to_string(),
-            repository: CommonKwargs::Undefined.as_str().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
             major: 1,
             minor: 0,
             patch: 0,
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            contact: CommonKwargs::Undefined.as_str().to_string(),
+            contact: CommonKwargs::Undefined.as_string().to_string(),
             tags: Json(HashMap::new()),
             datacard_uids: Json(Vec::new()),
             modelcard_uids: Json(Vec::new()),
-            pipelinecard_uid: CommonKwargs::Undefined.as_str().to_string(),
-            project: CommonKwargs::Undefined.as_str().to_string(),
+            pipelinecard_uid: CommonKwargs::Undefined.as_string().to_string(),
+            project: CommonKwargs::Undefined.as_string().to_string(),
             artifact_uris: Json(HashMap::new()),
             compute_environment: Json(HashMap::new()),
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 impl RunCardRecord {
     pub fn new(
         name: String,
@@ -353,7 +356,7 @@ impl RunCardRecord {
             datacard_uids: Json(datacard_uids.unwrap_or_default()),
             modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
             pipelinecard_uid: pipelinecard_uid
-                .unwrap_or_else(|| CommonKwargs::Undefined.as_str().to_string()),
+                .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             project,
             artifact_uris: Json(artifact_uris.unwrap_or_default()),
             compute_environment: Json(compute_environment.unwrap_or_default()),
@@ -383,6 +386,7 @@ pub struct AuditCardRecord {
     pub runcard_uids: Json<Vec<String>>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl AuditCardRecord {
     pub fn new(
         name: String,
@@ -430,15 +434,15 @@ impl Default for AuditCardRecord {
             date: get_utc_date(),
             timestamp: get_utc_timestamp(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-            name: CommonKwargs::Undefined.as_str().to_string(),
-            repository: CommonKwargs::Undefined.as_str().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
             major: 1,
             minor: 0,
             patch: 0,
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            contact: CommonKwargs::Undefined.as_str().to_string(),
+            contact: CommonKwargs::Undefined.as_string().to_string(),
             tags: Json(HashMap::new()),
             approved: false,
             datacard_uids: Json(Vec::new()),
@@ -470,6 +474,7 @@ pub struct PipelineCardRecord {
     pub runcard_uids: Json<Vec<String>>,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl PipelineCardRecord {
     pub fn new(
         name: String,
@@ -517,17 +522,17 @@ impl Default for PipelineCardRecord {
             date: get_utc_date(),
             timestamp: get_utc_timestamp(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-            name: CommonKwargs::Undefined.as_str().to_string(),
-            repository: CommonKwargs::Undefined.as_str().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            repository: CommonKwargs::Undefined.as_string().to_string(),
             major: 1,
             minor: 0,
             patch: 0,
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            contact: CommonKwargs::Undefined.as_str().to_string(),
+            contact: CommonKwargs::Undefined.as_string().to_string(),
             tags: Json(HashMap::new()),
-            pipeline_code_uri: CommonKwargs::Undefined.as_str().to_string(),
+            pipeline_code_uri: CommonKwargs::Undefined.as_string().to_string(),
             datacard_uids: Json(Vec::new()),
             modelcard_uids: Json(Vec::new()),
             runcard_uids: Json(Vec::new()),
