@@ -1367,6 +1367,19 @@ mod tests {
         let project_id = client.get_project_id("test1", "repo").await.unwrap();
 
         assert_eq!(project_id, 2);
+
+        let args = CardQueryArgs {
+            uid: None,
+            name: Some("test".to_string()),
+            repository: Some("repo".to_string()),
+            ..Default::default()
+        };
+        let cards = client
+            .query_cards(CardSQLTableNames::Project, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 1);
         cleanup();
     }
 }
