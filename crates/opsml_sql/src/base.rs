@@ -65,4 +65,6 @@ pub trait SqlClient {
         repository: Option<&str>,
         table: CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError>;
+
+    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError>;
 }

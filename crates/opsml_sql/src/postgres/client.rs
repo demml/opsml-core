@@ -564,6 +564,17 @@ impl SqlClient for PostgresClient {
 
         Ok(records)
     }
+
+    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError> {
+        let query = format!("DELETE FROM {} WHERE uid = $1", table);
+        sqlx::query(&query)
+            .bind(uid)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1221,7 +1232,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_postgres_query_page() {
+    async fn test_postgres_delete_card() {
         let config = OpsmlDatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
@@ -1234,6 +1245,65 @@ mod tests {
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
         sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // query all versions
+        // get versions (should return 1)
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 10);
+
+        // delete the card
+        let uid = match cards {
+            CardResults::Data(cards) => cards[0].uid.clone(),
+            _ => "".to_string(),
+        };
+
+        assert!(!uid.is_empty());
+
+        // delete the card
+        client
+            .delete_card(CardSQLTableNames::Data, &uid)
+            .await
+            .unwrap();
+
+        // check if the card was deleted
+        let args = CardQueryArgs {
+            uid: Some(uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 0);
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // check only 9 cards should be left
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 9);
+
         cleanup(&client.pool).await;
     }
 }

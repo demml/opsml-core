@@ -587,8 +587,6 @@ impl SqlClient for MySqlClient {
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
 
-        println!("combined_query: {}", combined_query);
-
         let records: Vec<CardSummary> = sqlx::query_as(&combined_query)
             .bind(repository) // 1st ? in versions_cte
             .bind(repository) // 2nd ? in versions_cte
@@ -607,6 +605,18 @@ impl SqlClient for MySqlClient {
             .unwrap();
 
         Ok(records)
+    }
+
+    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError> {
+        let query = format!("DELETE FROM {} WHERE uid = ?", table);
+
+        sqlx::query(&query)
+            .bind(uid)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -1280,6 +1290,97 @@ mod tests {
             .unwrap();
 
         assert_eq!(results.len(), 1);
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_delete_card() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+        let client = MySqlClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // query all versions
+        // get versions (should return 1)
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 10);
+
+        // delete the card
+        let uid = match cards {
+            CardResults::Data(cards) => cards[0].uid.clone(),
+            _ => "".to_string(),
+        };
+
+        assert!(!uid.is_empty());
+
+        // delete the card
+        client
+            .delete_card(CardSQLTableNames::Data, &uid)
+            .await
+            .unwrap();
+
+        // check if the card was deleted
+        let args = CardQueryArgs {
+            uid: Some(uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 0);
+
+        // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // query all versions
+        // get versions (should return 1)
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap(); // try name and repository
+        let card_args = CardQueryArgs {
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        // query all versions
+        // get versions (should return 1)
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &card_args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 9);
+
+        assert_eq!(cards.len(), 9);
+
         cleanup(&client.pool).await;
     }
 }

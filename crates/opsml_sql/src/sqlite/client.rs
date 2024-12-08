@@ -597,6 +597,17 @@ impl SqlClient for SqliteClient {
 
         Ok(records)
     }
+
+    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError> {
+        let query = format!("DELETE FROM {} WHERE uid = ?1", table);
+        sqlx::query(&query)
+            .bind(uid)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1250,5 +1261,62 @@ mod tests {
         assert_eq!(results.len(), 1);
 
         cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_delete_card() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        // delete card
+
+        let args = CardQueryArgs {
+            uid: None,
+            name: Some("Data1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        let cards = client
+            .query_cards(CardSQLTableNames::Data, &args)
+            .await
+            .unwrap();
+
+        let uid = match cards {
+            CardResults::Data(cards) => cards[0].uid.clone(),
+            _ => "".to_string(),
+        };
+
+        assert!(!uid.is_empty());
+
+        // delete the card
+        client
+            .delete_card(CardSQLTableNames::Data, &uid)
+            .await
+            .unwrap();
+
+        // check if the card was deleted
+        let args = CardQueryArgs {
+            uid: Some(uid),
+            ..Default::default()
+        };
+
+        let results = client
+            .query_cards(CardSQLTableNames::Data, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 0);
     }
 }
