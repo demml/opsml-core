@@ -307,8 +307,12 @@ impl SqlClient for MySqlClient {
             CardSQLTableNames::Project => {
                 let card: Vec<ProjectCardRecord> = sqlx::query_as(sql)
                     .bind(query_args.uid.as_ref())
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
                     .bind(query_args.max_date.as_ref())
                     .bind(query_args.limit.unwrap_or(50))
                     .fetch_all(&self.pool)
@@ -663,7 +667,7 @@ impl SqlClient for MySqlClient {
     async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError> {
         let query = r#"
             INSERT INTO opsml_run_metrics (run_uid, name, value, step, timestamp)
-            VALUES (?1, ?2, ?3, ?4, ?5)"#;
+            VALUES (?, ?, ?, ?, ?)"#;
 
         sqlx::query(&query)
             .bind(&card.run_uid)
@@ -683,11 +687,47 @@ impl SqlClient for MySqlClient {
         uid: &str,
         names: Option<&Vec<&str>>,
     ) -> Result<Vec<MetricRecord>, SqlError> {
-        unimplemented!()
+        let mut query = format!(
+            "SELECT run_uid, name, value, step, timestamp, date_ts, idx
+            FROM {}
+            WHERE run_uid = ?",
+            CardSQLTableNames::Metrics
+        );
+
+        // loop through names and bind them. First name = and and others are or
+        if let Some(names) = names {
+            for (idx, name) in names.iter().enumerate() {
+                if idx == 0 {
+                    query.push_str(format!(" AND (name = '{}'", name).as_str());
+                } else {
+                    query.push_str(format!(" OR name = '{}'", name).as_str());
+                }
+            }
+            query.push_str(")");
+        }
+
+        let records: Vec<MetricRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
     }
 
     async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError> {
-        unimplemented!()
+        let query = format!(
+            "SELECT DISTINCT name FROM {} WHERE run_uid = ?",
+            CardSQLTableNames::Metrics
+        );
+
+        let records: Vec<String> = sqlx::query_scalar(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
     }
 }
 
@@ -697,6 +737,7 @@ mod tests {
     use super::*;
     use crate::schemas::schema::ProjectCardRecord;
     use opsml_settings::config::SqlType;
+    use opsml_utils::utils::get_utc_date;
     use std::env;
 
     pub async fn cleanup(pool: &Pool<MySql>) {
@@ -1493,6 +1534,47 @@ mod tests {
             .unwrap();
 
         assert_eq!(cards.len(), 1);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_run_metrics() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::MySql,
+        };
+        let client = MySqlClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_mysql_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let metric = MetricRecord {
+            run_uid: uid.clone(),
+            name: "metric1".to_string(),
+            value: 1.0,
+            step: None,
+            timestamp: None,
+            date_ts: get_utc_date(),
+            idx: None,
+        };
+
+        client.insert_run_metric(&metric).await.unwrap();
+
+        let records = client.get_run_metric(&uid, None).await.unwrap();
+
+        let names = client.get_run_metric_names(&uid).await.unwrap();
+
+        assert_eq!(records.len(), 1);
+
+        // assert names = "metric1"
+        assert_eq!(names.len(), 1);
+        assert_eq!(names[0], "metric1");
 
         cleanup(&client.pool).await;
     }
