@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
 
 -- ProjectSchema
 CREATE TABLE IF NOT EXISTS opsml_project_registry (
+    date VARCHAR(32),
     uid VARCHAR(64),
     name VARCHAR(128),
     repository VARCHAR(128),

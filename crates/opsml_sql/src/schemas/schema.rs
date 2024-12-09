@@ -9,6 +9,31 @@ use std::env;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct MetricRecord {
+    pub run_uid: String,
+    pub name: String,
+    pub value: f64,
+    pub step: Option<i32>,
+    pub timestamp: Option<i64>,
+    pub date_ts: String,
+    pub idx: Option<i32>,
+}
+
+impl MetricRecord {
+    fn new(run_uid: String, name: String, value: f64) -> Self {
+        MetricRecord {
+            run_uid,
+            name,
+            value,
+            step: None,
+            timestamp: None,
+            date_ts: get_utc_date(),
+            idx: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct VersionResult {
     pub date: String,
     pub timestamp: i64,
@@ -542,6 +567,7 @@ impl Default for PipelineCardRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ProjectCardRecord {
+    pub date: String,
     pub uid: String,
     pub name: String,
     pub repository: String,
@@ -558,6 +584,7 @@ pub struct ProjectCardRecord {
 impl Default for ProjectCardRecord {
     fn default() -> Self {
         ProjectCardRecord {
+            date: get_utc_date(),
             uid: Uuid::new_v4().to_string(),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -576,6 +603,7 @@ impl Default for ProjectCardRecord {
 impl ProjectCardRecord {
     pub fn new(name: String, repository: String, version: Version, project_id: i32) -> Self {
         ProjectCardRecord {
+            date: get_utc_date(),
             uid: Uuid::new_v4().to_string(),
             name,
             repository,
@@ -652,17 +680,6 @@ impl CardResults {
                 .collect(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct MetricRecord {
-    pub run_uid: String,
-    pub name: String,
-    pub value: f64,
-    pub step: Option<i32>,
-    pub timestamp: Option<i64>,
-    pub date_ts: Option<String>,
-    pub idx: Option<i32>,
 }
 
 #[derive(Debug)]

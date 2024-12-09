@@ -3,6 +3,7 @@ use crate::base::SqlClient;
 use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
+use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
     PipelineCardRecord, QueryStats, RunCardRecord,
@@ -303,6 +304,19 @@ impl SqlClient for SqliteClient {
 
                 return Ok(CardResults::Pipeline(card));
             }
+            CardSQLTableNames::Project => {
+                let card: Vec<ProjectCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Project(card));
+            }
             _ => {
                 return Err(SqlError::QueryError(
                     "Invalid table name for query".to_string(),
@@ -362,14 +376,11 @@ impl SqlClient for SqliteClient {
                 }
             },
 
-            CardSQLTableNames::Metrics => match card {
-                Card::Metric(metric) => SqlHelper::get_metriccard_insert_query(metric),
-                _ => {
-                    return Err(SqlError::QueryError(
-                        "Invalid card type for insert".to_string(),
-                    ));
-                }
-            },
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for insert".to_string(),
+                ));
+            }
         };
 
         sqlx::query(&query)
@@ -663,17 +674,43 @@ impl SqlClient for SqliteClient {
         uid: &str,
         names: Option<&Vec<&str>>,
     ) -> Result<Vec<MetricRecord>, SqlError> {
-        let query = format!(
-            "SELECT run_uid, name, value, step, timestamp, date_ts
+        let mut query = format!(
+            "SELECT run_uid, name, value, step, timestamp, date_ts, idx
             FROM {}
-            WHERE run_uid = ?1
-            AND (?2 IS NULL OR name IN ?2)",
+            WHERE run_uid = ?1",
             CardSQLTableNames::Metrics
         );
 
+        // loop through names and bind them. First name = and and others are or
+        if names.is_some() {
+            let names = names.unwrap();
+            for (idx, name) in names.iter().enumerate() {
+                if idx == 0 {
+                    query.push_str(format!(" AND (name = {}", name).as_str());
+                } else {
+                    query.push_str(format!(" OR name = {}", name).as_str());
+                }
+            }
+            query.push_str(")");
+        }
+
         let records: Vec<MetricRecord> = sqlx::query_as(&query)
             .bind(uid)
-            .bind(names)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
+    }
+
+    async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError> {
+        let query = format!(
+            "SELECT DISTINCT name FROM {} WHERE run_uid = ?1",
+            CardSQLTableNames::Metrics
+        );
+
+        let records: Vec<String> = sqlx::query_scalar(&query)
+            .bind(uid)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -694,6 +731,7 @@ mod tests {
         }
     }
     use opsml_settings::config::SqlType;
+    use opsml_utils::utils::get_utc_date;
 
     #[tokio::test]
     async fn test_sqlite() {
@@ -1393,7 +1431,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_project_id() {
+    async fn test_sqlite_project_id() {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
@@ -1435,7 +1473,7 @@ mod tests {
 
     // test run metric
     #[tokio::test]
-    async fn test_run_metric() {
+    async fn test_sqlite_run_metric() {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
@@ -1448,31 +1486,30 @@ mod tests {
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
-        sqlx::query(&script).execute(&client.pool).await.unwrap();
 
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
         let metric = MetricRecord {
-            run_uid: "550e8400-e29b-41d4-a716-446655440000",
-            name: "metric1",
+            run_uid: uid.clone(),
+            name: "metric1".to_string(),
             value: 1.0,
             step: None,
             timestamp: None,
+            date_ts: get_utc_date(),
+            idx: None,
         };
 
         client.insert_run_metric(&metric).await.unwrap();
 
-        let args = CardQueryArgs {
-            uid: None,
-            name: Some("metric1".to_string()),
-            repository: Some("repo1".to_string()),
-            ..Default::default()
-        };
+        let records = client.get_run_metric(&uid, None).await.unwrap();
 
-        let cards = client
-            .query_cards(CardSQLTableNames::Run, &args)
-            .await
-            .unwrap();
+        let names = client.get_run_metric_names(&uid).await.unwrap();
 
-        assert_eq!(cards.len(), 1);
+        assert_eq!(records.len(), 1);
+
+        // assert names = "metric1"
+        assert_eq!(names.len(), 1);
+        assert_eq!(names[0], "metric1");
 
         cleanup();
     }

@@ -23,7 +23,7 @@ impl fmt::Display for CardSQLTableNames {
             CardSQLTableNames::Project => "opsml_project_registry",
             CardSQLTableNames::Audit => "opsml_audit_registry",
             CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
-            CardSQLTableNames::Metrics => "opsml_metrics_registry",
+            CardSQLTableNames::Metrics => "opsml_run_metrics",
         };
         write!(f, "{}", table_name)
     }
