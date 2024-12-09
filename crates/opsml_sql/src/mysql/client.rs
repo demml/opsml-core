@@ -6,7 +6,7 @@ use crate::schemas::schema::Card;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
-    PipelineCardRecord, RunCardRecord,
+    PipelineCardRecord, ProjectCardRecord, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -303,6 +303,19 @@ impl SqlClient for MySqlClient {
                     .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
                 return Ok(CardResults::Pipeline(card));
+            }
+            CardSQLTableNames::Project => {
+                let card: Vec<ProjectCardRecord> = sqlx::query_as(sql)
+                    .bind(query_args.uid.as_ref())
+                    .bind(query_args.name.as_ref())
+                    .bind(query_args.repository.as_ref())
+                    .bind(query_args.max_date.as_ref())
+                    .bind(query_args.limit.unwrap_or(50))
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+                return Ok(CardResults::Project(card));
             }
             _ => {
                 return Err(SqlError::QueryError(

@@ -9,6 +9,7 @@ pub struct SqlHelper;
 impl SqlHelper {
     pub fn get_projectcard_insert_query(card: &ProjectCardRecord) -> String {
         let mut columns = vec![
+            "date",
             "uid",
             "name",
             "repository",
@@ -20,6 +21,7 @@ impl SqlHelper {
             "timestamp",
         ];
         let mut values = vec![
+            format!("'{}'", card.date),
             format!("'{}'", card.uid),
             format!("'{}'", card.name),
             format!("'{}'", card.repository),
