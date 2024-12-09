@@ -362,6 +362,12 @@ impl SqlClient for MySqlClient {
                     ));
                 }
             },
+
+            _ => {
+                return Err(SqlError::QueryError(
+                    "Invalid table name for insert".to_string(),
+                ));
+            }
         };
 
         sqlx::query(&query)
@@ -647,8 +653,8 @@ impl SqlClient for MySqlClient {
             VALUES (?1, ?2, ?3, ?4, ?5)"#;
 
         sqlx::query(&query)
-            .bind(card.run_uid)
-            .bind(card.name)
+            .bind(&card.run_uid)
+            .bind(&card.name)
             .bind(card.value)
             .bind(card.step)
             .bind(card.timestamp)
@@ -657,6 +663,18 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(())
+    }
+
+    async fn get_run_metric(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<MetricRecord>, SqlError> {
+        unimplemented!()
+    }
+
+    async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError> {
+        unimplemented!()
     }
 }
 

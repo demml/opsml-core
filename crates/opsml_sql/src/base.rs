@@ -11,6 +11,7 @@ pub enum CardSQLTableNames {
     Project,
     Audit,
     Pipeline,
+    Metrics,
 }
 
 impl fmt::Display for CardSQLTableNames {
@@ -22,6 +23,7 @@ impl fmt::Display for CardSQLTableNames {
             CardSQLTableNames::Project => "opsml_project_registry",
             CardSQLTableNames::Audit => "opsml_audit_registry",
             CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
+            CardSQLTableNames::Metrics => "opsml_metrics_registry",
         };
         write!(f, "{}", table_name)
     }
@@ -74,4 +76,33 @@ pub trait SqlClient {
 
     // insert run metric
     async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError>;
+
+    /// Get run metric
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The unique identifier of the card
+    /// * `names` - The names of the metrics
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<MetricRecord>` - The metrics
+    ///
+    async fn get_run_metric(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<MetricRecord>, SqlError>;
+
+    /// Get run metric names
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The unique identifier of the card
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<String>` - The names of the metrics
+    ///
+    async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError>;
 }

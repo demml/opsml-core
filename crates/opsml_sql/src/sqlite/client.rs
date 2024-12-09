@@ -361,6 +361,15 @@ impl SqlClient for SqliteClient {
                     ));
                 }
             },
+
+            CardSQLTableNames::Metrics => match card {
+                Card::Metric(metric) => SqlHelper::get_metriccard_insert_query(metric),
+                _ => {
+                    return Err(SqlError::QueryError(
+                        "Invalid card type for insert".to_string(),
+                    ));
+                }
+            },
         };
 
         sqlx::query(&query)
@@ -637,7 +646,7 @@ impl SqlClient for SqliteClient {
             VALUES (?1, ?2, ?3, ?4, ?5)"#;
 
         sqlx::query(&query)
-            .bind(card.run_uid)
+            .bind(&card.run_uid)
             .bind(&card.name)
             .bind(card.value)
             .bind(card.step)
@@ -647,6 +656,29 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(())
+    }
+
+    async fn get_run_metric(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<MetricRecord>, SqlError> {
+        let query = format!(
+            "SELECT run_uid, name, value, step, timestamp, date_ts
+            FROM {}
+            WHERE run_uid = ?1
+            AND (?2 IS NULL OR name IN ?2)",
+            CardSQLTableNames::Metrics
+        );
+
+        let records: Vec<MetricRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .bind(names)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
     }
 }
 
@@ -1398,6 +1430,50 @@ mod tests {
             .unwrap();
 
         assert_eq!(cards.len(), 1);
+        cleanup();
+    }
+
+    // test run metric
+    #[tokio::test]
+    async fn test_run_metric() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        let metric = MetricRecord {
+            run_uid: "550e8400-e29b-41d4-a716-446655440000",
+            name: "metric1",
+            value: 1.0,
+            step: None,
+            timestamp: None,
+        };
+
+        client.insert_run_metric(&metric).await.unwrap();
+
+        let args = CardQueryArgs {
+            uid: None,
+            name: Some("metric1".to_string()),
+            repository: Some("repo1".to_string()),
+            ..Default::default()
+        };
+
+        let cards = client
+            .query_cards(CardSQLTableNames::Run, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 1);
+
         cleanup();
     }
 }
