@@ -1,5 +1,5 @@
 use crate::schemas::arguments::CardQueryArgs;
-use crate::schemas::schema::{Card, CardResults, CardSummary, QueryStats};
+use crate::schemas::schema::{Card, CardResults, CardSummary, MetricRecord, QueryStats};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
@@ -69,5 +69,9 @@ pub trait SqlClient {
     async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError>;
 
     // db specific functions
+    // get project_id
     async fn get_project_id(&self, project_name: &str, repository: &str) -> Result<i32, SqlError>;
+
+    // insert run metric
+    async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError>;
 }

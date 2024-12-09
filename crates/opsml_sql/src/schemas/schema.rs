@@ -654,6 +654,16 @@ impl CardResults {
     }
 }
 
+pub struct MetricRecord<'a> {
+    pub run_uid: &'a str,
+    pub name: &'a str,
+    pub value: f64,
+    pub step: Option<i32>,
+    pub timestamp: Option<i64>,
+    pub date_ts: Option<&'a str>,
+    pub idx: Option<i32>,
+}
+
 #[derive(Debug)]
 pub enum Card {
     Data(DataCardRecord),

@@ -4,8 +4,8 @@ use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, ModelCardRecord, PipelineCardRecord, QueryStats,
-    RunCardRecord,
+    AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
+    PipelineCardRecord, QueryStats, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -629,6 +629,24 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(project_id)
+    }
+
+    async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError> {
+        let query = r#"
+            INSERT INTO opsml_run_metrics (run_uid, name, value, step, timestamp)
+            VALUES (?1, ?2, ?3, ?4, ?5)"#;
+
+        sqlx::query(&query)
+            .bind(card.run_uid)
+            .bind(&card.name)
+            .bind(card.value)
+            .bind(card.step)
+            .bind(card.timestamp)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 

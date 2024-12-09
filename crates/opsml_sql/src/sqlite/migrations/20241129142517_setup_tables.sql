@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_metrics (
     step INTEGER,
     timestamp INTEGER,
     date_ts TEXT DEFAULT (datetime('now')),
-    idx INTEGER PRIMARY KEY
+    idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
 -- ParameterSchema
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
     name TEXT,
     value TEXT,
     date_ts TEXT DEFAULT (datetime('now')),
-    idx INTEGER PRIMARY KEY
+    idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
 -- HardwareMetricSchema
@@ -158,5 +158,5 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     run_uid TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     metrics TEXT,
-    idx INTEGER PRIMARY KEY
+    idx INTEGER PRIMARY KEY AUTOINCREMENT
 );

@@ -5,8 +5,8 @@ use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, ModelCardRecord, PipelineCardRecord,
-    RunCardRecord,
+    AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
+    PipelineCardRecord, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -639,6 +639,24 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(project_id)
+    }
+
+    async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError> {
+        let query = r#"
+            INSERT INTO opsml_run_metrics (run_uid, name, value, step, timestamp)
+            VALUES (?1, ?2, ?3, ?4, ?5)"#;
+
+        sqlx::query(&query)
+            .bind(card.run_uid)
+            .bind(card.name)
+            .bind(card.value)
+            .bind(card.step)
+            .bind(card.timestamp)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -1431,6 +1449,19 @@ mod tests {
         let project_id = client.get_project_id("test1", "repo").await.unwrap();
 
         assert_eq!(project_id, 2);
+
+        let args = CardQueryArgs {
+            uid: None,
+            name: Some("test".to_string()),
+            repository: Some("repo".to_string()),
+            ..Default::default()
+        };
+        let cards = client
+            .query_cards(CardSQLTableNames::Project, &args)
+            .await
+            .unwrap();
+
+        assert_eq!(cards.len(), 1);
 
         cleanup(&client.pool).await;
     }
