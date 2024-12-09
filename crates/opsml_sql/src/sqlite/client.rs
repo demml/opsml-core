@@ -1488,28 +1488,32 @@ mod tests {
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
 
         sqlx::query(&script).execute(&client.pool).await.unwrap();
-        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
-        let metric = MetricRecord {
-            run_uid: uid.clone(),
-            name: "metric1".to_string(),
-            value: 1.0,
-            step: None,
-            timestamp: None,
-            date_ts: get_utc_date(),
-            idx: None,
-        };
 
-        client.insert_run_metric(&metric).await.unwrap();
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let metric_names = vec!["metric1", "metric2", "metric3"];
+
+        for name in metric_names {
+            let metric = MetricRecord {
+                run_uid: uid.clone(),
+                name: name.to_string(),
+                value: 1.0,
+                step: None,
+                timestamp: None,
+                date_ts: get_utc_date(),
+                idx: None,
+            };
+
+            client.insert_run_metric(&metric).await.unwrap();
+        }
 
         let records = client.get_run_metric(&uid, None).await.unwrap();
 
         let names = client.get_run_metric_names(&uid).await.unwrap();
 
-        assert_eq!(records.len(), 1);
+        assert_eq!(records.len(), 3);
 
         // assert names = "metric1"
-        assert_eq!(names.len(), 1);
-        assert_eq!(names[0], "metric1");
+        assert_eq!(names.len(), 3);
 
         cleanup();
     }

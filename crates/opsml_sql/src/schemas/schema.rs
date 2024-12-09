@@ -20,13 +20,19 @@ pub struct MetricRecord {
 }
 
 impl MetricRecord {
-    fn new(run_uid: String, name: String, value: f64) -> Self {
+    pub fn new(
+        run_uid: String,
+        name: String,
+        value: f64,
+        step: Option<i32>,
+        timestamp: Option<i64>,
+    ) -> Self {
         MetricRecord {
             run_uid,
             name,
             value,
-            step: None,
-            timestamp: None,
+            step,
+            timestamp,
             date_ts: get_utc_date(),
             idx: None,
         }
