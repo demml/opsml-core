@@ -1,4 +1,4 @@
-use crate::base::{add_version_bounds, CardSQLTableNames, SqlClient};
+use crate::base::{CardSQLTableNames, SqlClient};
 
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
@@ -13,10 +13,8 @@ use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
-use opsml_utils::semver::{VersionParser, VersionValidator};
-use opsml_utils::utils::is_valid_uuid4;
+use opsml_utils::semver::VersionValidator;
 use semver::Version;
-use sqlx::{query_builder::QueryBuilder, Execute};
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
 pub struct SqliteClient {
