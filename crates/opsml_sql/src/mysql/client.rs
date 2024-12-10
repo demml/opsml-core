@@ -1015,6 +1015,21 @@ impl SqlClient for MySqlClient {
 
         Ok(())
     }
+
+    async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
+        let query = format!(
+            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = ?",
+            CardSQLTableNames::HardwareMetrics
+        );
+
+        let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
+    }
 }
 
 #[cfg(test)]
