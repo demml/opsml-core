@@ -1,6 +1,5 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
-use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 
@@ -516,60 +515,186 @@ impl SqlClient for PostgresClient {
     }
 
     async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
-        let query = match table {
+        match table {
             CardSQLTableNames::Data => match card {
-                Card::Data(data) => SqlHelper::get_datacard_update_query(data),
+                Card::Data(data) => {
+                    let query = PostgresQueryHelper::get_datacard_update_query();
+                    sqlx::query(&query)
+                        .bind(&data.date)
+                        .bind(&data.timestamp)
+                        .bind(&data.app_env)
+                        .bind(&data.name)
+                        .bind(&data.repository)
+                        .bind(&data.major)
+                        .bind(&data.minor)
+                        .bind(&data.patch)
+                        .bind(&data.version)
+                        .bind(&data.contact)
+                        .bind(&data.data_type)
+                        .bind(&data.interface_type)
+                        .bind(&data.tags)
+                        .bind(&data.runcard_uid)
+                        .bind(&data.pipelinecard_uid)
+                        .bind(&data.auditcard_uid)
+                        .bind(&data.pre_tag)
+                        .bind(&data.build_tag)
+                        .bind(&data.uid)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
-                        "Invalid card type for update".to_string(),
+                        "Invalid card type for insert".to_string(),
                     ));
                 }
             },
             CardSQLTableNames::Model => match card {
-                Card::Model(model) => SqlHelper::get_modelcard_update_query(model),
+                Card::Model(model) => {
+                    let query = PostgresQueryHelper::get_modelcard_update_query();
+                    sqlx::query(&query)
+                        .bind(&model.date)
+                        .bind(&model.timestamp)
+                        .bind(&model.app_env)
+                        .bind(&model.name)
+                        .bind(&model.repository)
+                        .bind(&model.major)
+                        .bind(&model.minor)
+                        .bind(&model.patch)
+                        .bind(&model.version)
+                        .bind(&model.contact)
+                        .bind(&model.datacard_uid)
+                        .bind(&model.sample_data_type)
+                        .bind(&model.model_type)
+                        .bind(&model.interface_type)
+                        .bind(&model.task_type)
+                        .bind(&model.tags)
+                        .bind(&model.runcard_uid)
+                        .bind(&model.pipelinecard_uid)
+                        .bind(&model.auditcard_uid)
+                        .bind(&model.pre_tag)
+                        .bind(&model.build_tag)
+                        .bind(&model.uid)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
-                        "Invalid card type for update".to_string(),
+                        "Invalid card type for insert".to_string(),
                     ));
                 }
             },
             CardSQLTableNames::Run => match card {
-                Card::Run(run) => SqlHelper::get_runcard_update_query(run),
+                Card::Run(run) => {
+                    let query = PostgresQueryHelper::get_runcard_update_query();
+                    sqlx::query(&query)
+                        .bind(&run.date)
+                        .bind(&run.timestamp)
+                        .bind(&run.app_env)
+                        .bind(&run.name)
+                        .bind(&run.repository)
+                        .bind(&run.major)
+                        .bind(&run.minor)
+                        .bind(&run.patch)
+                        .bind(&run.version)
+                        .bind(&run.contact)
+                        .bind(&run.project)
+                        .bind(&run.tags)
+                        .bind(&run.datacard_uids)
+                        .bind(&run.modelcard_uids)
+                        .bind(&run.pipelinecard_uid)
+                        .bind(&run.artifact_uris)
+                        .bind(&run.compute_environment)
+                        .bind(&run.pre_tag)
+                        .bind(&run.build_tag)
+                        .bind(&run.uid)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
-                        "Invalid card type for update".to_string(),
+                        "Invalid card type for insert".to_string(),
                     ));
                 }
             },
             CardSQLTableNames::Audit => match card {
-                Card::Audit(audit) => SqlHelper::get_auditcard_update_query(audit),
+                Card::Audit(audit) => {
+                    let query = PostgresQueryHelper::get_auditcard_update_query();
+                    sqlx::query(&query)
+                        .bind(&audit.date)
+                        .bind(&audit.timestamp)
+                        .bind(&audit.app_env)
+                        .bind(&audit.name)
+                        .bind(&audit.repository)
+                        .bind(&audit.major)
+                        .bind(&audit.minor)
+                        .bind(&audit.patch)
+                        .bind(&audit.version)
+                        .bind(&audit.contact)
+                        .bind(&audit.tags)
+                        .bind(&audit.approved)
+                        .bind(&audit.datacard_uids)
+                        .bind(&audit.modelcard_uids)
+                        .bind(&audit.runcard_uids)
+                        .bind(&audit.pre_tag)
+                        .bind(&audit.build_tag)
+                        .bind(&audit.uid)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
-                        "Invalid card type for update".to_string(),
+                        "Invalid card type for insert".to_string(),
                     ));
                 }
             },
             CardSQLTableNames::Pipeline => match card {
-                Card::Pipeline(pipeline) => SqlHelper::get_pipelinecard_update_query(pipeline),
+                Card::Pipeline(pipeline) => {
+                    let query = PostgresQueryHelper::get_pipelinecard_update_query();
+                    sqlx::query(&query)
+                        .bind(&pipeline.date)
+                        .bind(&pipeline.timestamp)
+                        .bind(&pipeline.app_env)
+                        .bind(&pipeline.name)
+                        .bind(&pipeline.repository)
+                        .bind(&pipeline.major)
+                        .bind(&pipeline.minor)
+                        .bind(&pipeline.patch)
+                        .bind(&pipeline.version)
+                        .bind(&pipeline.contact)
+                        .bind(&pipeline.tags)
+                        .bind(&pipeline.pipeline_code_uri)
+                        .bind(&pipeline.datacard_uids)
+                        .bind(&pipeline.modelcard_uids)
+                        .bind(&pipeline.runcard_uids)
+                        .bind(&pipeline.pre_tag)
+                        .bind(&pipeline.build_tag)
+                        .bind(&pipeline.uid)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
-                        "Invalid card type for update".to_string(),
+                        "Invalid card type for insert".to_string(),
                     ));
                 }
             },
+
             _ => {
                 return Err(SqlError::QueryError(
-                    "Invalid table name for update".to_string(),
+                    "Invalid table name for insert".to_string(),
                 ));
             }
-        };
-
-        sqlx::query(&query)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
-
-        Ok(())
+        }
     }
 
     /// Get unique repository names

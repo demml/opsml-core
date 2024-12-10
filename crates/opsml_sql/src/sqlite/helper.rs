@@ -120,4 +120,126 @@ impl SqliteQueryHelper {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             .to_string()
     }
+
+    pub fn get_datacard_update_query() -> String {
+        "UPDATE opsml_data_registry SET 
+        date = ?, 
+        timestamp = ?, 
+        app_env = ?, 
+        name = ?, 
+        repository = ?, 
+        major = ?, 
+        minor = ?, 
+        patch = ?, 
+        version = ?, 
+        contact = ?, 
+        data_type = ?, 
+        interface_type = ?, 
+        tags = ?, 
+        runcard_uid = ?, 
+        pipelinecard_uid = ?, 
+        auditcard_uid = ?, 
+        pre_tag = ?, 
+        build_tag = ? 
+        WHERE uid = ?"
+            .to_string()
+    }
+
+    pub fn get_modelcard_update_query() -> String {
+        "UPDATE opsml_model_registry SET 
+        date = ?, 
+        timestamp = ?, 
+        app_env = ?, 
+        name = ?, 
+        repository = ?, 
+        major = ?, 
+        minor = ?, 
+        patch = ?, 
+        version = ?, 
+        contact = ?, 
+        datacard_uid = ?, 
+        sample_data_type = ?, 
+        model_type = ?, 
+        interface_type = ?, 
+        task_type = ?, 
+        tags = ?, 
+        runcard_uid = ?, 
+        pipelinecard_uid = ?, 
+        auditcard_uid = ?, 
+        pre_tag = ?, 
+        build_tag = ? 
+        WHERE uid = ?"
+            .to_string()
+    }
+
+    pub fn get_runcard_update_query() -> String {
+        "UPDATE opsml_run_registry SET 
+        date = ?, 
+        timestamp = ?, 
+        app_env = ?, 
+        name = ?, 
+        repository = ?, 
+        major = ?, 
+        minor = ?, 
+        patch = ?, 
+        version = ?, 
+        contact = ?, 
+        project = ?, 
+        tags = ?, 
+        datacard_uids = ?, 
+        modelcard_uids = ?, 
+        pipelinecard_uid = ?, 
+        artifact_uris = ?, 
+        compute_environment = ?, 
+        pre_tag = ?, 
+        build_tag = ? 
+        WHERE uid = ?"
+            .to_string()
+    }
+
+    pub fn get_auditcard_update_query() -> String {
+        "UPDATE opsml_audit_registry SET 
+        date = ?, 
+        timestamp = ?, 
+        app_env = ?, 
+        name = ?, 
+        repository = ?, 
+        major = ?, 
+        minor = ?, 
+        patch = ?, 
+        version = ?, 
+        contact = ?, 
+        tags = ?, 
+        approved = ?, 
+        datacard_uids = ?, 
+        modelcard_uids = ?, 
+        runcard_uids = ?, 
+        pre_tag = ?, 
+        build_tag = ?
+        WHERE uid = ?"
+            .to_string()
+    }
+
+    pub fn get_pipelinecard_update_query() -> String {
+        "UPDATE opsml_pipeline_registry SET 
+        date = ?, 
+        timestamp = ?, 
+        app_env = ?, 
+        name = ?, 
+        repository = ?, 
+        major = ?, 
+        minor = ?, 
+        patch = ?, 
+        version = ?, 
+        contact = ?, 
+        tags = ?, 
+        pipeline_code_uri = ?, 
+        datacard_uids = ?, 
+        modelcard_uids = ?, 
+        runcard_uids = ?, 
+        pre_tag = ?, 
+        build_tag = ? 
+        WHERE uid = ?"
+            .to_string()
+    }
 }
