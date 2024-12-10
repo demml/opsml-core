@@ -309,7 +309,7 @@ impl SqlClient for PostgresClient {
         match table {
             CardSQLTableNames::Data => match card {
                 Card::Data(data) => {
-                    let query = SqlHelper::get_datacard_insert_query(data);
+                    let query = PostgresQueryHelper::get_datacard_insert_query();
                     sqlx::query(&query)
                         .bind(&data.uid)
                         .bind(&data.date)
@@ -343,7 +343,7 @@ impl SqlClient for PostgresClient {
             },
             CardSQLTableNames::Model => match card {
                 Card::Model(model) => {
-                    let query = SqlHelper::get_modelcard_insert_query(model);
+                    let query = PostgresQueryHelper::get_modelcard_insert_query();
                     sqlx::query(&query)
                         .bind(&model.uid)
                         .bind(&model.date)
@@ -380,7 +380,7 @@ impl SqlClient for PostgresClient {
             },
             CardSQLTableNames::Run => match card {
                 Card::Run(run) => {
-                    let query = SqlHelper::get_runcard_insert_query(run);
+                    let query = PostgresQueryHelper::get_runcard_insert_query();
                     sqlx::query(&query)
                         .bind(&run.uid)
                         .bind(&run.date)
@@ -415,7 +415,7 @@ impl SqlClient for PostgresClient {
             },
             CardSQLTableNames::Audit => match card {
                 Card::Audit(audit) => {
-                    let query = SqlHelper::get_auditcard_insert_query(audit);
+                    let query = PostgresQueryHelper::get_auditcard_insert_query();
                     sqlx::query(&query)
                         .bind(&audit.uid)
                         .bind(&audit.date)
@@ -448,7 +448,7 @@ impl SqlClient for PostgresClient {
             },
             CardSQLTableNames::Pipeline => match card {
                 Card::Pipeline(pipeline) => {
-                    let query = SqlHelper::get_pipelinecard_insert_query(pipeline);
+                    let query = PostgresQueryHelper::get_pipelinecard_insert_query();
                     sqlx::query(&query)
                         .bind(&pipeline.uid)
                         .bind(&pipeline.date)
@@ -481,7 +481,7 @@ impl SqlClient for PostgresClient {
             },
             CardSQLTableNames::Project => match card {
                 Card::Project(project) => {
-                    let query = SqlHelper::get_projectcard_insert_query(project);
+                    let query = PostgresQueryHelper::get_projectcard_insert_query();
                     sqlx::query(&query)
                         .bind(&project.date)
                         .bind(&project.uid)
