@@ -42,6 +42,39 @@ impl MetricRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ParameterRecord {
+    pub run_uid: String,
+    pub name: String,
+    pub value: String,
+    pub date_ts: Option<NaiveDateTime>,
+    pub idx: Option<i32>,
+}
+
+impl ParameterRecord {
+    pub fn new(run_uid: String, name: String, value: String) -> Self {
+        ParameterRecord {
+            run_uid,
+            name,
+            value,
+            date_ts: None,
+            idx: None,
+        }
+    }
+}
+
+impl Default for ParameterRecord {
+    fn default() -> Self {
+        ParameterRecord {
+            run_uid: Uuid::new_v4().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            value: CommonKwargs::Undefined.as_string().to_string(),
+            date_ts: None,
+            idx: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct VersionResult {
     pub date: String,
     pub timestamp: i64,

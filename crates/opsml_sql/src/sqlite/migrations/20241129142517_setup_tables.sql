@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_metrics (
     value REAL,
     step INTEGER,
     timestamp INTEGER,
-    date_ts TEXT DEFAULT (datetime('now')),
+    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
     run_uid TEXT,
     name TEXT,
     value TEXT,
-    date_ts TEXT DEFAULT (datetime('now')),
+    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 

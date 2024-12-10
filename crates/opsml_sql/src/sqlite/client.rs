@@ -5,7 +5,7 @@ use crate::schemas::schema::Card;
 use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, PipelineCardRecord, QueryStats, RunCardRecord,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use crate::sqlite::helper::SqliteQueryHelper;
@@ -1019,6 +1019,35 @@ impl SqlClient for SqliteClient {
         );
 
         let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
+    }
+
+    async fn insert_run_parameter(&self, card: &ParameterRecord) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_run_parameter_insert_query();
+
+        sqlx::query(&query)
+            .bind(&card.run_uid)
+            .bind(&card.name)
+            .bind(&card.value)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_run_parameter(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<ParameterRecord>, SqlError> {
+        let query = SqliteQueryHelper::get_run_parameter_query(names);
+        let records: Vec<ParameterRecord> = sqlx::query_as(&query)
             .bind(uid)
             .fetch_all(&self.pool)
             .await

@@ -2,6 +2,40 @@ use crate::base::CardSQLTableNames;
 pub struct PostgresQueryHelper;
 
 impl PostgresQueryHelper {
+    pub fn get_run_parameter_insert_query() -> String {
+        format!(
+            "INSERT INTO {} (
+                run_uid, 
+                name, 
+                value
+            ) VALUES ($1, $2, $3)",
+            CardSQLTableNames::Parameters
+        )
+        .to_string()
+    }
+    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> String {
+        let mut query = format!(
+            "SELECT *
+            FROM {}
+            WHERE run_uid = $1",
+            CardSQLTableNames::Parameters
+        );
+
+        // loop through names and bind them. First name = and and others are or
+        if names.is_some() {
+            let names = names.unwrap();
+            for (idx, name) in names.iter().enumerate() {
+                if idx == 0 {
+                    query.push_str(format!(" AND (name = {}", name).as_str());
+                } else {
+                    query.push_str(format!(" OR name = {}", name).as_str());
+                }
+            }
+            query.push_str(")");
+        }
+
+        query
+    }
     pub fn get_hardware_metric_insert_query() -> String {
         format!(
             "INSERT INTO {} (

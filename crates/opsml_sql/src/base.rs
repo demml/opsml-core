@@ -1,6 +1,7 @@
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::{
-    Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, QueryStats,
+    Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
+    QueryStats,
 };
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
@@ -15,6 +16,7 @@ pub enum CardSQLTableNames {
     Pipeline,
     Metrics,
     HardwareMetrics,
+    Parameters,
 }
 
 impl fmt::Display for CardSQLTableNames {
@@ -28,6 +30,7 @@ impl fmt::Display for CardSQLTableNames {
             CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
             CardSQLTableNames::Metrics => "opsml_run_metrics",
             CardSQLTableNames::HardwareMetrics => "opsml_run_hardware_metrics",
+            CardSQLTableNames::Parameters => "opsml_run_parameters",
         };
         write!(f, "{}", table_name)
     }
@@ -78,8 +81,25 @@ pub trait SqlClient {
     // get project_id
     async fn get_project_id(&self, project_name: &str, repository: &str) -> Result<i32, SqlError>;
 
-    // insert run metric
+    /// Insert run metric
+    ///
+    /// # Arguments
+    ///
+    /// * `card` - The metric record
+    ///
+    /// # Returns
+    ///
     async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError>;
+
+    /// insert run parameter
+    ///
+    /// # Arguments
+    ///
+    /// * `card` - The parameter record
+    ///
+    /// # Returns
+    ///
+    async fn insert_run_parameter(&self, card: &ParameterRecord) -> Result<(), SqlError>;
 
     /// Get run metric
     ///
@@ -109,6 +129,22 @@ pub trait SqlClient {
     /// * `Vec<String>` - The names of the metrics
     ///
     async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError>;
+
+    /// Get run parameter
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The unique identifier of the card
+    /// * `names` - The names of the parameters
+    ///
+    /// # Returns
+    ///
+    /// * `Vec<ParameterRecord>` - The parameters
+    async fn get_run_parameter(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<ParameterRecord>, SqlError>;
 
     /// Insert hardware metrics
     ///

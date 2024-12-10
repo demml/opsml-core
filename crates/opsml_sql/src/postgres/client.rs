@@ -7,7 +7,7 @@ use crate::postgres::helper::PostgresQueryHelper;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -995,6 +995,35 @@ impl SqlClient for PostgresClient {
         );
 
         let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
+    }
+
+    async fn insert_run_parameter(&self, card: &ParameterRecord) -> Result<(), SqlError> {
+        let query = PostgresQueryHelper::get_run_parameter_insert_query();
+
+        sqlx::query(&query)
+            .bind(&card.run_uid)
+            .bind(&card.name)
+            .bind(&card.value)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_run_parameter(
+        &self,
+        uid: &str,
+        names: Option<&Vec<&str>>,
+    ) -> Result<Vec<ParameterRecord>, SqlError> {
+        let query = PostgresQueryHelper::get_run_parameter_query(names);
+        let records: Vec<ParameterRecord> = sqlx::query_as(&query)
             .bind(uid)
             .fetch_all(&self.pool)
             .await

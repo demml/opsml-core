@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
     run_uid VARCHAR(64),
     name VARCHAR(128),
     value VARCHAR(128),
-    date_ts VARCHAR(64) DEFAULT (CURRENT_TIMESTAMP),
+    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx SERIAL PRIMARY KEY
 );
 
