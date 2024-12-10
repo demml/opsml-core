@@ -1,22 +1,29 @@
 /// this file contains helper logic for generating sql queries across different databases
+use crate::base::CardSQLTableNames;
 pub struct SqliteQueryHelper;
 
 impl SqliteQueryHelper {
     pub fn get_hardware_metic_insert_query() -> String {
-        "INSERT INTO opsml_hardware_metrics (run_uid, created_at, metrics) VALUES (1?, 2?, 3?)"
-            .to_string()
+        format!(
+            "INSERT INTO {} (run_uid, created_at, metrics) VALUES (?, ?, ?)",
+            CardSQLTableNames::HardwareMetrics
+        )
+        .to_string()
     }
 
     pub fn get_projectcard_insert_query() -> String {
-        "INSERT INTO opsml_project_registry (date, uid, name, repository, project_id, major, minor, patch, version, timestamp, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
+        format!("INSERT INTO {} (date, uid, name, repository, project_id, major, minor, patch, version, timestamp, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Project)
+            .to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        "INSERT INTO opsml_data_registry (uid, date, timestamp, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
+        format!("INSERT INTO {} (uid, date, timestamp, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Data)
+            .to_string()
     }
 
     pub fn get_modelcard_insert_query() -> String {
-        "INSERT INTO opsml_model_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -40,12 +47,15 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            CardSQLTableNames::Model
+        )
+        .to_string()
     }
 
     pub fn get_runcard_insert_query() -> String {
-        "INSERT INTO opsml_run_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -67,12 +77,15 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            CardSQLTableNames::Run
+        )
+        .to_string()
     }
 
     pub fn get_auditcard_insert_query() -> String {
-        "INSERT INTO opsml_audit_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -92,12 +105,15 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            CardSQLTableNames::Audit
+        )
+        .to_string()
     }
 
     pub fn get_pipelinecard_insert_query() -> String {
-        "INSERT INTO opsml_pipeline_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -117,12 +133,15 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            CardSQLTableNames::Pipeline
+        )
+        .to_string()
     }
 
     pub fn get_datacard_update_query() -> String {
-        "UPDATE opsml_data_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = ?, 
         timestamp = ?, 
         app_env = ?, 
@@ -141,12 +160,15 @@ impl SqliteQueryHelper {
         auditcard_uid = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?"
-            .to_string()
+        WHERE uid = ?",
+            CardSQLTableNames::Data
+        )
+        .to_string()
     }
 
     pub fn get_modelcard_update_query() -> String {
-        "UPDATE opsml_model_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = ?, 
         timestamp = ?, 
         app_env = ?, 
@@ -168,12 +190,15 @@ impl SqliteQueryHelper {
         auditcard_uid = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?"
-            .to_string()
+        WHERE uid = ?",
+            CardSQLTableNames::Model
+        )
+        .to_string()
     }
 
     pub fn get_runcard_update_query() -> String {
-        "UPDATE opsml_run_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = ?, 
         timestamp = ?, 
         app_env = ?, 
@@ -193,12 +218,15 @@ impl SqliteQueryHelper {
         compute_environment = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?"
-            .to_string()
+        WHERE uid = ?",
+            CardSQLTableNames::Run
+        )
+        .to_string()
     }
 
     pub fn get_auditcard_update_query() -> String {
-        "UPDATE opsml_audit_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = ?, 
         timestamp = ?, 
         app_env = ?, 
@@ -216,12 +244,15 @@ impl SqliteQueryHelper {
         runcard_uids = ?, 
         pre_tag = ?, 
         build_tag = ?
-        WHERE uid = ?"
-            .to_string()
+        WHERE uid = ?",
+            CardSQLTableNames::Audit
+        )
+        .to_string()
     }
 
     pub fn get_pipelinecard_update_query() -> String {
-        "UPDATE opsml_pipeline_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = ?, 
         timestamp = ?, 
         app_env = ?, 
@@ -239,7 +270,9 @@ impl SqliteQueryHelper {
         runcard_uids = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?"
-            .to_string()
+        WHERE uid = ?",
+            CardSQLTableNames::Pipeline
+        )
+        .to_string()
     }
 }

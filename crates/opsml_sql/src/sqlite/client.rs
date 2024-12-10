@@ -998,7 +998,7 @@ impl SqlClient for SqliteClient {
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
         let query = format!(
-            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = ?1",
+            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = ?",
             CardSQLTableNames::HardwareMetrics
         );
 
@@ -1845,14 +1845,9 @@ mod tests {
             client.insert_hardware_metric(&metric).await.unwrap();
         }
 
-        let records = client.get_run_metric(&uid, None).await.unwrap();
+        let records = client.get_hardware_metric(&uid).await.unwrap();
 
-        let names = client.get_run_metric_names(&uid).await.unwrap();
-
-        assert_eq!(records.len(), 3);
-
-        // assert names = "metric1"
-        assert_eq!(names.len(), 3);
+        assert_eq!(records.len(), 10);
 
         cleanup();
     }
