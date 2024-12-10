@@ -14,6 +14,7 @@ pub enum CardSQLTableNames {
     Audit,
     Pipeline,
     Metrics,
+    HardwareMetrics,
 }
 
 impl fmt::Display for CardSQLTableNames {
@@ -26,6 +27,7 @@ impl fmt::Display for CardSQLTableNames {
             CardSQLTableNames::Audit => "opsml_audit_registry",
             CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
             CardSQLTableNames::Metrics => "opsml_run_metrics",
+            CardSQLTableNames::HardwareMetrics => "opsml_run_hardware_metrics",
         };
         write!(f, "{}", table_name)
     }
@@ -118,4 +120,16 @@ pub trait SqlClient {
         &self,
         metric_record: &HardwareMetricsRecord,
     ) -> Result<(), SqlError>;
+
+    /// Get hardware metrics
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The unique identifier of the card
+    ///
+    /// # Returns
+    ///
+    /// * `HardwareMetricsRecord` - The hardware metrics
+
+    async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError>;
 }

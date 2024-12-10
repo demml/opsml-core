@@ -705,3 +705,13 @@ pub struct HardwareMetricsRecord {
     pub created_at: String,
     pub metrics: Json<HardwareMetrics>,
 }
+
+impl Default for HardwareMetricsRecord {
+    fn default() -> Self {
+        HardwareMetricsRecord {
+            run_uid: String::new(),
+            created_at: String::new(),
+            metrics: Json(HardwareMetrics::default()),
+        }
+    }
+}

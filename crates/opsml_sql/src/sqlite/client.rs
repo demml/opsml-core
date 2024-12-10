@@ -761,28 +761,19 @@ impl SqlClient for SqliteClient {
                 COALESCE(COUNT(DISTINCT name), 0) AS nbr_names, 
                 COALESCE(COUNT(major), 0) AS nbr_versions, 
                 COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
-            FROM {}",
+            FROM {}
+            WHERE 1=1
+            AND (?1 IS NULL OR name LIKE ?1 OR repository LIKE ?1)
+            ",
             table
         );
 
-        let query = if search_term.is_some() {
-            format!("{} WHERE name LIKE ?1 OR repository LIKE ?1", base_query)
-        } else {
-            base_query
-        };
-
-        let stats: QueryStats = if search_term.is_some() {
-            sqlx::query_as(&query)
-                .bind(format!("%{}%", search_term.unwrap()))
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
-        } else {
-            sqlx::query_as(&query)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|e| SqlError::QueryError(format!("{}", e)))?
-        };
+        // if search_term is not None, format with %search_term%, else None
+        let stats: QueryStats = sqlx::query_as(&base_query)
+            .bind(search_term.map(|term| format!("%{}%", term)))
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(stats)
     }
@@ -1004,6 +995,21 @@ impl SqlClient for SqliteClient {
 
         Ok(())
     }
+
+    async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
+        let query = format!(
+            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = ?1",
+            CardSQLTableNames::HardwareMetrics
+        );
+
+        let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
+            .bind(uid)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(records)
+    }
 }
 
 #[cfg(test)]
@@ -1018,7 +1024,9 @@ mod tests {
         }
     }
     use opsml_settings::config::SqlType;
+    use opsml_types::types::HardwareMetrics;
     use opsml_utils::utils::get_utc_date;
+    use sqlx::types::Json;
 
     #[tokio::test]
     async fn test_sqlite() {
@@ -1791,6 +1799,50 @@ mod tests {
             };
 
             client.insert_run_metric(&metric).await.unwrap();
+        }
+
+        let records = client.get_run_metric(&uid, None).await.unwrap();
+
+        let names = client.get_run_metric_names(&uid).await.unwrap();
+
+        assert_eq!(records.len(), 3);
+
+        // assert names = "metric1"
+        assert_eq!(names.len(), 3);
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_hardware_metric() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
+
+        sqlx::query(&script).execute(&client.pool).await.unwrap();
+
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+
+        // create a loop of 10
+        for _ in 0..10 {
+            let metrics = HardwareMetrics::default();
+
+            let metric = HardwareMetricsRecord {
+                run_uid: uid.clone(),
+                created_at: get_utc_date(),
+                metrics: Json(metrics),
+            };
+
+            client.insert_hardware_metric(&metric).await.unwrap();
         }
 
         let records = client.get_run_metric(&uid, None).await.unwrap();
