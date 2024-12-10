@@ -3,9 +3,29 @@ use crate::base::CardSQLTableNames;
 pub struct SqliteQueryHelper;
 
 impl SqliteQueryHelper {
-    pub fn get_hardware_metic_insert_query() -> String {
+    pub fn get_hardware_metric_insert_query() -> String {
         format!(
-            "INSERT INTO {} (run_uid, created_at, metrics) VALUES (?, ?, ?)",
+            "INSERT INTO {} (
+                run_uid, 
+                created_at, 
+                cpu_percent_utilization, 
+                cpu_percent_per_core, 
+                compute_overall, 
+                compute_utilized, 
+                load_avg, 
+                sys_ram_total, 
+                sys_ram_used, 
+                sys_ram_available, 
+                sys_ram_percent_used, 
+                sys_swap_total, 
+                sys_swap_used, 
+                sys_swap_free, 
+                sys_swap_percent, 
+                bytes_recv, 
+                bytes_sent, 
+                gpu_percent_utilization, 
+                gpu_percent_per_core
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::HardwareMetrics
         )
         .to_string()

@@ -983,12 +983,28 @@ impl SqlClient for SqliteClient {
         &self,
         metric_record: &HardwareMetricsRecord,
     ) -> Result<(), SqlError> {
-        let query = SqliteQueryHelper::get_hardware_metic_insert_query();
+        let query = SqliteQueryHelper::get_hardware_metric_insert_query();
 
         sqlx::query(&query)
             .bind(&metric_record.run_uid)
             .bind(&metric_record.created_at)
-            .bind(&metric_record.metrics)
+            .bind(&metric_record.cpu_percent_utilization)
+            .bind(&metric_record.cpu_percent_per_core)
+            .bind(&metric_record.compute_overall)
+            .bind(&metric_record.compute_utilized)
+            .bind(&metric_record.load_avg)
+            .bind(&metric_record.sys_ram_total)
+            .bind(&metric_record.sys_ram_used)
+            .bind(&metric_record.sys_ram_available)
+            .bind(&metric_record.sys_ram_percent_used)
+            .bind(&metric_record.sys_swap_total)
+            .bind(&metric_record.sys_swap_used)
+            .bind(&metric_record.sys_swap_free)
+            .bind(&metric_record.sys_swap_percent)
+            .bind(&metric_record.bytes_recv)
+            .bind(&metric_record.bytes_sent)
+            .bind(&metric_record.gpu_percent_utilization)
+            .bind(&metric_record.gpu_percent_per_core)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -998,7 +1014,7 @@ impl SqlClient for SqliteClient {
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
         let query = format!(
-            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = ?",
+            "SELECT * FROM {} WHERE run_uid = ?",
             CardSQLTableNames::HardwareMetrics
         );
 
@@ -1024,9 +1040,7 @@ mod tests {
         }
     }
     use opsml_settings::config::SqlType;
-    use opsml_types::types::HardwareMetrics;
-    use opsml_utils::utils::get_utc_date;
-    use sqlx::types::Json;
+    use opsml_utils::utils::{get_utc_date, get_utc_datetime};
 
     #[tokio::test]
     async fn test_sqlite() {
@@ -1834,12 +1848,10 @@ mod tests {
 
         // create a loop of 10
         for _ in 0..10 {
-            let metrics = HardwareMetrics::default();
-
             let metric = HardwareMetricsRecord {
                 run_uid: uid.clone(),
-                created_at: get_utc_date(),
-                metrics: Json(metrics),
+                created_at: get_utc_datetime(),
+                ..Default::default()
             };
 
             client.insert_hardware_metric(&metric).await.unwrap();

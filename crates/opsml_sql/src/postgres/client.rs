@@ -959,11 +959,28 @@ impl SqlClient for PostgresClient {
         &self,
         metric_record: &HardwareMetricsRecord,
     ) -> Result<(), SqlError> {
-        let query = PostgresQueryHelper::get_hardware_metic_insert_query();
+        let query = PostgresQueryHelper::get_hardware_metric_insert_query();
+
         sqlx::query(&query)
             .bind(&metric_record.run_uid)
             .bind(&metric_record.created_at)
-            .bind(&metric_record.metrics)
+            .bind(&metric_record.cpu_percent_utilization)
+            .bind(&metric_record.cpu_percent_per_core)
+            .bind(&metric_record.compute_overall)
+            .bind(&metric_record.compute_utilized)
+            .bind(&metric_record.load_avg)
+            .bind(&metric_record.sys_ram_total)
+            .bind(&metric_record.sys_ram_used)
+            .bind(&metric_record.sys_ram_available)
+            .bind(&metric_record.sys_ram_percent_used)
+            .bind(&metric_record.sys_swap_total)
+            .bind(&metric_record.sys_swap_used)
+            .bind(&metric_record.sys_swap_free)
+            .bind(&metric_record.sys_swap_percent)
+            .bind(&metric_record.bytes_recv)
+            .bind(&metric_record.bytes_sent)
+            .bind(&metric_record.gpu_percent_utilization)
+            .bind(&metric_record.gpu_percent_per_core)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -992,7 +1009,7 @@ mod tests {
     use super::*;
     use crate::schemas::schema::ProjectCardRecord;
     use opsml_settings::config::SqlType;
-    use opsml_utils::utils::get_utc_date;
+    use opsml_utils::utils::{get_utc_date, get_utc_datetime};
     use std::env;
     pub async fn cleanup(pool: &Pool<Postgres>) {
         sqlx::raw_sql(
@@ -1017,6 +1034,9 @@ mod tests {
 
             DELETE
             FROM opsml_run_metrics;
+
+            DELETE
+            FROM opsml_run_hardware_metrics;
             "#,
         )
         .fetch_all(pool)
@@ -1817,6 +1837,41 @@ mod tests {
 
         // assert names = "metric1"
         assert_eq!(names.len(), 3);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_postgres_hardware_metric() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+        let client = PostgresClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+
+        // create a loop of 10
+        for _ in 0..10 {
+            let metric = HardwareMetricsRecord {
+                run_uid: uid.clone(),
+                created_at: get_utc_datetime(),
+                ..Default::default()
+            };
+
+            client.insert_hardware_metric(&metric).await.unwrap();
+        }
+
+        let records = client.get_hardware_metric(&uid).await.unwrap();
+
+        assert_eq!(records.len(), 10);
 
         cleanup(&client.pool).await;
     }

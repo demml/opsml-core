@@ -29,8 +29,8 @@ pub struct MemoryMetrics {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NetworkRates {
-    pub bytes_recv: f64,
-    pub bytes_sent: f64,
+    pub bytes_recv: i64,
+    pub bytes_sent: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

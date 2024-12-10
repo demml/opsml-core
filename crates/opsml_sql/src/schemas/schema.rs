@@ -1,7 +1,10 @@
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use opsml_error::error::VersionError;
 use opsml_types::enums::CommonKwargs;
 use opsml_types::types::HardwareMetrics;
 use opsml_utils::utils::{get_utc_date, get_utc_timestamp};
+use semver::Op;
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, types::Json};
@@ -702,16 +705,48 @@ pub enum Card {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct HardwareMetricsRecord {
     pub run_uid: String,
-    pub created_at: String,
-    pub metrics: Json<HardwareMetrics>,
+    pub created_at: NaiveDateTime,
+    pub cpu_percent_utilization: f64,
+    pub cpu_percent_per_core: Option<Json<Vec<f64>>>,
+    pub compute_overall: Option<f64>,
+    pub compute_utilized: Option<f64>,
+    pub load_avg: f64,
+    pub sys_ram_total: i64,
+    pub sys_ram_used: i64,
+    pub sys_ram_available: i64,
+    pub sys_ram_percent_used: f64,
+    pub sys_swap_total: Option<i64>,
+    pub sys_swap_used: Option<i64>,
+    pub sys_swap_free: Option<i64>,
+    pub sys_swap_percent: Option<f64>,
+    pub bytes_recv: i64,
+    pub bytes_sent: i64,
+    pub gpu_percent_utilization: Option<f64>,
+    pub gpu_percent_per_core: Option<Json<Vec<f64>>>,
 }
 
 impl Default for HardwareMetricsRecord {
     fn default() -> Self {
         HardwareMetricsRecord {
-            run_uid: String::new(),
-            created_at: String::new(),
-            metrics: Json(HardwareMetrics::default()),
+            run_uid: Uuid::new_v4().to_string(),
+            created_at: Utc::now().naive_utc(),
+            cpu_percent_utilization: 0.0,
+            cpu_percent_per_core: None,
+            compute_overall: None,
+            compute_utilized: None,
+            load_avg: 0.0,
+            sys_ram_total: 0,
+            sys_ram_used: 0,
+            sys_ram_available: 0,
+            sys_ram_percent_used: 0.0,
+            sys_swap_total: None,
+            sys_swap_used: None,
+            sys_swap_free: None,
+            sys_swap_percent: None,
+            bytes_recv: 0,
+            bytes_sent: 0,
+            gpu_percent_utilization: None,
+            gpu_percent_per_core: None,
         }
     }
 }

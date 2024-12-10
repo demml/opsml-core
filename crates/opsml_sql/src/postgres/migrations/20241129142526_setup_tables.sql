@@ -154,7 +154,23 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
 -- HardwareMetricSchema
 CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     run_uid VARCHAR(64) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    metrics JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cpu_percent_utilization FLOAT,
+    cpu_percent_per_core JSONB,
+    compute_overall FLOAT,
+    compute_utilized FLOAT,
+    load_avg FLOAT,
+    sys_ram_total INT,
+    sys_ram_used INT,
+    sys_ram_available  INT,
+    sys_ram_percent_used FLOAT,
+    sys_swap_total INT,
+    sys_swap_used INT,
+    sys_swap_free INT,
+    sys_swap_percent FLOAT,
+    bytes_recv INT,
+    bytes_sent INT,
+    gpu_percent_utilization FLOAT,
+    gpu_percent_per_core JSONB,
     idx SERIAL PRIMARY KEY
 );

@@ -1064,6 +1064,9 @@ mod tests {
 
             DELETE
             FROM opsml_run_metrics;
+
+            DELETE
+            FROM opsml_run_hardware_metrics;
             "#,
         )
         .fetch_all(pool)
