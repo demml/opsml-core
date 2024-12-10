@@ -1,5 +1,5 @@
-use crate::base::CardSQLTableNames;
-use crate::base::SqlClient;
+use crate::base::{add_version_bounds, CardSQLTableNames, SqlClient};
+
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::ProjectCardRecord;
@@ -21,45 +21,6 @@ use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use tracing::info;
 pub struct SqliteClient {
     pub pool: Pool<Sqlite>,
-}
-
-fn add_version_bounds(builder: &mut QueryBuilder<Sqlite>, version: &str) -> Result<(), SqlError> {
-    let version_bounds = VersionParser::get_version_to_search(version)
-        .map_err(|e| SqlError::VersionError(format!("{}", e)))?;
-
-    // construct lower bound (already validated)
-    builder.push(format!(
-        " AND (major >= {} AND minor >= {} and patch >= {})",
-        version_bounds.lower_bound.major,
-        version_bounds.lower_bound.minor,
-        version_bounds.lower_bound.patch
-    ));
-
-    if !version_bounds.no_upper_bound {
-        // construct upper bound based on number of components
-        if version_bounds.num_parts == 1 {
-            builder.push(format!(
-                " AND (major < {})",
-                version_bounds.upper_bound.major
-            ));
-        } else if version_bounds.num_parts == 2
-            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Tilde
-            || version_bounds.num_parts == 3 && version_bounds.parser_type == VersionParser::Caret
-        {
-            builder.push(format!(
-                " AND (major == {} AND minor < {})",
-                version_bounds.upper_bound.major, version_bounds.upper_bound.minor
-            ));
-        } else {
-            builder.push(format!(
-                " AND (major == {} AND minor == {} AND patch < {})",
-                version_bounds.upper_bound.major,
-                version_bounds.upper_bound.minor,
-                version_bounds.upper_bound.patch
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[async_trait]
@@ -134,28 +95,8 @@ impl SqlClient for SqliteClient {
         version: Option<&str>,
     ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let query = "SELECT date, timestamp, name, repository, major, minor, patch, pre_tag, build_tag, contact, uid";
-
-        let mut builder = QueryBuilder::<Sqlite>::new(query);
-        builder.push(format!(" FROM {} ", table));
-
-        // add where clause due to multiple combinations
-        builder.push(" WHERE 1==1");
-        builder.push(" AND name == ");
-        builder.push_bind(name);
-
-        builder.push(" AND repository == ");
-        builder.push_bind(repository);
-
-        if let Some(version) = version {
-            add_version_bounds(&mut builder, version)?;
-        }
-
-        // order by timestamp and limit 20
-        builder.push(" ORDER BY timestamp DESC LIMIT 20;");
-        let sql = builder.build().sql();
-
-        let cards: Vec<VersionResult> = sqlx::query_as(sql)
+        let query = SqliteQueryHelper::get_versions_query(&table, version)?;
+        let cards: Vec<VersionResult> = sqlx::query_as(&query)
             .bind(name)
             .bind(repository)
             .fetch_all(&self.pool)
@@ -190,56 +131,11 @@ impl SqlClient for SqliteClient {
         table: CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        let query = format!(
-            "
-        SELECT * FROM {}
-        WHERE 1==1
-        AND (?1 IS NULL OR uid = ?1)
-        AND (?2 IS NULL OR name = ?2)
-        AND (?3 IS NULL OR repository = ?3)
-        AND (?4 IS NULL OR DATE(date) <= DATE(?4))
-        ",
-            table
-        );
-        let mut builder = QueryBuilder::<Sqlite>::new(query);
-
-        // check for uid. If uid is present, we only return that card
-        if query_args.uid.is_some() {
-            // validate uid
-            is_valid_uuid4(query_args.uid.as_ref().unwrap())
-                .map_err(|e| SqlError::GeneralError(e.to_string()))?;
-        } else {
-            // add where clause due to multiple combinations
-
-            if query_args.version.is_some() {
-                add_version_bounds(&mut builder, query_args.version.as_ref().unwrap())?;
-            }
-
-            if query_args.tags.is_some() {
-                let tags = query_args.tags.as_ref().unwrap();
-                for (key, value) in tags.iter() {
-                    builder.push(format!(
-                        " AND json_extract(tags, '$.{}') == '{}'",
-                        key, value
-                    ));
-                }
-            }
-
-            if query_args.sort_by_timestamp.unwrap_or(false) {
-                builder.push(" ORDER BY timestamp DESC");
-            } else {
-                // sort by major, minor, patch
-                builder.push(" ORDER BY major DESC, minor DESC, patch DESC");
-            }
-        }
-
-        builder.push(" LIMIT ?5");
-
-        let sql = builder.sql();
+        let query = SqliteQueryHelper::get_query_cards_query(&table, query_args)?;
 
         match table {
             CardSQLTableNames::Data => {
-                let card: Vec<DataCardRecord> = sqlx::query_as(sql)
+                let card: Vec<DataCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -252,7 +148,7 @@ impl SqlClient for SqliteClient {
                 return Ok(CardResults::Data(card));
             }
             CardSQLTableNames::Model => {
-                let card: Vec<ModelCardRecord> = sqlx::query_as(sql)
+                let card: Vec<ModelCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -265,7 +161,7 @@ impl SqlClient for SqliteClient {
                 return Ok(CardResults::Model(card));
             }
             CardSQLTableNames::Run => {
-                let card: Vec<RunCardRecord> = sqlx::query_as(sql)
+                let card: Vec<RunCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -279,7 +175,7 @@ impl SqlClient for SqliteClient {
             }
 
             CardSQLTableNames::Audit => {
-                let card: Vec<AuditCardRecord> = sqlx::query_as(sql)
+                let card: Vec<AuditCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -292,7 +188,7 @@ impl SqlClient for SqliteClient {
                 return Ok(CardResults::Audit(card));
             }
             CardSQLTableNames::Pipeline => {
-                let card: Vec<PipelineCardRecord> = sqlx::query_as(sql)
+                let card: Vec<PipelineCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -305,7 +201,7 @@ impl SqlClient for SqliteClient {
                 return Ok(CardResults::Pipeline(card));
             }
             CardSQLTableNames::Project => {
-                let card: Vec<ProjectCardRecord> = sqlx::query_as(sql)
+                let card: Vec<ProjectCardRecord> = sqlx::query_as(&query)
                     .bind(query_args.uid.as_ref())
                     .bind(query_args.name.as_ref())
                     .bind(query_args.repository.as_ref())
@@ -756,20 +652,10 @@ impl SqlClient for SqliteClient {
         table: CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        let base_query = format!(
-            "SELECT 
-                COALESCE(COUNT(DISTINCT name), 0) AS nbr_names, 
-                COALESCE(COUNT(major), 0) AS nbr_versions, 
-                COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
-            FROM {}
-            WHERE 1=1
-            AND (?1 IS NULL OR name LIKE ?1 OR repository LIKE ?1)
-            ",
-            table
-        );
+        let query = SqliteQueryHelper::get_query_stats_query(&table);
 
         // if search_term is not None, format with %search_term%, else None
-        let stats: QueryStats = sqlx::query_as(&base_query)
+        let stats: QueryStats = sqlx::query_as(&query)
             .bind(search_term.map(|term| format!("%{}%", term)))
             .fetch_one(&self.pool)
             .await
@@ -799,75 +685,12 @@ impl SqlClient for SqliteClient {
         repository: Option<&str>,
         table: CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let versions_cte = format!(
-            "WITH versions AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_num
-                FROM {}
-                WHERE (?1 IS NULL OR repository = ?1)
-                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
-            )", table
-        );
-
-        let stats_cte = format!(
-            ", stats AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    COUNT(DISTINCT version) AS versions, 
-                    MAX(timestamp) AS updated_at, 
-                    MIN(timestamp) AS created_at 
-                FROM {}
-                WHERE (?1 IS NULL OR repository = ?1)
-                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
-                GROUP BY repository, name
-            )",
-            table
-        );
-
-        let filtered_versions_cte = ", filtered_versions AS (
-                SELECT 
-                    repository, 
-                    name, 
-                    version, 
-                    row_num
-                FROM versions 
-                WHERE row_num = 1
-            )";
-
-        let joined_cte = format!(
-            ", joined AS (
-                SELECT 
-                    stats.repository, 
-                    stats.name, 
-                    filtered_versions.version, 
-                    stats.versions, 
-                    stats.updated_at, 
-                    stats.created_at, 
-                    ROW_NUMBER() OVER (ORDER BY stats.{}) AS row_num 
-                FROM stats 
-                JOIN filtered_versions 
-                ON stats.repository = filtered_versions.repository 
-                AND stats.name = filtered_versions.name
-            )",
-            sort_by
-        );
-
-        let combined_query = format!(
-            "{}{}{}{} 
-            SELECT * FROM joined 
-            WHERE row_num BETWEEN ?4 AND ?5
-            ORDER BY updated_at DESC",
-            versions_cte, stats_cte, filtered_versions_cte, joined_cte
-        );
+        let query = SqliteQueryHelper::get_query_page_query(&table, sort_by);
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
 
-        let records: Vec<CardSummary> = sqlx::query_as(&combined_query)
+        let records: Vec<CardSummary> = sqlx::query_as(&query)
             .bind(repository)
             .bind(search_term)
             .bind(search_term.map(|term| format!("%{}%", term)))
@@ -892,17 +715,9 @@ impl SqlClient for SqliteClient {
     }
 
     async fn get_project_id(&self, project_name: &str, repository: &str) -> Result<i32, SqlError> {
-        let query = r#"
-            WITH max_project AS (
-                SELECT MAX(project_id) AS max_id FROM opsml_project_registry
-            )
-            SELECT COALESCE(
-                (SELECT project_id FROM opsml_project_registry WHERE name = ? AND repository = ?),
-                (SELECT COALESCE(max_id, 0) + 1 FROM max_project)
-            ) AS project_id
-        "#;
+        let query = SqliteQueryHelper::get_project_id_query();
 
-        let project_id: i32 = sqlx::query_scalar(query)
+        let project_id: i32 = sqlx::query_scalar(&query)
             .bind(project_name)
             .bind(repository)
             .fetch_one(&self.pool)
@@ -913,9 +728,7 @@ impl SqlClient for SqliteClient {
     }
 
     async fn insert_run_metric(&self, record: &MetricRecord) -> Result<(), SqlError> {
-        let query = r#"
-            INSERT INTO opsml_run_metrics (run_uid, name, value, step, timestamp)
-            VALUES (?1, ?2, ?3, ?4, ?5)"#;
+        let query = SqliteQueryHelper::get_run_metric_insert_query();
 
         sqlx::query(&query)
             .bind(&record.run_uid)
@@ -935,24 +748,11 @@ impl SqlClient for SqliteClient {
         uid: &str,
         names: Option<&Vec<&str>>,
     ) -> Result<Vec<MetricRecord>, SqlError> {
-        let mut query = format!(
-            "SELECT run_uid, name, value, step, timestamp, date_ts, idx
-            FROM {}
-            WHERE run_uid = ?1",
-            CardSQLTableNames::Metrics
-        );
+        let (query, bindings) = SqliteQueryHelper::get_run_metric_query(names);
+        let mut query_builder = sqlx::query_as::<sqlx::Sqlite, MetricRecord>(&query).bind(uid);
 
-        // loop through names and bind them. First name = and and others are or
-        if names.is_some() {
-            let names = names.unwrap();
-            for (idx, name) in names.iter().enumerate() {
-                if idx == 0 {
-                    query.push_str(format!(" AND (name = {}", name).as_str());
-                } else {
-                    query.push_str(format!(" OR name = {}", name).as_str());
-                }
-            }
-            query.push_str(")");
+        for binding in bindings {
+            query_builder = query_builder.bind(binding);
         }
 
         let records: Vec<MetricRecord> = sqlx::query_as(&query)
@@ -1010,11 +810,7 @@ impl SqlClient for SqliteClient {
     }
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
-        let query = format!(
-            "SELECT * FROM {} WHERE run_uid = ?",
-            CardSQLTableNames::HardwareMetrics
-        );
-
+        let query = SqliteQueryHelper::get_hardware_metric_query();
         let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
             .bind(uid)
             .fetch_all(&self.pool)
