@@ -13,7 +13,7 @@ impl PostgresQueryHelper {
         )
         .to_string()
     }
-    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> String {
+    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -21,20 +21,25 @@ impl PostgresQueryHelper {
             CardSQLTableNames::Parameters
         );
 
-        // loop through names and bind them. First name = and and others are or
-        if names.is_some() {
-            let names = names.unwrap();
-            for (idx, name) in names.iter().enumerate() {
-                if idx == 0 {
-                    query.push_str(format!(" AND (name = {}", name).as_str());
-                } else {
-                    query.push_str(format!(" OR name = {}", name).as_str());
+        let mut bindings: Vec<String> = Vec::new();
+        let mut param_index = 2; // Start from 2 because $1 is used for run_uid
+
+        if let Some(names) = names {
+            if !names.is_empty() {
+                query.push_str(" AND (");
+                for (idx, name) in names.iter().enumerate() {
+                    if idx > 0 {
+                        query.push_str(" OR ");
+                    }
+                    query.push_str(&format!("name = ${}", param_index));
+                    bindings.push(name.to_string());
+                    param_index += 1;
                 }
+                query.push_str(")");
             }
-            query.push_str(")");
         }
 
-        query
+        (query, bindings)
     }
     pub fn get_hardware_metric_insert_query() -> String {
         format!(

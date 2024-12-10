@@ -1063,9 +1063,14 @@ impl SqlClient for MySqlClient {
         uid: &str,
         names: Option<&Vec<&str>>,
     ) -> Result<Vec<ParameterRecord>, SqlError> {
-        let query = MySQLQueryHelper::get_run_parameter_query(names);
-        let records: Vec<ParameterRecord> = sqlx::query_as(&query)
-            .bind(uid)
+        let (query, bindings) = MySQLQueryHelper::get_run_parameter_query(names);
+        let mut query_builder = sqlx::query_as::<_, ParameterRecord>(&query).bind(uid);
+
+        for binding in bindings {
+            query_builder = query_builder.bind(binding);
+        }
+
+        let records: Vec<ParameterRecord> = query_builder
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -1988,10 +1993,10 @@ mod tests {
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
 
         // create a loop of 10
-        for _ in 0..10 {
+        for i in 0..10 {
             let param = ParameterRecord {
                 run_uid: uid.clone(),
-                name: format!("param{}", 1),
+                name: format!("param{}", i),
                 ..Default::default()
             };
 
@@ -2001,6 +2006,13 @@ mod tests {
         let records = client.get_run_parameter(&uid, None).await.unwrap();
 
         assert_eq!(records.len(), 10);
+
+        let records = client
+            .get_run_parameter(&uid, Some(&vec!["param1"]))
+            .await
+            .unwrap();
+
+        assert_eq!(records.len(), 1);
 
         cleanup(&client.pool).await;
     }
