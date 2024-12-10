@@ -1,12 +1,13 @@
 use crate::base::CardSQLTableNames;
 use crate::base::SqlClient;
+use crate::mysql::helper::MySQLQueryHelper;
 use crate::queries::shared::SqlHelper;
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
-    PipelineCardRecord, ProjectCardRecord, RunCardRecord,
+    AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
+    ModelCardRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -728,6 +729,22 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(records)
+    }
+    async fn insert_hardware_metric(
+        &self,
+        metric_record: &HardwareMetricsRecord,
+    ) -> Result<(), SqlError> {
+        let query = MySQLQueryHelper::get_hardware_metic_insert_query();
+
+        sqlx::query(&query)
+            .bind(&metric_record.run_uid)
+            .bind(&metric_record.created_at)
+            .bind(&metric_record.metrics)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 

@@ -1,5 +1,7 @@
 use crate::schemas::arguments::CardQueryArgs;
-use crate::schemas::schema::{Card, CardResults, CardSummary, MetricRecord, QueryStats};
+use crate::schemas::schema::{
+    Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, QueryStats,
+};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
@@ -105,4 +107,15 @@ pub trait SqlClient {
     /// * `Vec<String>` - The names of the metrics
     ///
     async fn get_run_metric_names(&self, uid: &str) -> Result<Vec<String>, SqlError>;
+
+    /// Insert hardware metrics
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_record` - The hardware metrics
+    ///
+    async fn insert_hardware_metric(
+        &self,
+        metric_record: &HardwareMetricsRecord,
+    ) -> Result<(), SqlError>;
 }

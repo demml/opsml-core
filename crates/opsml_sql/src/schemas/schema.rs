@@ -1,5 +1,6 @@
 use opsml_error::error::VersionError;
 use opsml_types::enums::CommonKwargs;
+use opsml_types::types::HardwareMetrics;
 use opsml_utils::utils::{get_utc_date, get_utc_timestamp};
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
@@ -696,4 +697,11 @@ pub enum Card {
     Audit(AuditCardRecord),
     Pipeline(PipelineCardRecord),
     Project(ProjectCardRecord),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct HardwareMetricsRecord {
+    pub run_uid: String,
+    pub created_at: String,
+    pub metrics: Json<HardwareMetrics>,
 }

@@ -10,3 +10,4 @@ doctest = false
 
 [dependencies]
 pyo3 = { workspace = true }
+serde = { workspace = true }

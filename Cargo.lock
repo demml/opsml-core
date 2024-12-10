@@ -2960,6 +2960,7 @@ name = "opsml-types"
 version = "0.1.0"
 dependencies = [
  "pyo3",
+ "serde",
 ]
 
 [[package]]

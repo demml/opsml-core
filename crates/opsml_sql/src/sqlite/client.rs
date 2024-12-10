@@ -5,10 +5,11 @@ use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::Card;
 use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, MetricRecord, ModelCardRecord,
-    PipelineCardRecord, QueryStats, RunCardRecord,
+    AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
+    ModelCardRecord, PipelineCardRecord, QueryStats, RunCardRecord,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
+use crate::sqlite::helper::SqliteQueryHelper;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
@@ -326,9 +327,35 @@ impl SqlClient for SqliteClient {
     }
 
     async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
-        let query = match table {
+        match table {
             CardSQLTableNames::Data => match card {
-                Card::Data(data) => SqlHelper::get_datacard_insert_query(data),
+                Card::Data(data) => {
+                    let query = SqliteQueryHelper::get_datacard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&data.uid)
+                        .bind(&data.date)
+                        .bind(&data.timestamp)
+                        .bind(&data.app_env)
+                        .bind(&data.name)
+                        .bind(&data.repository)
+                        .bind(&data.major)
+                        .bind(&data.minor)
+                        .bind(&data.patch)
+                        .bind(&data.version)
+                        .bind(&data.contact)
+                        .bind(&data.data_type)
+                        .bind(&data.interface_type)
+                        .bind(&data.tags)
+                        .bind(&data.runcard_uid)
+                        .bind(&data.pipelinecard_uid)
+                        .bind(&data.auditcard_uid)
+                        .bind(&data.pre_tag)
+                        .bind(&data.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -336,7 +363,36 @@ impl SqlClient for SqliteClient {
                 }
             },
             CardSQLTableNames::Model => match card {
-                Card::Model(model) => SqlHelper::get_modelcard_insert_query(model),
+                Card::Model(model) => {
+                    let query = SqliteQueryHelper::get_modelcard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&model.uid)
+                        .bind(&model.date)
+                        .bind(&model.timestamp)
+                        .bind(&model.app_env)
+                        .bind(&model.name)
+                        .bind(&model.repository)
+                        .bind(&model.major)
+                        .bind(&model.minor)
+                        .bind(&model.patch)
+                        .bind(&model.version)
+                        .bind(&model.contact)
+                        .bind(&model.datacard_uid)
+                        .bind(&model.sample_data_type)
+                        .bind(&model.model_type)
+                        .bind(&model.interface_type)
+                        .bind(&model.task_type)
+                        .bind(&model.tags)
+                        .bind(&model.runcard_uid)
+                        .bind(&model.pipelinecard_uid)
+                        .bind(&model.auditcard_uid)
+                        .bind(&model.pre_tag)
+                        .bind(&model.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -344,7 +400,34 @@ impl SqlClient for SqliteClient {
                 }
             },
             CardSQLTableNames::Run => match card {
-                Card::Run(run) => SqlHelper::get_runcard_insert_query(run),
+                Card::Run(run) => {
+                    let query = SqliteQueryHelper::get_runcard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&run.uid)
+                        .bind(&run.date)
+                        .bind(&run.timestamp)
+                        .bind(&run.app_env)
+                        .bind(&run.name)
+                        .bind(&run.repository)
+                        .bind(&run.major)
+                        .bind(&run.minor)
+                        .bind(&run.patch)
+                        .bind(&run.version)
+                        .bind(&run.contact)
+                        .bind(&run.project)
+                        .bind(&run.tags)
+                        .bind(&run.datacard_uids)
+                        .bind(&run.modelcard_uids)
+                        .bind(&run.pipelinecard_uid)
+                        .bind(&run.artifact_uris)
+                        .bind(&run.compute_environment)
+                        .bind(&run.pre_tag)
+                        .bind(&run.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -352,7 +435,32 @@ impl SqlClient for SqliteClient {
                 }
             },
             CardSQLTableNames::Audit => match card {
-                Card::Audit(audit) => SqlHelper::get_auditcard_insert_query(audit),
+                Card::Audit(audit) => {
+                    let query = SqliteQueryHelper::get_auditcard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&audit.uid)
+                        .bind(&audit.date)
+                        .bind(&audit.timestamp)
+                        .bind(&audit.app_env)
+                        .bind(&audit.name)
+                        .bind(&audit.repository)
+                        .bind(&audit.major)
+                        .bind(&audit.minor)
+                        .bind(&audit.patch)
+                        .bind(&audit.version)
+                        .bind(&audit.contact)
+                        .bind(&audit.tags)
+                        .bind(&audit.approved)
+                        .bind(&audit.datacard_uids)
+                        .bind(&audit.modelcard_uids)
+                        .bind(&audit.runcard_uids)
+                        .bind(&audit.pre_tag)
+                        .bind(&audit.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -360,7 +468,32 @@ impl SqlClient for SqliteClient {
                 }
             },
             CardSQLTableNames::Pipeline => match card {
-                Card::Pipeline(pipeline) => SqlHelper::get_pipelinecard_insert_query(pipeline),
+                Card::Pipeline(pipeline) => {
+                    let query = SqliteQueryHelper::get_pipelinecard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&pipeline.uid)
+                        .bind(&pipeline.date)
+                        .bind(&pipeline.timestamp)
+                        .bind(&pipeline.app_env)
+                        .bind(&pipeline.name)
+                        .bind(&pipeline.repository)
+                        .bind(&pipeline.major)
+                        .bind(&pipeline.minor)
+                        .bind(&pipeline.patch)
+                        .bind(&pipeline.version)
+                        .bind(&pipeline.contact)
+                        .bind(&pipeline.tags)
+                        .bind(&pipeline.pipeline_code_uri)
+                        .bind(&pipeline.datacard_uids)
+                        .bind(&pipeline.modelcard_uids)
+                        .bind(&pipeline.runcard_uids)
+                        .bind(&pipeline.pre_tag)
+                        .bind(&pipeline.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -368,7 +501,26 @@ impl SqlClient for SqliteClient {
                 }
             },
             CardSQLTableNames::Project => match card {
-                Card::Project(project) => SqlHelper::get_projectcard_insert_query(project),
+                Card::Project(project) => {
+                    let query = SqliteQueryHelper::get_projectcard_insert_query();
+                    sqlx::query(&query)
+                        .bind(&project.date)
+                        .bind(&project.uid)
+                        .bind(&project.name)
+                        .bind(&project.repository)
+                        .bind(&project.project_id)
+                        .bind(&project.major)
+                        .bind(&project.minor)
+                        .bind(&project.patch)
+                        .bind(&project.version)
+                        .bind(&project.timestamp)
+                        .bind(&project.pre_tag)
+                        .bind(&project.build_tag)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+                    Ok(())
+                }
                 _ => {
                     return Err(SqlError::QueryError(
                         "Invalid card type for insert".to_string(),
@@ -381,14 +533,7 @@ impl SqlClient for SqliteClient {
                     "Invalid table name for insert".to_string(),
                 ));
             }
-        };
-
-        sqlx::query(&query)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
-
-        Ok(())
+        }
     }
 
     async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
@@ -716,6 +861,23 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(records)
+    }
+
+    async fn insert_hardware_metric(
+        &self,
+        metric_record: &HardwareMetricsRecord,
+    ) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_hardware_metic_insert_query();
+
+        sqlx::query(&query)
+            .bind(&metric_record.run_uid)
+            .bind(&metric_record.created_at)
+            .bind(&metric_record.metrics)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
     }
 }
 
