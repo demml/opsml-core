@@ -1,17 +1,22 @@
+use crate::base::CardSQLTableNames;
 pub struct PostgresQueryHelper;
 
 impl PostgresQueryHelper {
     pub fn get_hardware_metic_insert_query() -> String {
-        "INSERT INTO opsml_hardware_metrics (
+        format!(
+            "INSERT INTO {} (
         run_uid, 
         created_at, 
         metrics
         ) 
-        VALUES ($1, $2, $3)"
-            .to_string()
+        VALUES ($1, $2, $3)",
+            CardSQLTableNames::HardwareMetrics
+        )
+        .to_string()
     }
     pub fn get_projectcard_insert_query() -> String {
-        "INSERT INTO opsml_project_registry (
+        format!(
+            "INSERT INTO {} (
         date, 
         uid, 
         name, 
@@ -24,12 +29,14 @@ impl PostgresQueryHelper {
         timestamp, 
         pre_tag,
         build_tag) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
-            .to_string()
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+            CardSQLTableNames::Project
+        )
+        .to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        "INSERT INTO opsml_data_registry (
+        format!( "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -50,12 +57,12 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)"
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)", CardSQLTableNames::Data)
         .to_string()
     }
 
     pub fn get_modelcard_insert_query() -> String {
-        "INSERT INTO opsml_model_registry (
+        format!("INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -79,11 +86,11 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)".to_string()
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)", CardSQLTableNames::Model).to_string()
     }
 
     pub fn get_runcard_insert_query() -> String {
-        "INSERT INTO opsml_run_registry (
+        format!("INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -105,12 +112,13 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)"
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)", CardSQLTableNames::Run)
             .to_string()
     }
 
     pub fn get_auditcard_insert_query() -> String {
-        "INSERT INTO opsml_audit_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -130,12 +138,15 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)"
-            .to_string()
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+            CardSQLTableNames::Audit
+        )
+        .to_string()
     }
 
     pub fn get_pipelinecard_insert_query() -> String {
-        "INSERT INTO opsml_pipeline_registry (
+        format!(
+            "INSERT INTO {} (
         uid, 
         date, 
         timestamp, 
@@ -155,12 +166,15 @@ impl PostgresQueryHelper {
          pre_tag, 
          build_tag
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)"
-            .to_string()
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+            CardSQLTableNames::Pipeline
+        )
+        .to_string()
     }
 
     pub fn get_datacard_update_query() -> String {
-        "UPDATE opsml_data_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = $1, 
         timestamp = $2, 
         app_env = $3, 
@@ -179,12 +193,15 @@ impl PostgresQueryHelper {
         auditcard_uid = $16, 
         pre_tag = $17, 
         build_tag = $18 
-        WHERE uid = $19"
-            .to_string()
+        WHERE uid = $19",
+            CardSQLTableNames::Data
+        )
+        .to_string()
     }
 
     pub fn get_modelcard_update_query() -> String {
-        "UPDATE opsml_model_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = $1, 
         timestamp = $2, 
         app_env = $3, 
@@ -206,12 +223,15 @@ impl PostgresQueryHelper {
         auditcard_uid = $19, 
         pre_tag = $20, 
         build_tag = $21 
-        WHERE uid = $22"
-            .to_string()
+        WHERE uid = $22",
+            CardSQLTableNames::Model
+        )
+        .to_string()
     }
 
     pub fn get_runcard_update_query() -> String {
-        "UPDATE opsml_run_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = $1, 
         timestamp = $2, 
         app_env = $3, 
@@ -231,12 +251,15 @@ impl PostgresQueryHelper {
         compute_environment = $17, 
         pre_tag = $18, 
         build_tag = $19 
-        WHERE uid = $20"
-            .to_string()
+        WHERE uid = $20",
+            CardSQLTableNames::Run
+        )
+        .to_string()
     }
 
     pub fn get_auditcard_update_query() -> String {
-        "UPDATE opsml_audit_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = $1, 
         timestamp = $2, 
         app_env = $3, 
@@ -254,12 +277,15 @@ impl PostgresQueryHelper {
         runcard_uids = $15, 
         pre_tag = $16, 
         build_tag = $17 
-        WHERE uid = $18"
-            .to_string()
+        WHERE uid = $18",
+            CardSQLTableNames::Audit
+        )
+        .to_string()
     }
 
     pub fn get_pipelinecard_update_query() -> String {
-        "UPDATE opsml_pipeline_registry SET 
+        format!(
+            "UPDATE {} SET 
         date = $1, 
         timestamp = $2, 
         app_env = $3, 
@@ -277,7 +303,9 @@ impl PostgresQueryHelper {
         runcard_uids = $15, 
         pre_tag = $16, 
         build_tag = $17 
-        WHERE uid = $18"
-            .to_string()
+        WHERE uid = $18",
+            CardSQLTableNames::Pipeline
+        )
+        .to_string()
     }
 }
