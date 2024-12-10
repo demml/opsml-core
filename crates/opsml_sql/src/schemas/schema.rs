@@ -2,9 +2,7 @@ use chrono::NaiveDateTime;
 use chrono::Utc;
 use opsml_error::error::VersionError;
 use opsml_types::enums::CommonKwargs;
-use opsml_types::types::HardwareMetrics;
 use opsml_utils::utils::{get_utc_date, get_utc_timestamp};
-use semver::Op;
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, types::Json};
@@ -711,16 +709,16 @@ pub struct HardwareMetricsRecord {
     pub compute_overall: Option<f64>,
     pub compute_utilized: Option<f64>,
     pub load_avg: f64,
-    pub sys_ram_total: i64,
-    pub sys_ram_used: i64,
-    pub sys_ram_available: i64,
+    pub sys_ram_total: i32,
+    pub sys_ram_used: i32,
+    pub sys_ram_available: i32,
     pub sys_ram_percent_used: f64,
-    pub sys_swap_total: Option<i64>,
-    pub sys_swap_used: Option<i64>,
-    pub sys_swap_free: Option<i64>,
+    pub sys_swap_total: Option<i32>,
+    pub sys_swap_used: Option<i32>,
+    pub sys_swap_free: Option<i32>,
     pub sys_swap_percent: Option<f64>,
-    pub bytes_recv: i64,
-    pub bytes_sent: i64,
+    pub bytes_recv: i32,
+    pub bytes_sent: i32,
     pub gpu_percent_utilization: Option<f64>,
     pub gpu_percent_per_core: Option<Json<Vec<f64>>>,
 }

@@ -990,7 +990,7 @@ impl SqlClient for PostgresClient {
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
         let query = format!(
-            "SELECT run_uid, created_at, metrics FROM {} WHERE run_uid = $1",
+            "SELECT * FROM {} WHERE run_uid = $1",
             CardSQLTableNames::HardwareMetrics
         );
 
