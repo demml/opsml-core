@@ -89,7 +89,7 @@ pub trait SqlClient {
     ///
     /// # Returns
     ///
-    async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError>;
+    async fn insert_run_metric(&self, record: &MetricRecord) -> Result<(), SqlError>;
 
     /// insert run parameter
     ///
@@ -99,7 +99,7 @@ pub trait SqlClient {
     ///
     /// # Returns
     ///
-    async fn insert_run_parameter(&self, card: &ParameterRecord) -> Result<(), SqlError>;
+    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError>;
 
     /// Get run metric
     ///
@@ -152,10 +152,7 @@ pub trait SqlClient {
     ///
     /// * `metric_record` - The hardware metrics
     ///
-    async fn insert_hardware_metric(
-        &self,
-        metric_record: &HardwareMetricsRecord,
-    ) -> Result<(), SqlError>;
+    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError>;
 
     /// Get hardware metrics
     ///

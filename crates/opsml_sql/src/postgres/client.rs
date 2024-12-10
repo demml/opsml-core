@@ -889,17 +889,17 @@ impl SqlClient for PostgresClient {
         Ok(project_id)
     }
 
-    async fn insert_run_metric(&self, card: &MetricRecord) -> Result<(), SqlError> {
+    async fn insert_run_metric(&self, record: &MetricRecord) -> Result<(), SqlError> {
         let query = r#"
             INSERT INTO opsml_run_metrics (run_uid, name, value, step, timestamp)
             VALUES ($1, $2, $3, $4, $5)"#;
 
         sqlx::query(&query)
-            .bind(&card.run_uid)
-            .bind(&card.name)
-            .bind(card.value)
-            .bind(card.step)
-            .bind(card.timestamp)
+            .bind(&record.run_uid)
+            .bind(&record.name)
+            .bind(record.value)
+            .bind(record.step)
+            .bind(record.timestamp)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -955,32 +955,29 @@ impl SqlClient for PostgresClient {
         Ok(records)
     }
 
-    async fn insert_hardware_metric(
-        &self,
-        metric_record: &HardwareMetricsRecord,
-    ) -> Result<(), SqlError> {
+    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError> {
         let query = PostgresQueryHelper::get_hardware_metric_insert_query();
 
         sqlx::query(&query)
-            .bind(&metric_record.run_uid)
-            .bind(&metric_record.created_at)
-            .bind(&metric_record.cpu_percent_utilization)
-            .bind(&metric_record.cpu_percent_per_core)
-            .bind(&metric_record.compute_overall)
-            .bind(&metric_record.compute_utilized)
-            .bind(&metric_record.load_avg)
-            .bind(&metric_record.sys_ram_total)
-            .bind(&metric_record.sys_ram_used)
-            .bind(&metric_record.sys_ram_available)
-            .bind(&metric_record.sys_ram_percent_used)
-            .bind(&metric_record.sys_swap_total)
-            .bind(&metric_record.sys_swap_used)
-            .bind(&metric_record.sys_swap_free)
-            .bind(&metric_record.sys_swap_percent)
-            .bind(&metric_record.bytes_recv)
-            .bind(&metric_record.bytes_sent)
-            .bind(&metric_record.gpu_percent_utilization)
-            .bind(&metric_record.gpu_percent_per_core)
+            .bind(&record.run_uid)
+            .bind(&record.created_at)
+            .bind(&record.cpu_percent_utilization)
+            .bind(&record.cpu_percent_per_core)
+            .bind(&record.compute_overall)
+            .bind(&record.compute_utilized)
+            .bind(&record.load_avg)
+            .bind(&record.sys_ram_total)
+            .bind(&record.sys_ram_used)
+            .bind(&record.sys_ram_available)
+            .bind(&record.sys_ram_percent_used)
+            .bind(&record.sys_swap_total)
+            .bind(&record.sys_swap_used)
+            .bind(&record.sys_swap_free)
+            .bind(&record.sys_swap_percent)
+            .bind(&record.bytes_recv)
+            .bind(&record.bytes_sent)
+            .bind(&record.gpu_percent_utilization)
+            .bind(&record.gpu_percent_per_core)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -1003,13 +1000,13 @@ impl SqlClient for PostgresClient {
         Ok(records)
     }
 
-    async fn insert_run_parameter(&self, card: &ParameterRecord) -> Result<(), SqlError> {
+    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError> {
         let query = PostgresQueryHelper::get_run_parameter_insert_query();
 
         sqlx::query(&query)
-            .bind(&card.run_uid)
-            .bind(&card.name)
-            .bind(&card.value)
+            .bind(&record.run_uid)
+            .bind(&record.name)
+            .bind(&record.value)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -1066,6 +1063,9 @@ mod tests {
 
             DELETE
             FROM opsml_run_hardware_metrics;
+
+            DELETE
+            FROM opsml_run_parameters;
             "#,
         )
         .fetch_all(pool)
@@ -1899,6 +1899,41 @@ mod tests {
         }
 
         let records = client.get_hardware_metric(&uid).await.unwrap();
+
+        assert_eq!(records.len(), 10);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_postgres_parameter() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+        let client = PostgresClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_postgres_test.sql").unwrap();
+        sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
+
+        let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+
+        // create a loop of 10
+        for _ in 0..10 {
+            let param = ParameterRecord {
+                run_uid: uid.clone(),
+                name: format!("param{}", 1),
+                ..Default::default()
+            };
+
+            client.insert_run_parameter(&param).await.unwrap();
+        }
+
+        let records = client.get_run_parameter(&uid, None).await.unwrap();
 
         assert_eq!(records.len(), 10);
 
