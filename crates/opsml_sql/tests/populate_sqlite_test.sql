@@ -25,17 +25,17 @@ INSERT INTO opsml_model_registry (uid, app_env, name, repository, major, minor, 
 ('550e8400-e29b-41d4-a716-446655440009', 'development', 'Model10', 'repo10', 3, 0, 1, 'kappa', 'build10', '1.0.0','contact10', '{}', 'datacard10', 'sample10', 'type10', 'runcard10', 'pipelinecard10', 'auditcard10', 'typeJ', 'task10');
 
 -- Populate opsml_run_registry
-INSERT INTO opsml_run_registry (uid, app_env, name, repository, major, minor, patch, pre_tag, build_tag, version, contact, tags, datacard_uids, modelcard_uids, pipelinecard_uid, project, artifact_uris, compute_environment) VALUES 
-('550e8400-e29b-41d4-a716-446655440000', 'development', 'Run1', 'repo1', 1, 0, 0, 'alpha', 'build1', '0.0.0', 'contact1', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard1', 'project1', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440001', 'development', 'Run2', 'repo2', 1, 0, 1, 'beta', 'build2',  '0.0.0','contact2', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard2', 'project2', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440002', 'development', 'Run3', 'repo3', 1, 1, 0, 'gamma', 'build3', '0.0.0','contact3', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard3', 'project3', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440003', 'development', 'Run4', 'repo4', 1, 1, 1, 'delta', 'build4', '0.0.0','contact4', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard4', 'project4', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440004', 'development', 'Run5', 'repo5', 2, 0, 0, 'epsilon', 'build5', '0.0.0','contact5', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard5', 'project5', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440005', 'development', 'Run6', 'repo6', 2, 0, 1, 'zeta', 'build6', '0.0.0','contact6', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard6', 'project6', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440006', 'development', 'Run7', 'repo7', 2, 1, 0, 'eta', 'build7', '0.0.0','contact7', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard7', 'project7', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440007', 'development', 'Run8', 'repo8', 2, 1, 1, 'theta', 'build8', '0.0.0','contact8', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard8', 'project8', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440008', 'development', 'Run9', 'repo9', 3, 0, 0, 'iota', 'build9', '0.0.0','contact9', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard9', 'project9', '{}', '{}'),
-('550e8400-e29b-41d4-a716-446655440009', 'development', 'Run10', 'repo10', 3, 0, 1, 'kappa', 'build10', '0.0.0','contact10', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard10', 'project10', '{}', '{}');
+INSERT INTO opsml_run_registry (uid, created_at, app_env, name, repository, major, minor, patch, pre_tag, build_tag, version, contact, tags, datacard_uids, modelcard_uids, pipelinecard_uid, project, artifact_uris, compute_environment) VALUES 
+('550e8400-e29b-41d4-a716-446655440000', '2023-11-28 00:00:00', 'development', 'Run1', 'repo1', 1, 0, 0, 'alpha', 'build1', '0.0.0', 'contact1', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard1', 'project1', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440001', '2023-11-28 00:00:00', 'development', 'Run2', 'repo2', 1, 0, 1, 'beta', 'build2',  '0.0.0','contact2', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard2', 'project2', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440002', '2023-11-29 00:00:00', 'development', 'Run3', 'repo3', 1, 1, 0, 'gamma', 'build3', '0.0.0','contact3', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard3', 'project3', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440003', '2023-11-29 00:00:00', 'development', 'Run4', 'repo4', 1, 1, 1, 'delta', 'build4', '0.0.0','contact4', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard4', 'project4', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440004', '2023-11-29 00:00:00', 'development', 'Run5', 'repo5', 2, 0, 0, 'epsilon', 'build5', '0.0.0','contact5', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard5', 'project5', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440005', '2023-11-29 00:00:00', 'development', 'Run6', 'repo6', 2, 0, 1, 'zeta', 'build6', '0.0.0','contact6', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard6', 'project6', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440006', '2023-11-29 00:00:00', 'development', 'Run7', 'repo7', 2, 1, 0, 'eta', 'build7', '0.0.0','contact7', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard7', 'project7', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440007', '2023-11-29 00:00:00', 'development', 'Run8', 'repo8', 2, 1, 1, 'theta', 'build8', '0.0.0','contact8', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard8', 'project8', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440008', '2023-11-29 00:00:00', 'development', 'Run9', 'repo9', 3, 0, 0, 'iota', 'build9', '0.0.0','contact9', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard9', 'project9', '{}', '{}'),
+('550e8400-e29b-41d4-a716-446655440009', '2023-11-29 00:00:00', 'development', 'Run10', 'repo10', 3, 0, 1, 'kappa', 'build10', '0.0.0','contact10', '{}', '["datacard1"]', '["modelcard1"]', 'pipelinecard10', 'project10', '{}', '{}');
 
 -- Populate opsml_audit_registry
 INSERT INTO opsml_audit_registry (uid, app_env, name, repository, major, minor, patch, pre_tag, build_tag, version, contact, tags, approved, datacard_uids, modelcard_uids, runcard_uids) VALUES 

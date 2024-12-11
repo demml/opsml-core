@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     patch INTEGER NOT NULL,
     pre_tag VARCHAR(16),
     build_tag VARCHAR(16),
-    version VARCHAR(64),
+    version VARCHAR(64)
 );
 
 -- MetricSchema

@@ -125,7 +125,7 @@ impl PostgresQueryHelper {
                     repository, 
                     name, 
                     version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_num 
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY created_at DESC) AS row_num 
                 FROM {}
                 WHERE ($1 IS NULL OR repository = $1)
                 AND ($2 IS NULL OR name LIKE $3 OR repository LIKE $3)
@@ -138,8 +138,8 @@ impl PostgresQueryHelper {
                     repository, 
                     name, 
                     COUNT(DISTINCT version) AS versions, 
-                    MAX(timestamp) AS updated_at, 
-                    MIN(timestamp) AS created_at 
+                    MAX(created_at) AS updated_at, 
+                    MIN(created_at) AS created_at 
                 FROM {}
                 WHERE ($1 IS NULL OR repository = $1)
                 AND ($2 IS NULL OR name LIKE $3 OR repository LIKE $3)
@@ -269,7 +269,7 @@ impl PostgresQueryHelper {
             }
 
             if query_args.sort_by_timestamp.unwrap_or(false) {
-                query.push_str(" ORDER BY timestamp DESC");
+                query.push_str(" ORDER BY created_at DESC");
             } else {
                 // sort by major, minor, patch
                 query.push_str(" ORDER BY major DESC, minor DESC, patch DESC");

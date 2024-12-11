@@ -75,7 +75,7 @@ impl MySQLQueryHelper {
                     repository, 
                     name, 
                     version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_num
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY created_at DESC) AS row_num
                 FROM {}
                 WHERE 1=1
                 AND (? IS NULL OR repository = ?)
@@ -89,8 +89,8 @@ impl MySQLQueryHelper {
                     repository, 
                     name, 
                     COUNT(DISTINCT version) AS versions, 
-                    MAX(timestamp) AS updated_at, 
-                    MIN(timestamp) AS created_at 
+                    MAX(created_at) AS updated_at, 
+                    MIN(created_at) AS created_at 
                 FROM {}
                 WHERE 1=1
                 AND (? IS NULL OR repository = ?)
@@ -189,7 +189,7 @@ impl MySQLQueryHelper {
             add_version_bounds(&mut query, version)?;
         }
 
-        query.push_str(" ORDER BY timestamp DESC LIMIT 20;");
+        query.push_str(" ORDER BY created_at DESC LIMIT 20;");
 
         Ok(query)
     }
@@ -310,11 +310,11 @@ impl MySQLQueryHelper {
         .to_string()
     }
     pub fn get_projectcard_insert_query() -> String {
-        "INSERT INTO opsml_project_registry (date, uid, name, repository, project_id, major, minor, patch, version, timestamp, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
+        "INSERT INTO opsml_project_registry (uid, name, repository, project_id, major, minor, patch, version, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        "INSERT INTO opsml_data_registry (uid, date, timestamp, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
+        "INSERT INTO opsml_data_registry (uid, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
     }
 
     pub fn get_modelcard_insert_query() -> String {
