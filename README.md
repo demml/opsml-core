@@ -1,3 +1,5 @@
 # OpsML-Core
 
-## Core logic for the OpsML library
+## Coming Soon
+
+### Core logic, written in Rust, for the OpsML library
