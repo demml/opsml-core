@@ -50,6 +50,7 @@ impl FromRow<'_, MySqlRow> for User {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MySqlClient {
     pub pool: Pool<MySql>,
 }

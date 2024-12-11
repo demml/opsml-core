@@ -51,6 +51,7 @@ impl FromRow<'_, PgRow> for User {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PostgresClient {
     pub pool: Pool<Postgres>,
 }

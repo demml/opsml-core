@@ -21,9 +21,6 @@ use sqlx::{
     FromRow, Pool, Row, Sqlite,
 };
 use tracing::info;
-pub struct SqliteClient {
-    pub pool: Pool<Sqlite>,
-}
 
 impl FromRow<'_, SqliteRow> for User {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
@@ -51,6 +48,11 @@ impl FromRow<'_, SqliteRow> for User {
             group_permissions,
         })
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct SqliteClient {
+    pub pool: Pool<Sqlite>,
 }
 
 #[async_trait]

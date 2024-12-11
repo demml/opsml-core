@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::{OpsmlDatabaseSettings, SqlType};
 
+#[derive(Debug, Clone)]
 pub enum SqlClientEnum {
     Postgres(PostgresClient),
     Sqlite(SqliteClient),
