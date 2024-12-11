@@ -168,3 +168,11 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     gpu_percent_per_core JSONB,
     idx SERIAL PRIMARY KEY
 );
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    permissions JSONB NOT NULL,
+    group_permissions JSONB NOT NULL
+);

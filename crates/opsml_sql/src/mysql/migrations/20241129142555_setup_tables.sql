@@ -171,3 +171,11 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     gpu_percent_per_core JSON, -- MySQL uses JSON instead of JSONB
     idx INT AUTO_INCREMENT PRIMARY KEY -- MySQL uses AUTO_INCREMENT instead of SERIAL
 );
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    permissions JSON NOT NULL,
+    group_permissions JSON NOT NULL
+);

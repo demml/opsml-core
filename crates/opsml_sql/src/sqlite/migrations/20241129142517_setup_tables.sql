@@ -171,3 +171,11 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     gpu_percent_per_core TEXT, -- JSONB is not supported in SQLite, use TEXT to store JSON strings
     idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    permissions TEXT NOT NULL,
+    group_permissions TEXT NOT NULL
+);
