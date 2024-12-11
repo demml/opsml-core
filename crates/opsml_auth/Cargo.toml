@@ -8,4 +8,5 @@ repository = { workspace = true }
 doctest = false
 
 [dependencies]
+axum-login = { workspace = true }
 opsml-sql = { workspace = true }
