@@ -7,7 +7,7 @@ use crate::postgres::helper::PostgresQueryHelper;
 use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord, User,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
@@ -801,6 +801,33 @@ impl SqlClient for PostgresClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(records)
+    }
+
+    async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
+        let query = PostgresQueryHelper::get_user_insert_query();
+
+        sqlx::query(&query)
+            .bind(&user.username)
+            .bind(&user.password_hash)
+            .bind(&user.permissions)
+            .bind(&user.group_permissions)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_user(&self, username: &str) -> Result<User, SqlError> {
+        let query = PostgresQueryHelper::get_user_query();
+
+        let user: User = sqlx::query_as(&query)
+            .bind(username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(user)
     }
 }
 
@@ -1717,6 +1744,26 @@ mod tests {
             .unwrap();
 
         assert_eq!(param_records.len(), 1);
+
+        cleanup(&client.pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_postgres_user() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: env::var("OPSML_TRACKING_URI")
+                .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
+            max_connections: 1,
+            sql_type: SqlType::Postgres,
+        };
+        let client = PostgresClient::new(&config).await;
+        cleanup(&client.pool).await;
+
+        let user = User::new("user".to_string(), "pass".to_string(), None, None);
+        client.insert_user(&user).await.unwrap();
+
+        let user = client.get_user("user").await.unwrap();
+        assert_eq!(user.username, "user");
 
         cleanup(&client.pool).await;
     }

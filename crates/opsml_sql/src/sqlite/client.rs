@@ -5,7 +5,7 @@ use crate::schemas::schema::Card;
 use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
     AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, RunCardRecord,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, RunCardRecord, User,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use crate::sqlite::helper::SqliteQueryHelper;
@@ -829,6 +829,33 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         Ok(records)
+    }
+
+    async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_user_insert_query();
+
+        sqlx::query(&query)
+            .bind(&user.username)
+            .bind(&user.password_hash)
+            .bind(&user.permissions)
+            .bind(&user.group_permissions)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_user(&self, username: &str) -> Result<User, SqlError> {
+        let query = SqliteQueryHelper::get_user_query();
+
+        let user: User = sqlx::query_as(&query)
+            .bind(username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(user)
     }
 }
 
@@ -1708,6 +1735,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(param_records.len(), 1);
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_user() {
+        cleanup();
+
+        let config = OpsmlDatabaseSettings {
+            connection_uri: "sqlite:./test.db".to_string(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqliteClient::new(&config).await;
+
+        let user = User::new("user".to_string(), "pass".to_string(), None, None);
+        client.insert_user(&user).await.unwrap();
+
+        let user = client.get_user("user").await.unwrap();
+        assert_eq!(user.username, "user");
 
         cleanup();
     }

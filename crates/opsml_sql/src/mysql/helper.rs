@@ -5,6 +5,21 @@ use opsml_utils::utils::is_valid_uuid4;
 pub struct MySQLQueryHelper;
 
 impl MySQLQueryHelper {
+    pub fn get_user_insert_query() -> String {
+        format!(
+            "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
+
+    pub fn get_user_query() -> String {
+        format!(
+            "SELECT id, username, password_hash, permissions, group_permissions FROM {} WHERE username = ?",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
     pub fn get_hardware_metric_query() -> String {
         let query = format!(
             "SELECT * FROM {} WHERE run_uid = ?",

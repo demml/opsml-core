@@ -757,11 +757,28 @@ impl Default for HardwareMetricsRecord {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct User {
-    pub id: i32,
+    pub id: Option<i32>,
     pub username: String,
     pub password_hash: String,
-    pub permissions: Vec<String>,
-    pub group_permissions: Vec<String>,
+    pub permissions: Json<Vec<String>>,
+    pub group_permissions: Json<Vec<String>>,
+}
+
+impl User {
+    pub fn new(
+        username: String,
+        password_hash: String,
+        permissions: Option<Vec<String>>,
+        group_permissions: Option<Vec<String>>,
+    ) -> Self {
+        User {
+            id: None,
+            username,
+            password_hash,
+            permissions: Json(permissions.unwrap_or(vec!["read".to_string()])),
+            group_permissions: Json(group_permissions.unwrap_or(vec!["user".to_string()])),
+        }
+    }
 }

@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     idx INT AUTO_INCREMENT PRIMARY KEY -- MySQL uses AUTO_INCREMENT instead of SERIAL
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS opsml_users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,

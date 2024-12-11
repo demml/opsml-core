@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
     idx SERIAL PRIMARY KEY
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS opsml_users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,

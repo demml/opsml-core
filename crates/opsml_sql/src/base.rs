@@ -1,7 +1,7 @@
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::{
     Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
-    QueryStats,
+    QueryStats, User,
 };
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
@@ -18,6 +18,7 @@ pub enum CardSQLTableNames {
     Metrics,
     HardwareMetrics,
     Parameters,
+    Users,
 }
 
 impl fmt::Display for CardSQLTableNames {
@@ -32,6 +33,7 @@ impl fmt::Display for CardSQLTableNames {
             CardSQLTableNames::Metrics => "opsml_run_metrics",
             CardSQLTableNames::HardwareMetrics => "opsml_run_hardware_metrics",
             CardSQLTableNames::Parameters => "opsml_run_parameters",
+            CardSQLTableNames::Users => "opsml_users",
         };
         write!(f, "{}", table_name)
     }
@@ -212,4 +214,8 @@ pub trait SqlClient {
     /// * `HardwareMetricsRecord` - The hardware metrics
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError>;
+
+    async fn insert_user(&self, user: &User) -> Result<(), SqlError>;
+
+    async fn get_user(&self, username: &str) -> Result<User, SqlError>;
 }

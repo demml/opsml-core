@@ -54,6 +54,22 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
 pub struct PostgresQueryHelper;
 
 impl PostgresQueryHelper {
+    pub fn get_user_insert_query() -> String {
+        format!(
+            "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES ($1, $2, $3, $4)",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
+
+    pub fn get_user_query() -> String {
+        format!(
+            "SELECT id, username, password_hash, permissions, group_permissions FROM {} WHERE username = $1",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
+
     pub fn get_hardware_metric_query() -> String {
         let query = format!(
             "SELECT * FROM {} WHERE run_uid = $1",
