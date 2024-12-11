@@ -27,10 +27,10 @@ use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 
-/// Notes:
-/// For general compatibility with the Pyo3, Rust and generics, we need to define structs with sync in mind.
-/// Thus, some structs and functions will need to spawn a new runtime to run async functions from a sync context.
-/// This is handled at the 3rd-party abstraction level, so the user does not need to worry about it.
+// Notes:
+// For general compatibility with the Pyo3, Rust and generics, we need to define structs with sync in mind.
+// Thus, some structs and functions will need to spawn a new runtime to run async functions from a sync context.
+// This is handled at the 3rd-party abstraction level, so the user does not need to worry about it.
 
 pub struct AWSCreds {
     pub config: SdkConfig,
@@ -125,7 +125,6 @@ impl AWSMulitPartUpload {
 
     /// Generate a presigned url for a part in the multipart upload
     /// This needs to be a non-self method because it is called from both client or server
-
     pub async fn upload_part_with_presigned_url(
         &mut self,
         part_number: &i32,

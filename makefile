@@ -2,6 +2,10 @@
 test.sql.sqlite:
 	cargo test -p opsml-sql test_sqlite -- --nocapture --test-threads=1
 
+.PHONY: test.sql.enum
+test.sql.enum:
+	cargo test -p opsml-sql test_enum -- --nocapture --test-threads=1
+
 .PHONY: test.sql.postgres
 test.sql.postgres:
 	cargo test -p opsml-sql test_postgres -- --nocapture --test-threads=1
