@@ -6,3 +6,6 @@ repository = { workspace = true }
 
 [lib]
 doctest = false
+
+[dependencies]
+opsml-sql = { workspace = true }
