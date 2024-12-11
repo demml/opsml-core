@@ -168,8 +168,7 @@ impl MySQLQueryHelper {
         let mut query = format!(
             "
             SELECT
-             date, 
-             timestamp, 
+             created_at, 
              name, 
              repository, 
              major, minor, 
@@ -206,7 +205,7 @@ impl MySQLQueryHelper {
         AND (? IS NULL OR uid = ?)
         AND (? IS NULL OR name = ?)
         AND (? IS NULL OR repository = ?)
-        AND (? IS NULL OR DATE(date) <= STR_TO_DATE(?, '%Y-%m-%d'))
+        AND (? IS NULL OR created_at <= STR_TO_DATE(?, '%Y-%m-%d'))
         ",
             table
         );
@@ -233,7 +232,7 @@ impl MySQLQueryHelper {
             }
 
             if query_args.sort_by_timestamp.unwrap_or(false) {
-                query.push_str(" ORDER BY timestamp DESC");
+                query.push_str(" ORDER BY created_at DESC");
             } else {
                 // sort by major, minor, patch
                 query.push_str(" ORDER BY major DESC, minor DESC, patch DESC");
@@ -321,8 +320,6 @@ impl MySQLQueryHelper {
     pub fn get_modelcard_insert_query() -> String {
         "INSERT INTO opsml_model_registry (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -343,15 +340,13 @@ impl MySQLQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             .to_string()
     }
 
     pub fn get_runcard_insert_query() -> String {
         "INSERT INTO opsml_run_registry (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -370,15 +365,13 @@ impl MySQLQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             .to_string()
     }
 
     pub fn get_auditcard_insert_query() -> String {
         "INSERT INTO opsml_audit_registry (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -395,15 +388,13 @@ impl MySQLQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             .to_string()
     }
 
     pub fn get_pipelinecard_insert_query() -> String {
         "INSERT INTO opsml_pipeline_registry (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -420,14 +411,12 @@ impl MySQLQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             .to_string()
     }
 
     pub fn get_datacard_update_query() -> String {
         "UPDATE opsml_data_registry SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -450,8 +439,6 @@ impl MySQLQueryHelper {
 
     pub fn get_modelcard_update_query() -> String {
         "UPDATE opsml_model_registry SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -477,8 +464,6 @@ impl MySQLQueryHelper {
 
     pub fn get_runcard_update_query() -> String {
         "UPDATE opsml_run_registry SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -502,8 +487,6 @@ impl MySQLQueryHelper {
 
     pub fn get_auditcard_update_query() -> String {
         "UPDATE opsml_audit_registry SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -525,8 +508,6 @@ impl MySQLQueryHelper {
 
     pub fn get_pipelinecard_update_query() -> String {
         "UPDATE opsml_pipeline_registry SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 

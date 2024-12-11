@@ -233,8 +233,6 @@ impl SqlClient for MySqlClient {
                     let query = MySQLQueryHelper::get_datacard_insert_query();
                     sqlx::query(&query)
                         .bind(&data.uid)
-                        .bind(&data.date)
-                        .bind(&data.timestamp)
                         .bind(&data.app_env)
                         .bind(&data.name)
                         .bind(&data.repository)
@@ -267,8 +265,6 @@ impl SqlClient for MySqlClient {
                     let query = MySQLQueryHelper::get_modelcard_insert_query();
                     sqlx::query(&query)
                         .bind(&model.uid)
-                        .bind(&model.date)
-                        .bind(&model.timestamp)
                         .bind(&model.app_env)
                         .bind(&model.name)
                         .bind(&model.repository)
@@ -304,8 +300,6 @@ impl SqlClient for MySqlClient {
                     let query = MySQLQueryHelper::get_runcard_insert_query();
                     sqlx::query(&query)
                         .bind(&run.uid)
-                        .bind(&run.date)
-                        .bind(&run.timestamp)
                         .bind(&run.app_env)
                         .bind(&run.name)
                         .bind(&run.repository)
@@ -339,8 +333,6 @@ impl SqlClient for MySqlClient {
                     let query = MySQLQueryHelper::get_auditcard_insert_query();
                     sqlx::query(&query)
                         .bind(&audit.uid)
-                        .bind(&audit.date)
-                        .bind(&audit.timestamp)
                         .bind(&audit.app_env)
                         .bind(&audit.name)
                         .bind(&audit.repository)
@@ -372,8 +364,6 @@ impl SqlClient for MySqlClient {
                     let query = MySQLQueryHelper::get_pipelinecard_insert_query();
                     sqlx::query(&query)
                         .bind(&pipeline.uid)
-                        .bind(&pipeline.date)
-                        .bind(&pipeline.timestamp)
                         .bind(&pipeline.app_env)
                         .bind(&pipeline.name)
                         .bind(&pipeline.repository)
@@ -404,7 +394,6 @@ impl SqlClient for MySqlClient {
                 Card::Project(project) => {
                     let query = MySQLQueryHelper::get_projectcard_insert_query();
                     sqlx::query(&query)
-                        .bind(&project.date)
                         .bind(&project.uid)
                         .bind(&project.name)
                         .bind(&project.repository)
@@ -413,7 +402,6 @@ impl SqlClient for MySqlClient {
                         .bind(&project.minor)
                         .bind(&project.patch)
                         .bind(&project.version)
-                        .bind(&project.timestamp)
                         .bind(&project.pre_tag)
                         .bind(&project.build_tag)
                         .execute(&self.pool)
@@ -442,8 +430,6 @@ impl SqlClient for MySqlClient {
                 Card::Data(data) => {
                     let query = MySQLQueryHelper::get_datacard_update_query();
                     sqlx::query(&query)
-                        .bind(&data.date)
-                        .bind(&data.timestamp)
                         .bind(&data.app_env)
                         .bind(&data.name)
                         .bind(&data.repository)
@@ -476,8 +462,6 @@ impl SqlClient for MySqlClient {
                 Card::Model(model) => {
                     let query = MySQLQueryHelper::get_modelcard_update_query();
                     sqlx::query(&query)
-                        .bind(&model.date)
-                        .bind(&model.timestamp)
                         .bind(&model.app_env)
                         .bind(&model.name)
                         .bind(&model.repository)
@@ -513,8 +497,6 @@ impl SqlClient for MySqlClient {
                 Card::Run(run) => {
                     let query = MySQLQueryHelper::get_runcard_update_query();
                     sqlx::query(&query)
-                        .bind(&run.date)
-                        .bind(&run.timestamp)
                         .bind(&run.app_env)
                         .bind(&run.name)
                         .bind(&run.repository)
@@ -548,8 +530,6 @@ impl SqlClient for MySqlClient {
                 Card::Audit(audit) => {
                     let query = MySQLQueryHelper::get_auditcard_update_query();
                     sqlx::query(&query)
-                        .bind(&audit.date)
-                        .bind(&audit.timestamp)
                         .bind(&audit.app_env)
                         .bind(&audit.name)
                         .bind(&audit.repository)
@@ -581,8 +561,6 @@ impl SqlClient for MySqlClient {
                 Card::Pipeline(pipeline) => {
                     let query = MySQLQueryHelper::get_pipelinecard_update_query();
                     sqlx::query(&query)
-                        .bind(&pipeline.date)
-                        .bind(&pipeline.timestamp)
                         .bind(&pipeline.app_env)
                         .bind(&pipeline.name)
                         .bind(&pipeline.repository)
@@ -1744,7 +1722,7 @@ mod tests {
         for _ in 0..10 {
             let metric = HardwareMetricsRecord {
                 run_uid: uid.clone(),
-                created_at: get_utc_datetime(),
+                created_at: Some(get_utc_datetime()),
                 ..Default::default()
             };
 

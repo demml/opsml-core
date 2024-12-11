@@ -4,8 +4,7 @@
 -- DataSchema
 CREATE TABLE IF NOT EXISTS opsml_data_registry (
     uid TEXT PRIMARY KEY,
-    date TEXT,
-    timestamp INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env TEXT DEFAULT 'development',
     name TEXT,
     repository TEXT,
@@ -27,8 +26,7 @@ CREATE TABLE IF NOT EXISTS opsml_data_registry (
 -- ModelSchema
 CREATE TABLE IF NOT EXISTS opsml_model_registry (
     uid TEXT PRIMARY KEY,
-    date TEXT,
-    timestamp INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env TEXT DEFAULT 'development',
     name TEXT,
     repository TEXT,
@@ -53,8 +51,7 @@ CREATE TABLE IF NOT EXISTS opsml_model_registry (
 -- RunSchema
 CREATE TABLE IF NOT EXISTS opsml_run_registry (
     uid TEXT PRIMARY KEY,
-    date TEXT,
-    timestamp INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env TEXT DEFAULT 'development',
     name TEXT,
     repository TEXT,
@@ -77,8 +74,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_registry (
 -- AuditSchema
 CREATE TABLE IF NOT EXISTS opsml_audit_registry (
     uid TEXT PRIMARY KEY,
-    date TEXT,
-    timestamp INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env TEXT DEFAULT 'development',
     name TEXT,
     repository TEXT,
@@ -99,8 +95,7 @@ CREATE TABLE IF NOT EXISTS opsml_audit_registry (
 -- PipelineSchema
 CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
     uid TEXT PRIMARY KEY,
-    date TEXT,
-    timestamp INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env TEXT DEFAULT 'development',
     name TEXT,
     repository TEXT,
@@ -120,7 +115,7 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
 
 -- ProjectSchema
 CREATE TABLE IF NOT EXISTS opsml_project_registry (
-    date TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     uid TEXT,
     name TEXT,
     repository TEXT,
@@ -131,7 +126,6 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     pre_tag VARCHAR(16),
     build_tag VARCHAR(16),
     version VARCHAR(64),
-    timestamp INTEGER
 );
 
 -- MetricSchema
@@ -141,7 +135,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_metrics (
     value REAL,
     step INTEGER,
     timestamp INTEGER,
-    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
@@ -150,7 +144,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
     run_uid TEXT,
     name TEXT,
     value TEXT,
-    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx INTEGER PRIMARY KEY AUTOINCREMENT
 );
 

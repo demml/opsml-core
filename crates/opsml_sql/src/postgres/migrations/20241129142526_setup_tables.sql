@@ -1,8 +1,7 @@
 -- DataSchema
 CREATE TABLE IF NOT EXISTS opsml_data_registry (
     uid VARCHAR(64) PRIMARY KEY,
-    date VARCHAR(32),
-    timestamp BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -24,8 +23,7 @@ CREATE TABLE IF NOT EXISTS opsml_data_registry (
 -- ModelSchema
 CREATE TABLE IF NOT EXISTS opsml_model_registry (
     uid VARCHAR(64) PRIMARY KEY,
-    date VARCHAR(32),
-    timestamp BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -50,8 +48,7 @@ CREATE TABLE IF NOT EXISTS opsml_model_registry (
 -- RunSchema
 CREATE TABLE IF NOT EXISTS opsml_run_registry (
     uid VARCHAR(64) PRIMARY KEY,
-    date VARCHAR(32),
-    timestamp BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -74,8 +71,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_registry (
 -- AuditSchema
 CREATE TABLE IF NOT EXISTS opsml_audit_registry (
     uid VARCHAR(64) PRIMARY KEY,
-    date VARCHAR(32),
-    timestamp BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -96,8 +92,7 @@ CREATE TABLE IF NOT EXISTS opsml_audit_registry (
 -- PipelineSchema
 CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
     uid VARCHAR(64) PRIMARY KEY,
-    date VARCHAR(32),
-    timestamp BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     app_env VARCHAR(32) DEFAULT 'development',
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -117,7 +112,7 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
 
 -- ProjectSchema
 CREATE TABLE IF NOT EXISTS opsml_project_registry (
-    date VARCHAR(32),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     uid VARCHAR(64),
     name VARCHAR(128),
     repository VARCHAR(128),
@@ -128,7 +123,6 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     pre_tag VARCHAR(16),
     build_tag VARCHAR(16),
     version VARCHAR(64),
-    timestamp BIGINT
 );
 
 -- MetricSchema
@@ -138,7 +132,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_metrics (
     value FLOAT,
     step INT,
     timestamp BIGINT,
-    date_ts VARCHAR(64) DEFAULT (CURRENT_TIMESTAMP),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx SERIAL PRIMARY KEY
 );
 
@@ -147,7 +141,7 @@ CREATE TABLE IF NOT EXISTS opsml_run_parameters (
     run_uid VARCHAR(64),
     name VARCHAR(128),
     value VARCHAR(128),
-    date_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     idx SERIAL PRIMARY KEY
 );
 

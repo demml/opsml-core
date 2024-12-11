@@ -1,8 +1,7 @@
 use chrono::NaiveDateTime;
-use chrono::Utc;
 use opsml_error::error::VersionError;
 use opsml_types::enums::CommonKwargs;
-use opsml_utils::utils::{get_utc_date, get_utc_timestamp};
+use opsml_utils::utils::{get_utc_date, get_utc_datetime};
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, types::Json};
@@ -46,7 +45,7 @@ pub struct ParameterRecord {
     pub run_uid: String,
     pub name: String,
     pub value: String,
-    pub date_ts: Option<NaiveDateTime>,
+    pub created_at: Option<NaiveDateTime>,
     pub idx: Option<i32>,
 }
 
@@ -56,7 +55,7 @@ impl ParameterRecord {
             run_uid,
             name,
             value,
-            date_ts: None,
+            created_at: None,
             idx: None,
         }
     }
@@ -68,7 +67,7 @@ impl Default for ParameterRecord {
             run_uid: Uuid::new_v4().to_string(),
             name: CommonKwargs::Undefined.as_string().to_string(),
             value: CommonKwargs::Undefined.as_string().to_string(),
-            date_ts: None,
+            created_at: None,
             idx: None,
         }
     }
@@ -76,8 +75,7 @@ impl Default for ParameterRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct VersionResult {
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub name: String,
     pub repository: String,
     pub major: i32,
@@ -131,8 +129,7 @@ pub struct CardSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DataCardRecord {
     pub uid: String,
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub app_env: String,
     pub name: String,
     pub repository: String,
@@ -165,15 +162,13 @@ impl DataCardRecord {
         auditcard_uid: Option<String>,
         interface_type: Option<String>,
     ) -> Self {
-        let date = get_utc_date();
-        let timestamp = get_utc_timestamp();
+        let created_at = Some(get_utc_datetime());
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
         let uid = Uuid::new_v4().to_string();
 
         DataCardRecord {
             uid,
-            date,
-            timestamp,
+            created_at,
             app_env,
             name,
             repository,
@@ -202,8 +197,7 @@ impl Default for DataCardRecord {
     fn default() -> Self {
         DataCardRecord {
             uid: Uuid::new_v4().to_string(),
-            date: get_utc_date(),
-            timestamp: get_utc_timestamp(),
+            created_at: Some(get_utc_datetime()),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -227,8 +221,7 @@ impl Default for DataCardRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ModelCardRecord {
     pub uid: String,
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub app_env: String,
     pub name: String,
     pub repository: String,
@@ -267,15 +260,13 @@ impl ModelCardRecord {
         interface_type: Option<String>,
         task_type: Option<String>,
     ) -> Self {
-        let date = get_utc_date();
-        let timestamp = get_utc_timestamp();
+        let created_at = Some(get_utc_datetime());
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
         let uid = Uuid::new_v4().to_string();
 
         ModelCardRecord {
             uid,
-            date,
-            timestamp,
+            created_at,
             app_env,
             name,
             repository,
@@ -308,8 +299,7 @@ impl Default for ModelCardRecord {
     fn default() -> Self {
         ModelCardRecord {
             uid: Uuid::new_v4().to_string(),
-            date: get_utc_date(),
-            timestamp: get_utc_timestamp(),
+            created_at: Some(get_utc_datetime()),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -336,8 +326,7 @@ impl Default for ModelCardRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct RunCardRecord {
     pub uid: String,
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub app_env: String,
     pub name: String,
     pub repository: String,
@@ -361,8 +350,7 @@ impl Default for RunCardRecord {
     fn default() -> Self {
         RunCardRecord {
             uid: Uuid::new_v4().to_string(),
-            date: get_utc_date(),
-            timestamp: get_utc_timestamp(),
+            created_at: Some(get_utc_datetime()),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -399,15 +387,13 @@ impl RunCardRecord {
         artifact_uris: Option<HashMap<String, String>>,
         compute_environment: Option<HashMap<String, String>>,
     ) -> Self {
-        let date = get_utc_date();
-        let timestamp = get_utc_timestamp();
+        let created_at = Some(get_utc_datetime());
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
         let uid = Uuid::new_v4().to_string();
 
         RunCardRecord {
             uid,
-            date,
-            timestamp,
+            created_at,
             app_env,
             name,
             repository,
@@ -433,8 +419,7 @@ impl RunCardRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct AuditCardRecord {
     pub uid: String,
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub app_env: String,
     pub name: String,
     pub repository: String,
@@ -465,15 +450,13 @@ impl AuditCardRecord {
         modelcard_uids: Option<Vec<String>>,
         runcard_uids: Option<Vec<String>>,
     ) -> Self {
-        let date = get_utc_date();
-        let timestamp = get_utc_timestamp();
+        let created_at = Some(get_utc_datetime());
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
         let uid = Uuid::new_v4().to_string();
 
         AuditCardRecord {
             uid,
-            date,
-            timestamp,
+            created_at,
             app_env,
             name,
             repository,
@@ -497,8 +480,7 @@ impl Default for AuditCardRecord {
     fn default() -> Self {
         AuditCardRecord {
             uid: Uuid::new_v4().to_string(),
-            date: get_utc_date(),
-            timestamp: get_utc_timestamp(),
+            created_at: Some(get_utc_datetime()),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -521,8 +503,7 @@ impl Default for AuditCardRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PipelineCardRecord {
     pub uid: String,
-    pub date: String,
-    pub timestamp: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub app_env: String,
     pub name: String,
     pub repository: String,
@@ -553,15 +534,13 @@ impl PipelineCardRecord {
         modelcard_uids: Option<Vec<String>>,
         runcard_uids: Option<Vec<String>>,
     ) -> Self {
-        let date = get_utc_date();
-        let timestamp = get_utc_timestamp();
+        let created_at = Some(get_utc_datetime());
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
         let uid = Uuid::new_v4().to_string();
 
         PipelineCardRecord {
             uid,
-            date,
-            timestamp,
+            created_at,
             app_env,
             name,
             repository,
@@ -585,8 +564,7 @@ impl Default for PipelineCardRecord {
     fn default() -> Self {
         PipelineCardRecord {
             uid: Uuid::new_v4().to_string(),
-            date: get_utc_date(),
-            timestamp: get_utc_timestamp(),
+            created_at: Some(get_utc_datetime()),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
@@ -608,8 +586,8 @@ impl Default for PipelineCardRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ProjectCardRecord {
-    pub date: String,
     pub uid: String,
+    pub created_at: Option<NaiveDateTime>,
     pub name: String,
     pub repository: String,
     pub project_id: i32,
@@ -619,14 +597,13 @@ pub struct ProjectCardRecord {
     pub pre_tag: Option<String>,
     pub build_tag: Option<String>,
     pub version: String,
-    pub timestamp: i64,
 }
 
 impl Default for ProjectCardRecord {
     fn default() -> Self {
         ProjectCardRecord {
-            date: get_utc_date(),
             uid: Uuid::new_v4().to_string(),
+            created_at: Some(get_utc_datetime()),
             name: CommonKwargs::Undefined.as_string().to_string(),
             repository: CommonKwargs::Undefined.as_string().to_string(),
             project_id: 1,
@@ -636,7 +613,6 @@ impl Default for ProjectCardRecord {
             pre_tag: None,
             build_tag: None,
             version: Version::new(1, 0, 0).to_string(),
-            timestamp: get_utc_timestamp(),
         }
     }
 }
@@ -644,8 +620,8 @@ impl Default for ProjectCardRecord {
 impl ProjectCardRecord {
     pub fn new(name: String, repository: String, version: Version, project_id: i32) -> Self {
         ProjectCardRecord {
-            date: get_utc_date(),
             uid: Uuid::new_v4().to_string(),
+            created_at: Some(get_utc_datetime()),
             name,
             repository,
             project_id,
@@ -655,7 +631,6 @@ impl ProjectCardRecord {
             pre_tag: version.pre.to_string().parse().ok(),
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
-            timestamp: get_utc_timestamp(),
         }
     }
 }
@@ -736,7 +711,7 @@ pub enum Card {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct HardwareMetricsRecord {
     pub run_uid: String,
-    pub created_at: NaiveDateTime,
+    pub created_at: Option<NaiveDateTime>,
     pub cpu_percent_utilization: f64,
     pub cpu_percent_per_core: Option<Json<Vec<f64>>>,
     pub compute_overall: Option<f64>,
@@ -760,7 +735,7 @@ impl Default for HardwareMetricsRecord {
     fn default() -> Self {
         HardwareMetricsRecord {
             run_uid: Uuid::new_v4().to_string(),
-            created_at: Utc::now().naive_utc(),
+            created_at: Some(get_utc_datetime()),
             cpu_percent_utilization: 0.0,
             cpu_percent_per_core: None,
             compute_overall: None,

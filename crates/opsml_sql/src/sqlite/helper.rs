@@ -160,8 +160,7 @@ impl SqliteQueryHelper {
         let mut query = format!(
             "
             SELECT
-             date, 
-             timestamp, 
+             created_at,
              name, 
              repository, 
              major, minor, 
@@ -182,7 +181,7 @@ impl SqliteQueryHelper {
             add_version_bounds(&mut query, version)?;
         }
 
-        query.push_str(" ORDER BY timestamp DESC LIMIT 20;");
+        query.push_str(" ORDER BY created_at DESC LIMIT 20;");
 
         Ok(query)
     }
@@ -278,7 +277,6 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
                 run_uid, 
-                created_at, 
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -296,19 +294,19 @@ impl SqliteQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::HardwareMetrics
         )
         .to_string()
     }
 
     pub fn get_projectcard_insert_query() -> String {
-        format!("INSERT INTO {} (date, uid, name, repository, project_id, major, minor, patch, version, timestamp, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Project)
+        format!("INSERT INTO {} (uid, name, repository, project_id, major, minor, patch, version, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Project)
             .to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        format!("INSERT INTO {} (uid, date, timestamp, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Data)
+        format!("INSERT INTO {} (uid, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Data)
             .to_string()
     }
 
@@ -316,8 +314,6 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -338,7 +334,7 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::Model
         )
         .to_string()
@@ -348,8 +344,6 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -368,7 +362,7 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::Run
         )
         .to_string()
@@ -378,8 +372,6 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -396,7 +388,7 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::Audit
         )
         .to_string()
@@ -406,8 +398,6 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -424,7 +414,7 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::Pipeline
         )
         .to_string()
@@ -433,8 +423,6 @@ impl SqliteQueryHelper {
     pub fn get_datacard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -460,8 +448,6 @@ impl SqliteQueryHelper {
     pub fn get_modelcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -490,8 +476,6 @@ impl SqliteQueryHelper {
     pub fn get_runcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -518,8 +502,6 @@ impl SqliteQueryHelper {
     pub fn get_auditcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = ?, 
-        timestamp = ?, 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -543,9 +525,7 @@ impl SqliteQueryHelper {
 
     pub fn get_pipelinecard_update_query() -> String {
         format!(
-            "UPDATE {} SET 
-        date = ?, 
-        timestamp = ?, 
+            "UPDATE {} SET  
         app_env = ?, 
         name = ?, 
         repository = ?, 

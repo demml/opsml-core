@@ -207,8 +207,7 @@ impl PostgresQueryHelper {
         let mut query = format!(
             "
             SELECT
-             date, 
-             timestamp, 
+             created_at,
              name, 
              repository, 
              major, minor, 
@@ -229,7 +228,7 @@ impl PostgresQueryHelper {
             add_version_bounds(&mut query, version)?;
         }
 
-        query.push_str(" ORDER BY timestamp DESC LIMIT 20;");
+        query.push_str(" ORDER BY created_at DESC LIMIT 20;");
 
         Ok(query)
     }
@@ -245,7 +244,7 @@ impl PostgresQueryHelper {
         AND ($1 IS NULL OR uid = $1)
         AND ($2 IS NULL OR name = $2)
         AND ($3 IS NULL OR repository = $3)
-        AND ($4 IS NULL OR date::date <= TO_DATE($4, 'YYYY-MM-DD'))
+        AND ($4 IS NULL OR created_at <= TO_DATE($4, 'YYYY-MM-DD'))
         ",
             table
         );
@@ -324,7 +323,6 @@ impl PostgresQueryHelper {
         format!(
             "INSERT INTO {} (
                 run_uid, 
-                created_at, 
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -342,7 +340,7 @@ impl PostgresQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
             CardSQLTableNames::HardwareMetrics
         )
         .to_string()
@@ -350,7 +348,6 @@ impl PostgresQueryHelper {
     pub fn get_projectcard_insert_query() -> String {
         format!(
             "INSERT INTO {} (
-        date, 
         uid, 
         name, 
         repository, 
@@ -359,20 +356,18 @@ impl PostgresQueryHelper {
         minor, 
         patch, 
         version, 
-        timestamp, 
         pre_tag,
         build_tag) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
             CardSQLTableNames::Project
         )
         .to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        format!( "INSERT INTO {} (
+        format!(
+            "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -390,15 +385,15 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)", CardSQLTableNames::Data)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+            CardSQLTableNames::Data
+        )
         .to_string()
     }
 
     pub fn get_modelcard_insert_query() -> String {
         format!("INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -419,14 +414,13 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)", CardSQLTableNames::Model).to_string()
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)", CardSQLTableNames::Model).to_string()
     }
 
     pub fn get_runcard_insert_query() -> String {
-        format!("INSERT INTO {} (
-        uid, 
-        date, 
-        timestamp, 
+        format!(
+            "INSERT INTO {} (
+        uid,
         app_env, 
         name, 
         repository, 
@@ -445,16 +439,16 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)", CardSQLTableNames::Run)
-            .to_string()
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+            CardSQLTableNames::Run
+        )
+        .to_string()
     }
 
     pub fn get_auditcard_insert_query() -> String {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -471,7 +465,7 @@ impl PostgresQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
             CardSQLTableNames::Audit
         )
         .to_string()
@@ -481,8 +475,6 @@ impl PostgresQueryHelper {
         format!(
             "INSERT INTO {} (
         uid, 
-        date, 
-        timestamp, 
         app_env, 
         name, 
         repository, 
@@ -499,7 +491,7 @@ impl PostgresQueryHelper {
          pre_tag, 
          build_tag
          ) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
             CardSQLTableNames::Pipeline
         )
         .to_string()
@@ -508,25 +500,23 @@ impl PostgresQueryHelper {
     pub fn get_datacard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = $1, 
-        timestamp = $2, 
-        app_env = $3, 
-        name = $4, 
-        repository = $5, 
-        major = $6, 
-        minor = $7, 
-        patch = $8, 
-        version = $9, 
-        contact = $10, 
-        data_type = $11, 
-        interface_type = $12, 
-        tags = $13, 
-        runcard_uid = $14, 
-        pipelinecard_uid = $15, 
-        auditcard_uid = $16, 
-        pre_tag = $17, 
-        build_tag = $18 
-        WHERE uid = $19",
+        app_env = $1, 
+        name = $2, 
+        repository = $3, 
+        major = $4, 
+        minor = $5, 
+        patch = $6, 
+        version = $7, 
+        contact = $8, 
+        data_type = $9, 
+        interface_type = $10, 
+        tags = $11, 
+        runcard_uid = $12, 
+        pipelinecard_uid = $13, 
+        auditcard_uid = $14, 
+        pre_tag = $15, 
+        build_tag = $16 
+        WHERE uid = $17",
             CardSQLTableNames::Data
         )
         .to_string()
@@ -535,28 +525,26 @@ impl PostgresQueryHelper {
     pub fn get_modelcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = $1, 
-        timestamp = $2, 
-        app_env = $3, 
-        name = $4, 
-        repository = $5, 
-        major = $6, 
-        minor = $7, 
-        patch = $8, 
-        version = $9, 
-        contact = $10, 
-        datacard_uid = $11, 
-        sample_data_type = $12, 
-        model_type = $13, 
-        interface_type = $14, 
-        task_type = $15, 
-        tags = $16, 
-        runcard_uid = $17, 
-        pipelinecard_uid = $18, 
-        auditcard_uid = $19, 
-        pre_tag = $20, 
-        build_tag = $21 
-        WHERE uid = $22",
+        app_env = $1, 
+        name = $2, 
+        repository = $3, 
+        major = $4, 
+        minor = $5, 
+        patch = $6, 
+        version = $7, 
+        contact = $8, 
+        datacard_uid = $9, 
+        sample_data_type = $10, 
+        model_type = $11, 
+        interface_type = $12, 
+        task_type = $13, 
+        tags = $14, 
+        runcard_uid = $15, 
+        pipelinecard_uid = $16, 
+        auditcard_uid = $17, 
+        pre_tag = $18, 
+        build_tag = $19 
+        WHERE uid = $20",
             CardSQLTableNames::Model
         )
         .to_string()
@@ -565,26 +553,24 @@ impl PostgresQueryHelper {
     pub fn get_runcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = $1, 
-        timestamp = $2, 
-        app_env = $3, 
-        name = $4, 
-        repository = $5, 
-        major = $6, 
-        minor = $7, 
-        patch = $8, 
-        version = $9, 
-        contact = $10, 
-        project = $11, 
-        tags = $12, 
-        datacard_uids = $13, 
-        modelcard_uids = $14, 
-        pipelinecard_uid = $15, 
-        artifact_uris = $16, 
-        compute_environment = $17, 
-        pre_tag = $18, 
-        build_tag = $19 
-        WHERE uid = $20",
+        app_env = $1, 
+        name = $2, 
+        repository = $3, 
+        major = $4, 
+        minor = $5, 
+        patch = $6, 
+        version = $7, 
+        contact = $8, 
+        project = $9, 
+        tags = $10, 
+        datacard_uids = $11, 
+        modelcard_uids = $12, 
+        pipelinecard_uid = $13, 
+        artifact_uris = $14, 
+        compute_environment = $15, 
+        pre_tag = $16, 
+        build_tag = $17
+        WHERE uid = $18",
             CardSQLTableNames::Run
         )
         .to_string()
@@ -593,24 +579,22 @@ impl PostgresQueryHelper {
     pub fn get_auditcard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = $1, 
-        timestamp = $2, 
-        app_env = $3, 
-        name = $4, 
-        repository = $5, 
-        major = $6, 
-        minor = $7, 
-        patch = $8, 
-        version = $9, 
-        contact = $10, 
-        tags = $11, 
-        approved = $12, 
-        datacard_uids = $13, 
-        modelcard_uids = $14, 
-        runcard_uids = $15, 
-        pre_tag = $16, 
-        build_tag = $17 
-        WHERE uid = $18",
+        app_env = $1, 
+        name = $2, 
+        repository = $3, 
+        major = $4, 
+        minor = $5, 
+        patch = $6, 
+        version = $7, 
+        contact = $8, 
+        tags = $9, 
+        approved = $10, 
+        datacard_uids = $11, 
+        modelcard_uids = $12, 
+        runcard_uids = $13, 
+        pre_tag = $14, 
+        build_tag = $15 
+        WHERE uid = $16",
             CardSQLTableNames::Audit
         )
         .to_string()
@@ -619,24 +603,22 @@ impl PostgresQueryHelper {
     pub fn get_pipelinecard_update_query() -> String {
         format!(
             "UPDATE {} SET 
-        date = $1, 
-        timestamp = $2, 
-        app_env = $3, 
-        name = $4, 
-        repository = $5, 
-        major = $6, 
-        minor = $7, 
-        patch = $8, 
-        version = $9, 
-        contact = $10, 
-        tags = $11, 
-        pipeline_code_uri = $12, 
-        datacard_uids = $13, 
-        modelcard_uids = $14, 
-        runcard_uids = $15, 
-        pre_tag = $16, 
-        build_tag = $17 
-        WHERE uid = $18",
+        app_env = $1, 
+        name = $2, 
+        repository = $3, 
+        major = $4, 
+        minor = $5, 
+        patch = $6, 
+        version = $7, 
+        contact = $8, 
+        tags = $9, 
+        pipeline_code_uri = $10, 
+        datacard_uids = $11, 
+        modelcard_uids = $12, 
+        runcard_uids = $13, 
+        pre_tag = $14, 
+        build_tag = $15 
+        WHERE uid = $16",
             CardSQLTableNames::Pipeline
         )
         .to_string()
