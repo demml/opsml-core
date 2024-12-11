@@ -16,10 +16,39 @@ use opsml_settings::config::OpsmlDatabaseSettings;
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
 use sqlx::{
-    mysql::{MySql, MySqlPoolOptions},
-    Pool,
+    mysql::{MySql, MySqlPoolOptions, MySqlRow},
+    types::chrono::NaiveDateTime,
+    FromRow, Pool, Row,
 };
 use tracing::info;
+
+impl FromRow<'_, MySqlRow> for User {
+    fn from_row(row: &MySqlRow) -> Result<Self, sqlx::Error> {
+        let id: Option<i32> = row.try_get("id")?;
+        let created_at: Option<NaiveDateTime> = row.try_get("created_at")?;
+        let active: bool = row.try_get("active")?;
+        let username: String = row.try_get("username")?;
+        let password_hash: String = row.try_get("password_hash")?;
+
+        // Deserialize JSON strings into Vec<String>
+        let permissions: String = row.try_get("permissions")?;
+        let permissions: Vec<String> = serde_json::from_str(&permissions).unwrap_or_default();
+
+        let group_permissions: String = row.try_get("group_permissions")?;
+        let group_permissions: Vec<String> =
+            serde_json::from_str(&group_permissions).unwrap_or_default();
+
+        Ok(User {
+            id,
+            created_at,
+            active,
+            username,
+            password_hash,
+            permissions,
+            group_permissions,
+        })
+    }
+}
 
 pub struct MySqlClient {
     pub pool: Pool<MySql>,
@@ -841,12 +870,14 @@ impl SqlClient for MySqlClient {
 
     async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
         let query = MySQLQueryHelper::get_user_insert_query();
+        let (_id, _created_at, _active, username, password_hash, permissions, group_permissions) =
+            user.to_row();
 
         sqlx::query(&query)
-            .bind(&user.username)
-            .bind(&user.password_hash)
-            .bind(&user.permissions)
-            .bind(&user.group_permissions)
+            .bind(username)
+            .bind(password_hash)
+            .bind(permissions)
+            .bind(group_permissions)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -868,13 +899,15 @@ impl SqlClient for MySqlClient {
 
     async fn update_user(&self, user: &User) -> Result<(), SqlError> {
         let query = MySQLQueryHelper::get_user_update_query();
+        let (_id, _created_at, active, username, password_hash, permissions, group_permissions) =
+            user.to_row();
 
         sqlx::query(&query)
-            .bind(user.active)
-            .bind(&user.password_hash)
-            .bind(&user.permissions)
-            .bind(&user.group_permissions)
-            .bind(&user.username)
+            .bind(active)
+            .bind(password_hash)
+            .bind(permissions)
+            .bind(group_permissions)
+            .bind(username)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;

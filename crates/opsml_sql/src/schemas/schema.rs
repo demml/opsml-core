@@ -757,15 +757,15 @@ impl Default for HardwareMetricsRecord {
     }
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize)]
 pub struct User {
     pub id: Option<i32>,
     pub created_at: Option<NaiveDateTime>,
     pub active: bool,
     pub username: String,
     pub password_hash: String,
-    pub permissions: Json<Vec<String>>,
-    pub group_permissions: Json<Vec<String>>,
+    pub permissions: Vec<String>,
+    pub group_permissions: Vec<String>,
 }
 
 impl User {
@@ -781,8 +781,30 @@ impl User {
             active: true,
             username,
             password_hash,
-            permissions: Json(permissions.unwrap_or(vec!["read".to_string()])),
-            group_permissions: Json(group_permissions.unwrap_or(vec!["user".to_string()])),
+            permissions: permissions.unwrap_or(vec!["read".to_string()]),
+            group_permissions: group_permissions.unwrap_or(vec!["user".to_string()]),
         }
+    }
+
+    pub fn to_row(
+        &self,
+    ) -> (
+        Option<i32>,
+        Option<NaiveDateTime>,
+        bool,
+        String,
+        String,
+        String,
+        String,
+    ) {
+        (
+            self.id,
+            self.created_at,
+            self.active,
+            self.username.clone(),
+            self.password_hash.clone(),
+            serde_json::to_string(&self.permissions).unwrap(),
+            serde_json::to_string(&self.group_permissions).unwrap(),
+        )
     }
 }
