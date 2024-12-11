@@ -808,3 +808,16 @@ impl User {
         )
     }
 }
+
+impl std::fmt::Debug for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("User")
+            .field("id", &self.id)
+            .field("username", &self.username)
+            .field("active", &self.active)
+            .field("password_hash", &"[redacted]")
+            .field("permissions", &"[redacted]")
+            .field("group_permissions", &"[redacted]")
+            .finish()
+    }
+}
