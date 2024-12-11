@@ -760,6 +760,8 @@ impl Default for HardwareMetricsRecord {
 #[derive(Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Option<i32>,
+    pub created_at: Option<NaiveDateTime>,
+    pub active: bool,
     pub username: String,
     pub password_hash: String,
     pub permissions: Json<Vec<String>>,
@@ -775,6 +777,8 @@ impl User {
     ) -> Self {
         User {
             id: None,
+            created_at: None,
+            active: true,
             username,
             password_hash,
             permissions: Json(permissions.unwrap_or(vec!["read".to_string()])),

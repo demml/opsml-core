@@ -865,6 +865,22 @@ impl SqlClient for MySqlClient {
 
         Ok(user)
     }
+
+    async fn update_user(&self, user: &User) -> Result<(), SqlError> {
+        let query = MySQLQueryHelper::get_user_update_query();
+
+        sqlx::query(&query)
+            .bind(&user.active)
+            .bind(&user.password_hash)
+            .bind(&user.permissions)
+            .bind(&user.group_permissions)
+            .bind(&user.username)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -905,6 +921,9 @@ mod tests {
 
             DELETE
             FROM opsml_run_parameters;
+
+            DELETE
+            FROM opsml_users;
             "#,
         )
         .fetch_all(pool)
@@ -1818,8 +1837,15 @@ mod tests {
         let user = User::new("user".to_string(), "pass".to_string(), None, None);
         client.insert_user(&user).await.unwrap();
 
-        let user = client.get_user("user").await.unwrap();
+        let mut user = client.get_user("user").await.unwrap();
         assert_eq!(user.username, "user");
+
+        // update user
+        user.active = false;
+
+        client.update_user(&user).await.unwrap();
+        let user = client.get_user("user").await.unwrap();
+        assert_eq!(user.active, false);
 
         cleanup(&client.pool).await;
     }

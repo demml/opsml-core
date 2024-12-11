@@ -15,7 +15,20 @@ impl MySQLQueryHelper {
 
     pub fn get_user_query() -> String {
         format!(
-            "SELECT id, username, password_hash, permissions, group_permissions FROM {} WHERE username = ?",
+            "SELECT id, created_at, active, username, password_hash, permissions, group_permissions FROM {} WHERE username = ?",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
+
+    pub fn get_user_update_query() -> String {
+        format!(
+            "UPDATE {} SET 
+            active = ?, 
+            password_hash = ?, 
+            permissions = ?, 
+            group_permissions = ? 
+            WHERE username = ? ",
             CardSQLTableNames::Users
         )
         .to_string()

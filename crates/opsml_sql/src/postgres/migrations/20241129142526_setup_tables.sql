@@ -171,6 +171,8 @@ CREATE TABLE IF NOT EXISTS opsml_run_hardware_metrics (
 
 CREATE TABLE IF NOT EXISTS opsml_users (
     id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN DEFAULT TRUE,
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     permissions JSONB NOT NULL,

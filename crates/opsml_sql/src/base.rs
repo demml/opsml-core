@@ -212,10 +212,35 @@ pub trait SqlClient {
     /// # Returns
     ///
     /// * `HardwareMetricsRecord` - The hardware metrics
-
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError>;
 
+    /// Insert user
+    ///
+    /// # Arguments
+    ///
+    /// * `user` - The user
+    ///
     async fn insert_user(&self, user: &User) -> Result<(), SqlError>;
 
+    /// Get user
+    ///
+    /// # Arguments
+    ///
+    /// * `username` - The username
+    ///
+    /// # Returns
+    ///
+    /// * `User` - The user
     async fn get_user(&self, username: &str) -> Result<User, SqlError>;
+
+    /// update user
+    ///
+    /// # Arguments
+    ///
+    /// * `user` - The user
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), SqlError>` - The result of the operation
+    async fn update_user(&self, user: &User) -> Result<(), SqlError>;
 }
