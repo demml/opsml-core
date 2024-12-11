@@ -34,7 +34,7 @@ pub enum UriNames {
 #[pymethods]
 impl UriNames {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             "trained_model_uri" => Some(UriNames::TrainedModelUri),
             "sample_data_uri" => Some(UriNames::SampleDataUri),
@@ -57,7 +57,7 @@ impl UriNames {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             UriNames::TrainedModelUri => "trained_model_uri",
             UriNames::SampleDataUri => "sample_data_uri",
@@ -113,7 +113,7 @@ pub enum CommonKwargs {
 #[pymethods]
 impl CommonKwargs {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             "is_pipeline" => Some(CommonKwargs::IsPipeline),
             "model_type" => Some(CommonKwargs::ModelType),
@@ -144,7 +144,7 @@ impl CommonKwargs {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             CommonKwargs::IsPipeline => "is_pipeline",
             CommonKwargs::ModelType => "model_type",
@@ -203,7 +203,7 @@ pub enum SaveName {
 #[pymethods]
 impl SaveName {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             "card" => Some(SaveName::Card),
             "audit" => Some(SaveName::Audit),
@@ -229,7 +229,7 @@ impl SaveName {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             SaveName::Card => "card",
             SaveName::Audit => "audit",
@@ -277,7 +277,7 @@ pub enum Suffix {
 #[pymethods]
 impl Suffix {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             ".onnx" => Some(Suffix::Onnx),
             ".parquet" => Some(Suffix::Parquet),
@@ -297,7 +297,7 @@ impl Suffix {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             Suffix::Onnx => ".onnx",
             Suffix::Parquet => ".parquet",
@@ -327,7 +327,7 @@ pub enum ArtifactClass {
 #[pymethods]
 impl ArtifactClass {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             "data" => Some(ArtifactClass::Data),
             "other" => Some(ArtifactClass::Other),
@@ -335,7 +335,7 @@ impl ArtifactClass {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             ArtifactClass::Data => "data",
             ArtifactClass::Other => "other",
@@ -365,7 +365,7 @@ pub enum PresignableTypes {
 #[pymethods]
 impl PresignableTypes {
     #[staticmethod]
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str) -> Option<Self> {
         match s {
             ".jpeg" => Some(PresignableTypes::Jpeg),
             ".jpg" => Some(PresignableTypes::Jpg),
@@ -385,7 +385,7 @@ impl PresignableTypes {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_string(&self) -> &str {
         match self {
             PresignableTypes::Jpeg => ".jpeg",
             PresignableTypes::Jpg => ".jpg",
@@ -410,98 +410,104 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_uri_names_from_str() {
+    fn test_uri_names_from_string() {
         assert_eq!(
-            UriNames::from_str("trained_model_uri"),
+            UriNames::from_string("trained_model_uri"),
             Some(UriNames::TrainedModelUri)
         );
         assert_eq!(
-            UriNames::from_str("sample_data_uri"),
+            UriNames::from_string("sample_data_uri"),
             Some(UriNames::SampleDataUri)
         );
-        assert_eq!(UriNames::from_str("invalid_uri"), None);
+        assert_eq!(UriNames::from_string("invalid_uri"), None);
     }
 
     #[test]
     fn test_uri_names_as_str() {
-        assert_eq!(UriNames::TrainedModelUri.as_str(), "trained_model_uri");
-        assert_eq!(UriNames::SampleDataUri.as_str(), "sample_data_uri");
+        assert_eq!(UriNames::TrainedModelUri.as_string(), "trained_model_uri");
+        assert_eq!(UriNames::SampleDataUri.as_string(), "sample_data_uri");
     }
 
     #[test]
     fn test_common_kwargs_from_str() {
         assert_eq!(
-            CommonKwargs::from_str("is_pipeline"),
+            CommonKwargs::from_string("is_pipeline"),
             Some(CommonKwargs::IsPipeline)
         );
         assert_eq!(
-            CommonKwargs::from_str("model_type"),
+            CommonKwargs::from_string("model_type"),
             Some(CommonKwargs::ModelType)
         );
-        assert_eq!(CommonKwargs::from_str("invalid_kwarg"), None);
+        assert_eq!(CommonKwargs::from_string("invalid_kwarg"), None);
     }
 
     #[test]
     fn test_common_kwargs_as_str() {
-        assert_eq!(CommonKwargs::IsPipeline.as_str(), "is_pipeline");
-        assert_eq!(CommonKwargs::ModelType.as_str(), "model_type");
+        assert_eq!(CommonKwargs::IsPipeline.as_string(), "is_pipeline");
+        assert_eq!(CommonKwargs::ModelType.as_string(), "model_type");
     }
 
     #[test]
     fn test_save_name_from_str() {
-        assert_eq!(SaveName::from_str("card"), Some(SaveName::Card));
-        assert_eq!(SaveName::from_str("audit"), Some(SaveName::Audit));
-        assert_eq!(SaveName::from_str("invalid_save_name"), None);
+        assert_eq!(SaveName::from_string("card"), Some(SaveName::Card));
+        assert_eq!(SaveName::from_string("audit"), Some(SaveName::Audit));
+        assert_eq!(SaveName::from_string("invalid_save_name"), None);
     }
 
     #[test]
     fn test_save_name_as_str() {
-        assert_eq!(SaveName::Card.as_str(), "card");
-        assert_eq!(SaveName::Audit.as_str(), "audit");
+        assert_eq!(SaveName::Card.as_string(), "card");
+        assert_eq!(SaveName::Audit.as_string(), "audit");
     }
 
     #[test]
     fn test_suffix_from_str() {
-        assert_eq!(Suffix::from_str(".onnx"), Some(Suffix::Onnx));
-        assert_eq!(Suffix::from_str(".parquet"), Some(Suffix::Parquet));
-        assert_eq!(Suffix::from_str(".invalid_suffix"), None);
+        assert_eq!(Suffix::from_string(".onnx"), Some(Suffix::Onnx));
+        assert_eq!(Suffix::from_string(".parquet"), Some(Suffix::Parquet));
+        assert_eq!(Suffix::from_string(".invalid_suffix"), None);
     }
 
     #[test]
     fn test_suffix_as_str() {
-        assert_eq!(Suffix::Onnx.as_str(), ".onnx");
-        assert_eq!(Suffix::Parquet.as_str(), ".parquet");
+        assert_eq!(Suffix::Onnx.as_string(), ".onnx");
+        assert_eq!(Suffix::Parquet.as_string(), ".parquet");
     }
 
     #[test]
     fn test_artifact_class_from_str() {
-        assert_eq!(ArtifactClass::from_str("data"), Some(ArtifactClass::Data));
-        assert_eq!(ArtifactClass::from_str("other"), Some(ArtifactClass::Other));
-        assert_eq!(ArtifactClass::from_str("invalid_class"), None);
+        assert_eq!(
+            ArtifactClass::from_string("data"),
+            Some(ArtifactClass::Data)
+        );
+        assert_eq!(
+            ArtifactClass::from_string("other"),
+            Some(ArtifactClass::Other)
+        );
+        assert_eq!(ArtifactClass::from_string("invalid_class"), None);
     }
 
     #[test]
     fn test_artifact_class_as_str() {
-        assert_eq!(ArtifactClass::Data.as_str(), "data");
-        assert_eq!(ArtifactClass::Other.as_str(), "other");
+        assert_eq!(ArtifactClass::Data.as_string(), "data");
+        assert_eq!(ArtifactClass::Other.as_string(), "other");
     }
 
     #[test]
     fn test_presignable_types_from_str() {
         assert_eq!(
-            PresignableTypes::from_str(".jpeg"),
+            PresignableTypes::from_string(".jpeg"),
             Some(PresignableTypes::Jpeg)
         );
         assert_eq!(
-            PresignableTypes::from_str(".jpg"),
+            PresignableTypes::from_string(".jpg"),
             Some(PresignableTypes::Jpg)
         );
-        assert_eq!(PresignableTypes::from_str(".invalid_type"), None);
+        assert_eq!(PresignableTypes::from_string(".invalid_type"), None);
     }
 
     #[test]
     fn test_presignable_types_as_str() {
-        assert_eq!(PresignableTypes::Jpeg.as_str(), ".jpeg");
-        assert_eq!(PresignableTypes::Jpg.as_str(), ".jpg");
+        assert_eq!(PresignableTypes::Jpeg.as_string(), ".jpeg");
+        assert_eq!(PresignableTypes::Jpg.as_string(), ".jpg");
     }
 }

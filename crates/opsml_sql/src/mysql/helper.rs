@@ -1,12 +1,10 @@
-use opsml_error::error::SqlError;
-
-/// this file contains helper logic for generating sql queries across different databases
 use crate::base::{add_version_bounds, CardSQLTableNames};
 use crate::schemas::arguments::CardQueryArgs;
+use opsml_error::error::SqlError;
 use opsml_utils::utils::is_valid_uuid4;
-pub struct SqliteQueryHelper;
+pub struct MySQLQueryHelper;
 
-impl SqliteQueryHelper {
+impl MySQLQueryHelper {
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",
@@ -30,34 +28,14 @@ impl SqliteQueryHelper {
             password_hash = ?, 
             permissions = ?, 
             group_permissions = ? 
-            WHERE username = ?",
+            WHERE username = ? ",
             CardSQLTableNames::Users
         )
         .to_string()
     }
     pub fn get_hardware_metric_query() -> String {
         let query = format!(
-            "SELECT
-            run_uid,
-            created_at,
-            cpu_percent_utilization,
-            cpu_percent_per_core,
-            compute_overall,
-            compute_utilized,
-            load_avg,
-            sys_ram_total,
-            sys_ram_used,
-            sys_ram_available,
-            sys_ram_percent_used,
-            sys_swap_total,
-            sys_swap_used,
-            sys_swap_free,
-            sys_swap_percent,
-            bytes_recv,
-            bytes_sent,
-            gpu_percent_utilization,
-            gpu_percent_per_core
-            FROM {} WHERE run_uid = ?",
+            "SELECT * FROM {} WHERE run_uid = ?",
             CardSQLTableNames::HardwareMetrics
         );
 
@@ -80,7 +58,7 @@ impl SqliteQueryHelper {
         let mut query = format!(
             "SELECT *
             FROM {}
-            WHERE run_uid = ?1",
+            WHERE run_uid = ?",
             CardSQLTableNames::Metrics
         );
 
@@ -127,8 +105,9 @@ impl SqliteQueryHelper {
                     version, 
                     ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY created_at DESC) AS row_num
                 FROM {}
-                WHERE (?1 IS NULL OR repository = ?1)
-                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
+                WHERE 1=1
+                AND (? IS NULL OR repository = ?)
+                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
             )", table
         );
 
@@ -141,8 +120,9 @@ impl SqliteQueryHelper {
                     MAX(created_at) AS updated_at, 
                     MIN(created_at) AS created_at 
                 FROM {}
-                WHERE (?1 IS NULL OR repository = ?1)
-                AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
+                WHERE 1=1
+                AND (? IS NULL OR repository = ?)
+                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
                 GROUP BY repository, name
             )",
             table
@@ -185,10 +165,10 @@ impl SqliteQueryHelper {
             versions,
             updated_at,
             created_at,
-            row_num
+            CAST(row_num AS SIGNED) AS row_num
             FROM joined 
-            WHERE row_num BETWEEN ?4 AND ?5
-            ORDER BY updated_at DESC",
+            WHERE row_num BETWEEN ? AND ?
+            ORDER BY updated_at DESC;",
             versions_cte, stats_cte, filtered_versions_cte, joined_cte
         );
 
@@ -202,7 +182,7 @@ impl SqliteQueryHelper {
                     COALESCE(COUNT(DISTINCT repository), 0) AS nbr_repositories 
                 FROM {}
                 WHERE 1=1
-                AND (?1 IS NULL OR name LIKE ?1 OR repository LIKE ?1)
+                AND (? IS NULL OR name LIKE ? OR repository LIKE ?)
                 ",
             table
         );
@@ -216,7 +196,7 @@ impl SqliteQueryHelper {
         let mut query = format!(
             "
             SELECT
-             created_at,
+             created_at, 
              name, 
              repository, 
              major, minor, 
@@ -249,11 +229,11 @@ impl SqliteQueryHelper {
         let mut query = format!(
             "
         SELECT * FROM {}
-        WHERE 1==1
-        AND (?1 IS NULL OR uid = ?1)
-        AND (?2 IS NULL OR name = ?2)
-        AND (?3 IS NULL OR repository = ?3)
-        AND (?4 IS NULL OR created_at <= DATETIME(?4))
+        WHERE 1=1
+        AND (? IS NULL OR uid = ?)
+        AND (? IS NULL OR name = ?)
+        AND (? IS NULL OR repository = ?)
+        AND (? IS NULL OR created_at <= STR_TO_DATE(?, '%Y-%m-%d'))
         ",
             table
         );
@@ -274,7 +254,7 @@ impl SqliteQueryHelper {
                 let tags = query_args.tags.as_ref().unwrap();
                 for (key, value) in tags.iter() {
                     query.push_str(
-                        format!(" AND json_extract(tags, '$.{}') == '{}'", key, value).as_str(),
+                        format!(" AND json_extract(tags, '$.{}') = '{}'", key, value).as_str(),
                     );
                 }
             }
@@ -287,7 +267,7 @@ impl SqliteQueryHelper {
             }
         }
 
-        query.push_str(" LIMIT ?5");
+        query.push_str(" LIMIT ?");
 
         Ok(query)
     }
@@ -302,6 +282,7 @@ impl SqliteQueryHelper {
         )
         .to_string()
     }
+
     pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
@@ -333,7 +314,7 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
                 run_uid, 
-                created_at,
+                created_at, 
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -356,20 +337,16 @@ impl SqliteQueryHelper {
         )
         .to_string()
     }
-
     pub fn get_projectcard_insert_query() -> String {
-        format!("INSERT INTO {} (uid, name, repository, project_id, major, minor, patch, version, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Project)
-            .to_string()
+        "INSERT INTO opsml_project_registry (uid, name, repository, project_id, major, minor, patch, version, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
     }
 
     pub fn get_datacard_insert_query() -> String {
-        format!("INSERT INTO {} (uid, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CardSQLTableNames::Data)
-            .to_string()
+        "INSERT INTO opsml_data_registry (uid, app_env, name, repository, major, minor, patch, version, contact, data_type, interface_type, tags, runcard_uid, pipelinecard_uid, auditcard_uid, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
     }
 
     pub fn get_modelcard_insert_query() -> String {
-        format!(
-            "INSERT INTO {} (
+        "INSERT INTO opsml_model_registry (
         uid, 
         app_env, 
         name, 
@@ -391,15 +368,12 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            CardSQLTableNames::Model
-        )
-        .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            .to_string()
     }
 
     pub fn get_runcard_insert_query() -> String {
-        format!(
-            "INSERT INTO {} (
+        "INSERT INTO opsml_run_registry (
         uid, 
         app_env, 
         name, 
@@ -419,15 +393,12 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            CardSQLTableNames::Run
-        )
-        .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            .to_string()
     }
 
     pub fn get_auditcard_insert_query() -> String {
-        format!(
-            "INSERT INTO {} (
+        "INSERT INTO opsml_audit_registry (
         uid, 
         app_env, 
         name, 
@@ -445,15 +416,12 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            CardSQLTableNames::Audit
-        )
-        .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            .to_string()
     }
 
     pub fn get_pipelinecard_insert_query() -> String {
-        format!(
-            "INSERT INTO {} (
+        "INSERT INTO opsml_pipeline_registry (
         uid, 
         app_env, 
         name, 
@@ -471,15 +439,12 @@ impl SqliteQueryHelper {
         pre_tag, 
         build_tag
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            CardSQLTableNames::Pipeline
-        )
-        .to_string()
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            .to_string()
     }
 
     pub fn get_datacard_update_query() -> String {
-        format!(
-            "UPDATE {} SET 
+        "UPDATE opsml_data_registry SET 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -496,15 +461,12 @@ impl SqliteQueryHelper {
         auditcard_uid = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?",
-            CardSQLTableNames::Data
-        )
-        .to_string()
+        WHERE uid = ?"
+            .to_string()
     }
 
     pub fn get_modelcard_update_query() -> String {
-        format!(
-            "UPDATE {} SET 
+        "UPDATE opsml_model_registry SET 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -524,15 +486,12 @@ impl SqliteQueryHelper {
         auditcard_uid = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?",
-            CardSQLTableNames::Model
-        )
-        .to_string()
+        WHERE uid = ?"
+            .to_string()
     }
 
     pub fn get_runcard_update_query() -> String {
-        format!(
-            "UPDATE {} SET 
+        "UPDATE opsml_run_registry SET 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -550,15 +509,12 @@ impl SqliteQueryHelper {
         compute_environment = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?",
-            CardSQLTableNames::Run
-        )
-        .to_string()
+        WHERE uid = ?"
+            .to_string()
     }
 
     pub fn get_auditcard_update_query() -> String {
-        format!(
-            "UPDATE {} SET 
+        "UPDATE opsml_audit_registry SET 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -573,16 +529,13 @@ impl SqliteQueryHelper {
         modelcard_uids = ?, 
         runcard_uids = ?, 
         pre_tag = ?, 
-        build_tag = ?
-        WHERE uid = ?",
-            CardSQLTableNames::Audit
-        )
-        .to_string()
+        build_tag = ? 
+        WHERE uid = ?"
+            .to_string()
     }
 
     pub fn get_pipelinecard_update_query() -> String {
-        format!(
-            "UPDATE {} SET  
+        "UPDATE opsml_pipeline_registry SET 
         app_env = ?, 
         name = ?, 
         repository = ?, 
@@ -598,9 +551,7 @@ impl SqliteQueryHelper {
         runcard_uids = ?, 
         pre_tag = ?, 
         build_tag = ? 
-        WHERE uid = ?",
-            CardSQLTableNames::Pipeline
-        )
-        .to_string()
+        WHERE uid = ?"
+            .to_string()
     }
 }

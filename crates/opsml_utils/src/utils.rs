@@ -233,3 +233,7 @@ pub fn get_utc_date() -> String {
 pub fn get_utc_timestamp() -> i64 {
     chrono::Utc::now().timestamp()
 }
+
+pub fn get_utc_datetime() -> NaiveDateTime {
+    chrono::Utc::now().naive_utc()
+}
