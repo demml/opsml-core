@@ -63,7 +63,7 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
         {
             builder.push_str(
                 format!(
-                    " AND (major == {} AND minor < {})",
+                    " AND (major = {} AND minor < {})",
                     version_bounds.upper_bound.major, version_bounds.upper_bound.minor
                 )
                 .as_str(),
@@ -71,7 +71,7 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
         } else {
             builder.push_str(
                 format!(
-                    " AND (major == {} AND minor == {} AND patch < {})",
+                    " AND (major = {} AND minor = {} AND patch < {})",
                     version_bounds.upper_bound.major,
                     version_bounds.upper_bound.minor,
                     version_bounds.upper_bound.patch
