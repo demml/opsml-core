@@ -9,7 +9,27 @@ pub struct SqliteQueryHelper;
 impl SqliteQueryHelper {
     pub fn get_hardware_metric_query() -> String {
         let query = format!(
-            "SELECT * FROM {} WHERE run_uid = ?",
+            "SELECT
+            run_uid,
+            created_at,
+            cpu_percent_utilization,
+            cpu_percent_per_core,
+            compute_overall,
+            compute_utilized,
+            load_avg,
+            sys_ram_total,
+            sys_ram_used,
+            sys_ram_available,
+            sys_ram_percent_used,
+            sys_swap_total,
+            sys_swap_used,
+            sys_swap_free,
+            sys_swap_percent,
+            bytes_recv,
+            bytes_sent,
+            gpu_percent_utilization,
+            gpu_percent_per_core
+            FROM {} WHERE run_uid = ?",
             CardSQLTableNames::HardwareMetrics
         );
 
@@ -77,7 +97,7 @@ impl SqliteQueryHelper {
                     repository, 
                     name, 
                     version, 
-                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY timestamp DESC) AS row_num
+                    ROW_NUMBER() OVER (PARTITION BY repository, name ORDER BY created_at DESC) AS row_num
                 FROM {}
                 WHERE (?1 IS NULL OR repository = ?1)
                 AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
@@ -90,8 +110,8 @@ impl SqliteQueryHelper {
                     repository, 
                     name, 
                     COUNT(DISTINCT version) AS versions, 
-                    MAX(timestamp) AS updated_at, 
-                    MIN(timestamp) AS created_at 
+                    MAX(created_at) AS updated_at, 
+                    MIN(created_at) AS created_at 
                 FROM {}
                 WHERE (?1 IS NULL OR repository = ?1)
                 AND (?2 IS NULL OR name LIKE ?3 OR repository LIKE ?3)
@@ -130,7 +150,15 @@ impl SqliteQueryHelper {
 
         let combined_query = format!(
             "{}{}{}{} 
-            SELECT * FROM joined 
+            SELECT
+            repository,
+            name,
+            version,
+            versions,
+            updated_at,
+            created_at,
+            row_num
+            FROM joined 
             WHERE row_num BETWEEN ?4 AND ?5
             ORDER BY updated_at DESC",
             versions_cte, stats_cte, filtered_versions_cte, joined_cte
@@ -197,7 +225,7 @@ impl SqliteQueryHelper {
         AND (?1 IS NULL OR uid = ?1)
         AND (?2 IS NULL OR name = ?2)
         AND (?3 IS NULL OR repository = ?3)
-        AND (?4 IS NULL OR DATE(date) <= DATE(?4))
+        AND (?4 IS NULL OR created_at <= DATETIME(?4))
         ",
             table
         );
@@ -224,7 +252,7 @@ impl SqliteQueryHelper {
             }
 
             if query_args.sort_by_timestamp.unwrap_or(false) {
-                query.push_str(" ORDER BY timestamp DESC");
+                query.push_str(" ORDER BY created_at DESC");
             } else {
                 // sort by major, minor, patch
                 query.push_str(" ORDER BY major DESC, minor DESC, patch DESC");
@@ -277,6 +305,7 @@ impl SqliteQueryHelper {
         format!(
             "INSERT INTO {} (
                 run_uid, 
+                created_at,
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -294,7 +323,7 @@ impl SqliteQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             CardSQLTableNames::HardwareMetrics
         )
         .to_string()

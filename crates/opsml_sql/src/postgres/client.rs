@@ -809,7 +809,7 @@ mod tests {
     use super::*;
     use crate::schemas::schema::ProjectCardRecord;
     use opsml_settings::config::SqlType;
-    use opsml_utils::utils::{get_utc_date, get_utc_datetime};
+    use opsml_utils::utils::get_utc_datetime;
     use std::env;
     pub async fn cleanup(pool: &Pool<Postgres>) {
         sqlx::raw_sql(
@@ -1625,7 +1625,7 @@ mod tests {
                 value: 1.0,
                 step: None,
                 timestamp: None,
-                date_ts: get_utc_date(),
+                created_at: None,
                 idx: None,
             };
 
@@ -1665,7 +1665,7 @@ mod tests {
         for _ in 0..10 {
             let metric = HardwareMetricsRecord {
                 run_uid: uid.clone(),
-                created_at: Some(get_utc_datetime()),
+                created_at: get_utc_datetime(),
                 ..Default::default()
             };
 

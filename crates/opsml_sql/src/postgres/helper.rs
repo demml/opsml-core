@@ -323,6 +323,7 @@ impl PostgresQueryHelper {
         format!(
             "INSERT INTO {} (
                 run_uid, 
+                created_at,
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -340,7 +341,7 @@ impl PostgresQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
             CardSQLTableNames::HardwareMetrics
         )
         .to_string()

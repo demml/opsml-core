@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use opsml_error::error::VersionError;
 use opsml_types::enums::CommonKwargs;
-use opsml_utils::utils::{get_utc_date, get_utc_datetime};
+use opsml_utils::utils::get_utc_datetime;
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, types::Json};
@@ -16,7 +16,7 @@ pub struct MetricRecord {
     pub value: f64,
     pub step: Option<i32>,
     pub timestamp: Option<i64>,
-    pub date_ts: String,
+    pub created_at: Option<NaiveDateTime>,
     pub idx: Option<i32>,
 }
 
@@ -34,7 +34,7 @@ impl MetricRecord {
             value,
             step,
             timestamp,
-            date_ts: get_utc_date(),
+            created_at: None,
             idx: None,
         }
     }
@@ -121,8 +121,8 @@ pub struct CardSummary {
     pub name: String,
     pub version: String,
     pub versions: i64,
-    pub updated_at: i64,
-    pub created_at: i64,
+    pub updated_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
     pub row_num: i64,
 }
 
@@ -711,7 +711,7 @@ pub enum Card {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct HardwareMetricsRecord {
     pub run_uid: String,
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: NaiveDateTime,
     pub cpu_percent_utilization: f64,
     pub cpu_percent_per_core: Option<Json<Vec<f64>>>,
     pub compute_overall: Option<f64>,
@@ -735,7 +735,7 @@ impl Default for HardwareMetricsRecord {
     fn default() -> Self {
         HardwareMetricsRecord {
             run_uid: Uuid::new_v4().to_string(),
-            created_at: Some(get_utc_datetime()),
+            created_at: get_utc_datetime(),
             cpu_percent_utilization: 0.0,
             cpu_percent_per_core: None,
             compute_overall: None,

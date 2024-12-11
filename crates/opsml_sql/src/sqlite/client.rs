@@ -787,6 +787,7 @@ impl SqlClient for SqliteClient {
 
     async fn get_hardware_metric(&self, uid: &str) -> Result<Vec<HardwareMetricsRecord>, SqlError> {
         let query = SqliteQueryHelper::get_hardware_metric_query();
+
         let records: Vec<HardwareMetricsRecord> = sqlx::query_as(&query)
             .bind(uid)
             .fetch_all(&self.pool)
@@ -843,7 +844,7 @@ mod tests {
         }
     }
     use opsml_settings::config::SqlType;
-    use opsml_utils::utils::{get_utc_date, get_utc_datetime};
+    use opsml_utils::utils::get_utc_datetime;
 
     #[tokio::test]
     async fn test_sqlite() {
@@ -977,9 +978,15 @@ mod tests {
 
         assert_eq!(results.len(), 1);
 
+        // get created_at for the first result
+        let created_at = match results {
+            CardResults::Model(ref results) => results[0].created_at,
+            _ => Err(SqlError::QueryError("Invalid result type".to_string())).unwrap(),
+        };
+
         // max_date
         let card_args = CardQueryArgs {
-            max_date: Some("2023-11-28".to_string()),
+            max_date: Some(created_at.unwrap().to_string()),
             ..Default::default()
         };
         let results = client
@@ -987,7 +994,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(results.len(), 2);
+        assert_eq!(results.len(), 10);
 
         // try tags
         let tags = [("key1".to_string(), "value1".to_string())]
@@ -1611,7 +1618,7 @@ mod tests {
                 value: 1.0,
                 step: None,
                 timestamp: None,
-                date_ts: get_utc_date(),
+                created_at: None,
                 idx: None,
             };
 
@@ -1653,7 +1660,7 @@ mod tests {
         for _ in 0..10 {
             let metric = HardwareMetricsRecord {
                 run_uid: uid.clone(),
-                created_at: Some(get_utc_datetime()),
+                created_at: get_utc_datetime(),
                 ..Default::default()
             };
 

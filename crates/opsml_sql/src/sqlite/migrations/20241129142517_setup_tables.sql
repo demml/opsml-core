@@ -115,8 +115,8 @@ CREATE TABLE IF NOT EXISTS opsml_pipeline_registry (
 
 -- ProjectSchema
 CREATE TABLE IF NOT EXISTS opsml_project_registry (
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     uid TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     name TEXT,
     repository TEXT,
     project_id INTEGER PRIMARY KEY,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS opsml_project_registry (
     patch INT NOT NULL,
     pre_tag VARCHAR(16),
     build_tag VARCHAR(16),
-    version VARCHAR(64),
+    version VARCHAR(64)
 );
 
 -- MetricSchema
