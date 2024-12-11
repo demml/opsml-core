@@ -126,7 +126,7 @@ impl PostgresQueryHelper {
                     bindings.push(name.to_string());
                     param_index += 1;
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 
@@ -342,7 +342,7 @@ impl PostgresQueryHelper {
                     bindings.push(name.to_string());
                     param_index += 1;
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 

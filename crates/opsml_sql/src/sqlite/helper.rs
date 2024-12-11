@@ -97,7 +97,7 @@ impl SqliteQueryHelper {
                     query.push_str("name = ?");
                     bindings.push(name.to_string());
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 
@@ -323,7 +323,7 @@ impl SqliteQueryHelper {
                     query.push_str("name = ?");
                     bindings.push(name.to_string());
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 

@@ -75,7 +75,7 @@ impl MySQLQueryHelper {
                     query.push_str("name = ?");
                     bindings.push(name.to_string());
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 
@@ -304,7 +304,7 @@ impl MySQLQueryHelper {
                     query.push_str("name = ?");
                     bindings.push(name.to_string());
                 }
-                query.push_str(")");
+                query.push(')');
             }
         }
 
