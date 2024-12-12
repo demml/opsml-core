@@ -20,6 +20,7 @@ pub struct ErrorResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWTAuthMiddleware {
+    pub required: bool,
     pub authenticated: bool,
     pub permissions: Vec<String>,
     pub group_permissions: Vec<String>,
@@ -31,6 +32,19 @@ pub async fn auth_api_middleware(
     mut req: Request,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AuthError>)> {
+    // if auth is disabled, just return
+    if !state.config.opsml_auth {
+        req.extensions_mut().insert(JWTAuthMiddleware {
+            required: false,
+            authenticated: false,
+            permissions: vec![],
+            group_permissions: vec![],
+        });
+
+        return Ok(next.run(req).await);
+    }
+
+    // get the access token from the cookie or the authorization header
     let access_token = cookie_jar
         .get("access_token")
         .map(|cookie| cookie.value().to_string())
@@ -39,11 +53,9 @@ pub async fn auth_api_middleware(
                 .get(header::AUTHORIZATION)
                 .and_then(|auth_header| auth_header.to_str().ok())
                 .and_then(|auth_value| {
-                    if auth_value.starts_with("Bearer ") {
-                        Some(auth_value[7..].to_owned())
-                    } else {
-                        None
-                    }
+                    auth_value
+                        .strip_prefix("Bearer ")
+                        .map(|token| token.to_owned())
                 })
         });
 
@@ -63,6 +75,7 @@ pub async fn auth_api_middleware(
             let permissions = claims.permissions.clone();
             let group_permissions = claims.group_permissions.clone();
             JWTAuthMiddleware {
+                required: true,
                 authenticated: true,
                 permissions,
                 group_permissions,

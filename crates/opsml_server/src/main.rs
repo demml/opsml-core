@@ -5,8 +5,6 @@ use anyhow::Ok;
 use anyhow::Result;
 use axum::Router;
 use opsml_auth::auth::AuthManager;
-use opsml_settings::config;
-use opsml_settings::config::OpsmlAuthSettings;
 use opsml_utils::color::LogColors;
 use std::sync::Arc;
 use tracing::info;
@@ -16,8 +14,6 @@ mod core;
 async fn create_app() -> Result<Router> {
     // setup components (config, logging, storage client)
     let (config, storage_client, sql_client) = setup_components().await?;
-
-    let opsml_auth = &config.auth_settings();
 
     // Create shared state for the application (storage client, auth manager, config)
     let app_state = Arc::new(AppState {
@@ -33,7 +29,7 @@ async fn create_app() -> Result<Router> {
     info!("Application state created");
 
     // create the router
-    let app = create_router(opsml_auth, app_state).await?;
+    let app = create_router(app_state).await?;
 
     info!("Router created");
 
@@ -73,18 +69,32 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::health::schema::Alive;
     use axum::{
         body::Body,
-        extract::connect_info::MockConnectInfo,
-        http::{self, Request, StatusCode},
+        http::{Request, StatusCode},
     };
     use http_body_util::BodyExt; // for `collect`
-    use serde_json::{json, Value};
-    use tokio::net::TcpListener;
-    use tower::{Service, ServiceExt}; // for `call`, `oneshot`, and `ready`
+    use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
+
+    fn cleanup() {
+        // cleanup delete opsml.db and opsml_registries folder from the current directory
+        let current_dir = std::env::current_dir().unwrap();
+        let db_path = current_dir.join("opsml.db");
+        let registry_path = current_dir.join("opsml_registries");
+
+        if db_path.exists() {
+            std::fs::remove_file(db_path).unwrap();
+        }
+
+        if registry_path.exists() {
+            std::fs::remove_dir_all(registry_path).unwrap();
+        }
+    }
 
     #[tokio::test]
     async fn test_opsml_server_healthcheck() {
+        cleanup();
         let app = create_app().await.unwrap();
 
         // `Router` implements `tower::Service<Request<Body>>` so we can
@@ -102,6 +112,12 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], b"Hello, World!");
+
+        // check if Alive
+        let response: Alive = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(response.status, "Alive");
+
+        cleanup();
     }
 }
