@@ -27,6 +27,7 @@ opsml-server = { path = "crates/opsml_server" }
 opsml-settings = { path = "crates/opsml_settings" }
 opsml-sql = { path = "crates/opsml_sql" }
 opsml-storage = { path = "crates/opsml_storage" }
+opsml-todo = { path = "crates/opsml_todo" }
 opsml-types = { path = "crates/opsml_types" }
 opsml-utils = { path = "crates/opsml_utils" }
 
@@ -45,6 +46,7 @@ bytes = "1.*"
 axum = { version = "0.7.7", features = ["multipart"] }
 axum-extra = { version =  "0.*", features = ["cookie"] }
 axum-login = "0.*"
+clap = { version = "4.*", features = ["derive"] }
 chrono = { version = "0.*", features = ["serde"] }
 colored = "2.*"
 colored_json = "5.*"
@@ -58,12 +60,14 @@ jsonwebtoken = "9.*"
 password-auth = "1.*"
 pyo3 = { version = "0.22", features = ["extension-module", "anyhow", "gil-refs"] }
 rand = "0.8.5"
+rayon = "1.*"
 reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }
 reqwest-middleware = "0.*"
 semver = "1.*"
 serde = { version = "1.*", features = ["derive"] }
 serde_json = "1.*"
 sqlx = { version = "0.*", features = [ "runtime-tokio", "tls-native-tls", "postgres", "mysql", "sqlite", "chrono", "json"] }
+tabled = { version = "0.*", features = ["ansi"] }
 thiserror = "2.*"
 time = "0.*"
 
