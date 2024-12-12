@@ -94,8 +94,16 @@ impl Default for OpsmlConfig {
         let opsml_storage_uri =
             env::var("OPSML_STORAGE_URI").unwrap_or_else(|_| "./opsml_registries".to_string());
 
-        let opsml_tracking_uri =
-            env::var("OPSML_TRACKING_URI").unwrap_or_else(|_| "sqlite:///opsml.db".to_string());
+        let opsml_tracking_uri = env::var("OPSML_TRACKING_URI").unwrap_or_else(|_| {
+            let mut current_dir = env::current_dir().expect("Failed to get current directory");
+            current_dir.push("opsml.db");
+            format!(
+                "sqlite://{}",
+                current_dir
+                    .to_str()
+                    .expect("Failed to convert path to string")
+            )
+        });
 
         let using_client = OpsmlConfig::is_using_client(&opsml_tracking_uri);
 

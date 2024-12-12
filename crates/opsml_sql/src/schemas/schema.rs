@@ -787,30 +787,6 @@ impl User {
             refresh_token: None,
         }
     }
-
-    pub fn to_row(
-        &self,
-    ) -> (
-        Option<i32>,
-        Option<NaiveDateTime>,
-        bool,
-        String,
-        String,
-        String,
-        String,
-        Option<String>,
-    ) {
-        (
-            self.id,
-            self.created_at,
-            self.active,
-            self.username.clone(),
-            self.password_hash.clone(),
-            serde_json::to_string(&self.permissions).unwrap(),
-            serde_json::to_string(&self.group_permissions).unwrap(),
-            self.refresh_token.clone(),
-        )
-    }
 }
 
 impl std::fmt::Debug for User {

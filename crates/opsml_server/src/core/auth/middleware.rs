@@ -9,7 +9,7 @@ use axum::{
     response::Json,
 };
 use axum_extra::extract::cookie::CookieJar;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Serialize)]
@@ -18,10 +18,17 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JWTAuthMiddleware {
+    pub authenticated: bool,
+    pub permissions: Vec<String>,
+    pub group_permissions: Vec<String>,
+}
+
 pub async fn auth_api_middleware(
     cookie_jar: CookieJar,
     State(state): State<Arc<AppState>>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AuthError>)> {
     let access_token = cookie_jar
@@ -51,8 +58,16 @@ pub async fn auth_api_middleware(
     })?;
 
     // validate the access token (this will also check if the token is expired)
-    match state.auth_manager.validate_jwt(&access_token) {
-        Ok(claims) => claims,
+    let auth_middleware = match state.auth_manager.validate_jwt(&access_token) {
+        Ok(claims) => {
+            let permissions = claims.permissions.clone();
+            let group_permissions = claims.group_permissions.clone();
+            JWTAuthMiddleware {
+                authenticated: true,
+                permissions,
+                group_permissions,
+            }
+        }
         Err(_) => {
             return Err((
                 StatusCode::UNAUTHORIZED,
@@ -63,6 +78,9 @@ pub async fn auth_api_middleware(
             ));
         }
     };
+
+    // add the auth middleware to the request extensions
+    req.extensions_mut().insert(auth_middleware);
 
     Ok(next.run(req).await)
 }

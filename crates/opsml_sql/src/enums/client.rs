@@ -7,6 +7,7 @@ use crate::schemas::schema::{
     QueryStats, User,
 };
 use crate::sqlite::client::SqliteClient;
+use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
@@ -44,19 +45,19 @@ impl SqlClientEnum {
 
 #[async_trait]
 impl SqlClient for SqlClientEnum {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Self {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
         match settings.sql_type {
             SqlType::Postgres => {
-                let client = PostgresClient::new(settings).await;
-                SqlClientEnum::Postgres(client)
+                let client = PostgresClient::new(settings).await?;
+                Ok(SqlClientEnum::Postgres(client))
             }
             SqlType::Sqlite => {
-                let client = SqliteClient::new(settings).await;
-                SqlClientEnum::Sqlite(client)
+                let client = SqliteClient::new(settings).await?;
+                Ok(SqlClientEnum::Sqlite(client))
             }
             SqlType::MySql => {
-                let client = MySqlClient::new(settings).await;
-                SqlClientEnum::MySql(client)
+                let client = MySqlClient::new(settings).await?;
+                Ok(SqlClientEnum::MySql(client))
             }
         }
     }
@@ -274,7 +275,12 @@ impl SqlClient for SqlClientEnum {
 
 pub async fn get_sql_client(config: &OpsmlConfig) -> AnyhowResult<SqlClientEnum> {
     let settings = &config.database_settings();
-    Ok(SqlClientEnum::new(settings).await)
+    SqlClientEnum::new(settings).await.with_context(|| {
+        format!(
+            "Failed to create sql client for sql type: {:?}",
+            settings.sql_type
+        )
+    })
 }
 
 #[cfg(test)]
@@ -301,7 +307,7 @@ mod tests {
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqlClientEnum::new(&config).await;
+        let client = SqlClientEnum::new(&config).await.unwrap();
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
         client.query(&script).await;
 

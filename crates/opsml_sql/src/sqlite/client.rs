@@ -60,13 +60,28 @@ pub struct SqliteClient {
 
 #[async_trait]
 impl SqlClient for SqliteClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Self {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
         // if the connection uri is not in memory, create the file
         if !settings.connection_uri.contains(":memory:") {
+            // strip "sqlite://" from the connection uri
+            let uri = settings.connection_uri.replace("sqlite://", "");
+            let path = std::path::Path::new(&uri);
+
             // check if the file exists
-            if !std::path::Path::new(&settings.connection_uri).exists() {
-                // strip "sqlite:" from the connection uri
-                let uri = settings.connection_uri.replace("sqlite:", "");
+            if !path.exists() {
+                // Ensure the parent directory exists
+                if let Some(parent) = path.parent() {
+                    if !parent.exists() {
+                        std::fs::create_dir_all(parent)
+                            .map_err(|e| {
+                                SqlError::FileError(format!(
+                                    "Failed to create SQLite file parents: {} with error: {}",
+                                    &uri, e
+                                ))
+                            })
+                            .unwrap();
+                    }
+                }
 
                 // create the file
                 std::fs::File::create(&uri)
@@ -84,7 +99,7 @@ impl SqlClient for SqliteClient {
             .max_connections(settings.max_connections)
             .connect(&settings.connection_uri)
             .await
-            .expect("Failed to connect to SQLite database");
+            .map_err(|e| SqlError::ConnectionError(format!("{}", e)))?;
 
         // attempt to start logging, silently fail if it fails
         let _ = (setup_logging().await).is_ok();
@@ -92,14 +107,10 @@ impl SqlClient for SqliteClient {
         let client = Self { pool };
 
         // run migrations
-        client
-            .run_migrations()
-            .await
-            .expect("Failed to run migrations");
+        client.run_migrations().await?;
 
-        client
+        Ok(client)
     }
-
     async fn run_migrations(&self) -> Result<(), SqlError> {
         info!("Running migrations");
         sqlx::migrate!("src/sqlite/migrations")
@@ -870,22 +881,18 @@ impl SqlClient for SqliteClient {
 
     async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
         let query = SqliteQueryHelper::get_user_insert_query();
-        let (
-            _id,
-            _created_at,
-            _active,
-            username,
-            password_hash,
-            permissions,
-            group_permissions,
-            _refresh_token,
-        ) = user.to_row();
+
+        let group_permissions = serde_json::to_string(&user.group_permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        let permissions = serde_json::to_string(&user.permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         sqlx::query(&query)
-            .bind(username)
-            .bind(password_hash)
-            .bind(permissions)
-            .bind(group_permissions)
+            .bind(&user.username)
+            .bind(&user.password_hash)
+            .bind(&permissions)
+            .bind(&group_permissions)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -906,24 +913,19 @@ impl SqlClient for SqliteClient {
     }
     async fn update_user(&self, user: &User) -> Result<(), SqlError> {
         let query = SqliteQueryHelper::get_user_update_query();
-        let (
-            _id,
-            _created_at,
-            active,
-            username,
-            password_hash,
-            permissions,
-            group_permissions,
-            refresh_token,
-        ) = user.to_row();
+        let group_permissions = serde_json::to_string(&user.group_permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        let permissions = serde_json::to_string(&user.permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
         sqlx::query(&query)
-            .bind(active)
-            .bind(password_hash)
-            .bind(permissions)
-            .bind(group_permissions)
-            .bind(refresh_token)
-            .bind(username)
+            .bind(user.active)
+            .bind(&user.password_hash)
+            .bind(&permissions)
+            .bind(&group_permissions)
+            .bind(&user.refresh_token)
+            .bind(&user.username)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -937,14 +939,27 @@ mod tests {
 
     use super::*;
 
-    pub fn cleanup() {
-        // delete ./test.db if exists
-        if std::path::Path::new("./test.db").exists() {
-            std::fs::remove_file("./test.db").unwrap();
-        }
-    }
     use opsml_settings::config::SqlType;
     use opsml_utils::utils::get_utc_datetime;
+    use std::env;
+
+    fn get_connection_uri() -> String {
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        format!(
+            "sqlite://{}",
+            current_dir
+                .to_str()
+                .expect("Failed to convert path to string")
+        )
+    }
+
+    pub fn cleanup() {
+        // delete ./test.db if exists
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        let _ = std::fs::remove_file(current_dir);
+    }
 
     #[tokio::test]
     async fn test_sqlite() {
@@ -964,12 +979,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1037,12 +1052,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1138,12 +1153,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
         let data_card = DataCardRecord::default();
         let card = Card::Data(data_card.clone());
 
@@ -1264,12 +1279,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Test DataCardRecord
         let mut data_card = DataCardRecord::default();
@@ -1484,12 +1499,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1511,12 +1526,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1548,12 +1563,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1591,12 +1606,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1648,12 +1663,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1690,12 +1705,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1736,12 +1751,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1773,12 +1788,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         // Run the SQL script to populate the database
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
@@ -1817,12 +1832,12 @@ mod tests {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqliteClient::new(&config).await;
+        let client = SqliteClient::new(&config).await.unwrap();
 
         let user = User::new("user".to_string(), "pass".to_string(), None, None);
         client.insert_user(&user).await.unwrap();
@@ -1832,10 +1847,12 @@ mod tests {
 
         // update user
         user.active = false;
+        user.refresh_token = Some("token".to_string());
 
         client.update_user(&user).await.unwrap();
         let user = client.get_user("user").await.unwrap();
         assert!(!user.active);
+        assert_eq!(user.refresh_token.unwrap(), "token");
 
         cleanup();
     }

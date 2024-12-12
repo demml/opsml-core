@@ -108,6 +108,9 @@ pub enum SqlError {
 
     #[error("Error - {0}")]
     GeneralError(String),
+
+    #[error("Failed to connect to the database - {0}")]
+    ConnectionError(String),
 }
 
 #[derive(Error, Debug)]

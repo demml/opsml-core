@@ -2949,6 +2949,7 @@ dependencies = [
  "axum-extra",
  "bytes 1.8.0",
  "futures",
+ "http-body-util",
  "mockall",
  "mockito",
  "opsml-auth",

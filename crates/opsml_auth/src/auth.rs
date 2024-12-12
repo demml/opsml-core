@@ -9,6 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Claims {
     pub sub: String,
     exp: usize,
+    pub permissions: Vec<String>,
+    pub group_permissions: Vec<String>,
 }
 
 pub struct AuthManager {
@@ -33,6 +35,8 @@ impl AuthManager {
         let claims = Claims {
             sub: user.username.clone(),
             exp: expiration as usize,
+            permissions: user.permissions.clone(),
+            group_permissions: user.group_permissions.clone(),
         };
 
         encode(
@@ -53,6 +57,8 @@ impl AuthManager {
         let claims = Claims {
             sub: user.username.clone(),
             exp: expiration as usize,
+            permissions: user.permissions.clone(),
+            group_permissions: user.group_permissions.clone(),
         };
 
         encode(

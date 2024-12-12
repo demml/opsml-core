@@ -35,3 +35,7 @@ lints:
 .PHONY: test.utils
 test.utils:
 	cargo test -p opsml-utils -- --nocapture
+
+.PHONY: test.opsml.server
+test.opsml.server:
+	cargo test -p opsml-server test_opsml_server -- --nocapture --test-threads=1

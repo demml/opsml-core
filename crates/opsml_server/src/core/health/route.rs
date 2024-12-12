@@ -1,15 +1,19 @@
 use crate::core::auth::middleware::auth_api_middleware;
+use crate::core::auth::middleware::JWTAuthMiddleware;
 use crate::core::health::schema::Alive;
 use crate::core::state::AppState;
 use anyhow::{Context, Result};
 use axum::middleware;
-use axum::{routing::get, Router};
+use axum::{routing::get, Extension, Router};
 use opsml_settings::config::OpsmlAuthSettings;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use tracing::info;
 
-pub async fn health_check() -> Alive {
+pub async fn health_check(Extension(auth): Extension<Option<JWTAuthMiddleware>>) -> Alive {
+    if let Some(_auth) = auth {
+        info!("✅ Auth enabled for health check");
+    }
     Alive::default()
 }
 

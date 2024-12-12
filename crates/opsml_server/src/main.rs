@@ -69,3 +69,39 @@ async fn main() {
     println!("🚀 Server Running 🚀");
     axum::serve(listener, app).await.unwrap();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::Body,
+        extract::connect_info::MockConnectInfo,
+        http::{self, Request, StatusCode},
+    };
+    use http_body_util::BodyExt; // for `collect`
+    use serde_json::{json, Value};
+    use tokio::net::TcpListener;
+    use tower::{Service, ServiceExt}; // for `call`, `oneshot`, and `ready`
+
+    #[tokio::test]
+    async fn test_opsml_server_healthcheck() {
+        let app = create_app().await.unwrap();
+
+        // `Router` implements `tower::Service<Request<Body>>` so we can
+        // call it like any tower service, no need to run an HTTP server.
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/opsml/healthcheck")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"Hello, World!");
+    }
+}

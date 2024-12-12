@@ -1,3 +1,4 @@
+use crate::core::auth::middleware::JWTAuthMiddleware;
 use crate::core::error::internal_server_error;
 use crate::core::files::schema::{
     DeleteFileQuery, DownloadFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery,
@@ -5,12 +6,13 @@ use crate::core::files::schema::{
 use crate::core::state::AppState;
 use axum::extract::DefaultBodyLimit;
 use axum::extract::Multipart;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::{
     body::Body,
     routing::{delete, get, post},
-    Router,
+    Extension, Router,
 };
 use axum::{
     extract::{Query, State},
@@ -203,8 +205,15 @@ pub async fn list_file_info(
 
 pub async fn delete_file(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Option<JWTAuthMiddleware>>,
     params: Query<DeleteFileQuery>,
 ) -> Result<Json<DeleteFileResponse>, (StatusCode, Json<serde_json::Value>)> {
+    // If auth is enabled, check permissions or other auth-related logic
+    if let Some(auth) = auth {
+        // Perform any necessary checks with `auth`
+        // Example: if !auth.permissions.contains("delete") { ... }
+    }
+
     let path = Path::new(&params.path);
     let recursive = params.recursive;
 
