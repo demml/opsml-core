@@ -1,4 +1,4 @@
-use crate::core::auth::middleware::auth_api_middleware;
+use crate::core::auth::route::get_auth_router;
 use crate::core::debug::route::get_debug_router;
 use crate::core::files::route::get_file_router;
 use crate::core::health::route::get_health_router;
@@ -9,7 +9,6 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
 };
-use axum::middleware::{self};
 use axum::Router;
 use opsml_settings::config::OpsmlAuthSettings;
 use std::sync::Arc;
@@ -33,12 +32,14 @@ pub async fn create_router(auth: &OpsmlAuthSettings, app_state: Arc<AppState>) -
     let health_routes = get_health_router(auth, &app_state, ROUTE_PREFIX).await?;
     let file_routes = get_file_router(auth, &app_state, ROUTE_PREFIX).await?;
     let settings_routes = get_settings_router(ROUTE_PREFIX).await?;
+    let auth_routes = get_auth_router(ROUTE_PREFIX).await?;
 
     Ok(Router::new()
         .merge(debug_routes)
         .merge(health_routes)
         .merge(settings_routes)
         .merge(file_routes)
+        .merge(auth_routes)
         .layer(cors)
         .with_state(app_state))
 }

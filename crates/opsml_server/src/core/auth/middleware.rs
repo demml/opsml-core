@@ -1,14 +1,12 @@
 use crate::core::auth::schema::AuthError;
 use crate::core::state::AppState;
-use axum::extract::FromRequestParts;
-use axum::http::header;
-use axum::http::StatusCode;
+
+use axum::http::{header, StatusCode};
 use axum::response::IntoResponse;
 use axum::{
-    body::Body,
     extract::{Request, State},
     middleware::Next,
-    response::{Json, Response},
+    response::Json,
 };
 use axum_extra::extract::cookie::CookieJar;
 use serde::Serialize;
