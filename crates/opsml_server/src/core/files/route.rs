@@ -1,32 +1,25 @@
-use crate::core::auth::middleware::JWTAuthMiddleware;
 use crate::core::error::internal_server_error;
-use crate::core::files::schema::{
-    DeleteFileQuery, DownloadFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery,
-};
+use crate::core::files::schema::{DeleteFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery};
 use crate::core::state::AppState;
 use axum::extract::DefaultBodyLimit;
 use axum::extract::Multipart;
-use axum::response::IntoResponse;
-use axum::response::Response;
-use axum::{
-    body::Body,
-    routing::{delete, get, post},
-    Extension, Router,
-};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     Json,
 };
+use axum::{
+    routing::{delete, get, post},
+    Extension, Router,
+};
+use opsml_auth::permission::UserPermissions;
 use opsml_constants::MAX_FILE_SIZE;
 use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
-use opsml_settings::config::StorageType;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio_util::io::ReaderStream;
 
 use anyhow::{Context, Result};
 use opsml_error::error::ServerError;
@@ -38,10 +31,39 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info};
 
+/// Create a multipart upload session (write)
+///
+/// # Parameters
+///
+/// - `state` - The shared state of the application
+/// - `params` - The query parameters for the request
+///
+/// # Returns
+///
+/// The session URL for the multipart upload
 pub async fn create_multipart_upload(
     State(state): State<Arc<AppState>>,
+    Extension(perms): Extension<UserPermissions>,
     params: Query<MultiPartQuery>,
 ) -> Result<Json<MultiPartSession>, (StatusCode, Json<serde_json::Value>)> {
+    // If auth is enabled, check permissions or other auth-related logic
+    if state.config.opsml_auth {
+        let repository_id = Path::new(&params.path).iter().next().ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid path" })),
+            )
+        })?;
+
+        // check if user has permission to write to the repo
+        if !perms.has_write_permission(&repository_id.to_str().unwrap()) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Permission denied" })),
+            ));
+        }
+    }
+
     let path = Path::new(&params.path);
 
     info!("Creating multipart upload for path: {}", path.display());
@@ -63,10 +85,32 @@ pub async fn create_multipart_upload(
     Ok(Json(MultiPartSession { session_url }))
 }
 
+/// Generate a presigned URL for a file (read)
+///
+/// # Parameters
+///
+/// - `state` - The shared state of the application
+/// - `params` - The query parameters for the request
+///
+/// # Returns
+///
+/// The presigned URL for the file
 pub async fn generate_presigned_url(
     State(state): State<Arc<AppState>>,
+    Extension(perms): Extension<UserPermissions>,
     params: Query<PresignedQuery>,
 ) -> Result<Json<PresignedUrl>, (StatusCode, Json<serde_json::Value>)> {
+    // check for read access
+    if state.config.opsml_auth {
+        // check if user has permission to write to the repo
+        if !perms.has_read_permission() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Permission denied" })),
+            ));
+        }
+    }
+
     let path = Path::new(&params.path);
     let for_multi_part = params.for_multi_part.unwrap_or(false);
 
@@ -155,7 +199,6 @@ pub async fn list_files(
     params: Query<ListFileQuery>,
 ) -> Result<Json<ListFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
-
     info!("Listing files for: {}", path.display());
 
     let files = state
@@ -202,13 +245,25 @@ pub async fn list_file_info(
 
 pub async fn delete_file(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<Option<JWTAuthMiddleware>>,
+    Extension(perms): Extension<UserPermissions>,
     params: Query<DeleteFileQuery>,
 ) -> Result<Json<DeleteFileResponse>, (StatusCode, Json<serde_json::Value>)> {
-    // If auth is enabled, check permissions or other auth-related logic
-    if let Some(_auth) = auth {
-        // Perform any necessary checks with `auth`
-        // Example: if !auth.permissions.contains("delete") { ... }
+    // check for delete access
+    if state.config.opsml_auth {
+        // check if user has permission to write to the repo
+        let repository_id = Path::new(&params.path).iter().next().ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid path" })),
+            )
+        })?;
+
+        if !perms.has_delete_permission(&repository_id.to_str().unwrap()) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Permission denied" })),
+            ));
+        }
     }
 
     let path = Path::new(&params.path);
@@ -244,43 +299,6 @@ pub async fn delete_file(
     }
 }
 
-pub async fn download_file(
-    State(state): State<Arc<AppState>>,
-    params: Query<DownloadFileQuery>,
-) -> Response<Body> {
-    // check if storage client is local (fails if not)
-    if state.storage_client.storage_type() != StorageType::Local {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Download is only supported for local storage" })),
-        )
-            .into_response();
-    }
-
-    // need to join the bucket and the file name
-
-    let path = Path::new(&params.path);
-    let bucket = state.config.opsml_storage_uri.clone();
-    let rpath = Path::new(&bucket).join(path);
-
-    let file = match File::open(&rpath).await {
-        Ok(file) => file,
-        Err(e) => {
-            error!("Failed to open file: {}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "failed": "Failed to open file" })),
-            )
-                .into_response();
-        }
-    };
-
-    let stream = ReaderStream::new(file);
-    let body = Body::from_stream(stream);
-
-    (StatusCode::OK, body).into_response()
-}
-
 pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -296,7 +314,6 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
                 &format!("{}/files/presigned", prefix),
                 get(generate_presigned_url),
             )
-            .route(&format!("{}/files", prefix), get(download_file))
             .route(&format!("{}/files/list", prefix), get(list_files))
             .route(&format!("{}/files/list/info", prefix), get(list_file_info))
             .route(&format!("{}/files/delete", prefix), delete(delete_file))

@@ -1,6 +1,5 @@
 use crate::core::auth::schema::AuthError;
 use crate::core::state::AppState;
-
 use axum::http::{header, StatusCode};
 use axum::response::IntoResponse;
 use axum::{
@@ -9,21 +8,14 @@ use axum::{
     response::Json,
 };
 use axum_extra::extract::cookie::CookieJar;
-use serde::{Deserialize, Serialize};
+use opsml_auth::permission::UserPermissions;
+use serde::Serialize;
 use std::sync::Arc;
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub status: &'static str,
     pub message: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct JWTAuthMiddleware {
-    pub required: bool,
-    pub authenticated: bool,
-    pub permissions: Vec<String>,
-    pub group_permissions: Vec<String>,
 }
 
 pub async fn auth_api_middleware(
@@ -34,9 +26,8 @@ pub async fn auth_api_middleware(
 ) -> Result<impl IntoResponse, (StatusCode, Json<AuthError>)> {
     // if auth is disabled, just return
     if !state.config.opsml_auth {
-        req.extensions_mut().insert(JWTAuthMiddleware {
-            required: false,
-            authenticated: false,
+        req.extensions_mut().insert(UserPermissions {
+            username: "".to_string(),
             permissions: vec![],
             group_permissions: vec![],
         });
@@ -74,9 +65,8 @@ pub async fn auth_api_middleware(
         Ok(claims) => {
             let permissions = claims.permissions.clone();
             let group_permissions = claims.group_permissions.clone();
-            JWTAuthMiddleware {
-                required: true,
-                authenticated: true,
+            UserPermissions {
+                username: claims.sub,
                 permissions,
                 group_permissions,
             }
