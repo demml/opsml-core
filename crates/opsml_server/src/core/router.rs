@@ -1,3 +1,4 @@
+use crate::core::auth::middleware::auth_api_middleware;
 use crate::core::debug::route::get_debug_router;
 use crate::core::files::route::get_file_router;
 use crate::core::health::route::get_health_router;
@@ -8,13 +9,15 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
 };
+use axum::middleware::{self};
 use axum::Router;
+use opsml_settings::config::OpsmlAuthSettings;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 const ROUTE_PREFIX: &str = "/opsml";
 
-pub async fn create_router(app_state: Arc<AppState>) -> Result<Router> {
+pub async fn create_router(auth: &OpsmlAuthSettings, app_state: Arc<AppState>) -> Result<Router> {
     let cors = CorsLayer::new()
         .allow_methods([
             Method::GET,
@@ -27,8 +30,8 @@ pub async fn create_router(app_state: Arc<AppState>) -> Result<Router> {
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
 
     let debug_routes = get_debug_router(ROUTE_PREFIX).await?;
-    let health_routes = get_health_router(ROUTE_PREFIX).await?;
-    let file_routes = get_file_router(ROUTE_PREFIX).await?;
+    let health_routes = get_health_router(auth, &app_state, ROUTE_PREFIX).await?;
+    let file_routes = get_file_router(auth, &app_state, ROUTE_PREFIX).await?;
     let settings_routes = get_settings_router(ROUTE_PREFIX).await?;
 
     Ok(Router::new()
@@ -36,6 +39,6 @@ pub async fn create_router(app_state: Arc<AppState>) -> Result<Router> {
         .merge(health_routes)
         .merge(settings_routes)
         .merge(file_routes)
-        .with_state(app_state)
-        .layer(cors))
+        .layer(cors)
+        .with_state(app_state))
 }

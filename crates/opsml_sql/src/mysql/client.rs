@@ -38,6 +38,8 @@ impl FromRow<'_, MySqlRow> for User {
         let group_permissions: Vec<String> =
             serde_json::from_str(&group_permissions).unwrap_or_default();
 
+        let refresh_token: Option<String> = row.try_get("refresh_token")?;
+
         Ok(User {
             id,
             created_at,
@@ -46,6 +48,7 @@ impl FromRow<'_, MySqlRow> for User {
             password_hash,
             permissions,
             group_permissions,
+            refresh_token,
         })
     }
 }
@@ -871,8 +874,16 @@ impl SqlClient for MySqlClient {
 
     async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
         let query = MySQLQueryHelper::get_user_insert_query();
-        let (_id, _created_at, _active, username, password_hash, permissions, group_permissions) =
-            user.to_row();
+        let (
+            _id,
+            _created_at,
+            _active,
+            username,
+            password_hash,
+            permissions,
+            group_permissions,
+            _refresh_token,
+        ) = user.to_row();
 
         sqlx::query(&query)
             .bind(username)
@@ -900,14 +911,23 @@ impl SqlClient for MySqlClient {
 
     async fn update_user(&self, user: &User) -> Result<(), SqlError> {
         let query = MySQLQueryHelper::get_user_update_query();
-        let (_id, _created_at, active, username, password_hash, permissions, group_permissions) =
-            user.to_row();
+        let (
+            _id,
+            _created_at,
+            active,
+            username,
+            password_hash,
+            permissions,
+            group_permissions,
+            refresh_token,
+        ) = user.to_row();
 
         sqlx::query(&query)
             .bind(active)
             .bind(password_hash)
             .bind(permissions)
             .bind(group_permissions)
+            .bind(refresh_token)
             .bind(username)
             .execute(&self.pool)
             .await

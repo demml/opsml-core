@@ -43,6 +43,7 @@ aws-types = "1.*"
 base64 = "0.*"
 bytes = "1.*"
 axum = { version = "0.7.7", features = ["multipart"] }
+axum-extra = { version =  "0.*", features = ["cookie"] }
 axum-login = "0.*"
 chrono = { version = "0.*", features = ["serde"] }
 colored = "2.*"
@@ -53,6 +54,7 @@ google-cloud-storage = { version = "0.*", features  = ["auth"] }
 google-cloud-auth = "0.*"
 google-cloud-token = "0.*"
 indicatif = "0.*"
+jsonwebtoken = "9.*"
 password-auth = "1.*"
 pyo3 = { version = "0.22", features = ["extension-module", "anyhow", "gil-refs"] }
 rand = "0.8.5"

@@ -39,6 +39,8 @@ impl FromRow<'_, PgRow> for User {
         let group_permissions: Vec<String> =
             serde_json::from_str(&group_permissions).unwrap_or_default();
 
+        let refresh_token: Option<String> = row.try_get("refresh_token")?;
+
         Ok(User {
             id,
             created_at,
@@ -47,6 +49,7 @@ impl FromRow<'_, PgRow> for User {
             password_hash,
             permissions,
             group_permissions,
+            refresh_token,
         })
     }
 }
@@ -868,6 +871,7 @@ impl SqlClient for PostgresClient {
             .bind(&user.password_hash)
             .bind(&user.permissions)
             .bind(&user.group_permissions)
+            .bind(&user.refresh_token)
             .bind(&user.username)
             .execute(&self.pool)
             .await

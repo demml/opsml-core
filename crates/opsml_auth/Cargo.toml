@@ -8,10 +8,14 @@ repository = { workspace = true }
 doctest = false
 
 [dependencies]
+async-trait = { workspace = true }
 axum-login = { workspace = true }
 chrono = { workspace = true }
 password-auth = { workspace = true }
+jsonwebtoken = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true }
 
+opsml-error = { workspace = true }
 opsml-sql = { workspace = true }
  

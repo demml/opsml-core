@@ -7,9 +7,10 @@ use crate::schemas::schema::{
     QueryStats, User,
 };
 use crate::sqlite::client::SqliteClient;
+use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
-use opsml_settings::config::{OpsmlDatabaseSettings, SqlType};
+use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings, SqlType};
 
 #[derive(Debug, Clone)]
 pub enum SqlClientEnum {
@@ -19,6 +20,13 @@ pub enum SqlClientEnum {
 }
 
 impl SqlClientEnum {
+    pub fn name(&self) -> String {
+        match self {
+            SqlClientEnum::Postgres(_) => "Postgres".to_string(),
+            SqlClientEnum::Sqlite(_) => "Sqlite".to_string(),
+            SqlClientEnum::MySql(_) => "MySql".to_string(),
+        }
+    }
     pub async fn query(&self, sql: &str) {
         match self {
             SqlClientEnum::Postgres(client) => {
@@ -262,6 +270,11 @@ impl SqlClient for SqlClientEnum {
             SqlClientEnum::MySql(client) => client.update_user(user).await,
         }
     }
+}
+
+pub async fn get_sql_client(config: &OpsmlConfig) -> AnyhowResult<SqlClientEnum> {
+    let settings = &config.database_settings();
+    Ok(SqlClientEnum::new(settings).await)
 }
 
 #[cfg(test)]

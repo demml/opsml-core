@@ -4,6 +4,9 @@ use crate::core::state::AppState;
 use anyhow::Ok;
 use anyhow::Result;
 use axum::Router;
+use opsml_auth::auth::AuthManager;
+use opsml_settings::config;
+use opsml_settings::config::OpsmlAuthSettings;
 use opsml_utils::color::LogColors;
 use std::sync::Arc;
 use tracing::info;
@@ -12,18 +15,25 @@ mod core;
 
 async fn create_app() -> Result<Router> {
     // setup components (config, logging, storage client)
-    let (config, storage_client) = setup_components().await?;
+    let (config, storage_client, sql_client) = setup_components().await?;
 
-    // Create shared state for the application
+    let opsml_auth = &config.auth_settings();
+
+    // Create shared state for the application (storage client, auth manager, config)
     let app_state = Arc::new(AppState {
         storage_client: Arc::new(storage_client),
+        sql_client: Arc::new(sql_client),
+        auth_manager: Arc::new(AuthManager::new(
+            &config.opsml_jwt_secret,
+            &config.opsml_refresh_secret,
+        )),
         config: Arc::new(config),
     });
 
     info!("Application state created");
 
     // create the router
-    let app = create_router(app_state).await?;
+    let app = create_router(opsml_auth, app_state).await?;
 
     info!("Router created");
 

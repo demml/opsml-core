@@ -5,6 +5,13 @@ use opsml_utils::utils::is_valid_uuid4;
 pub struct MySQLQueryHelper;
 
 impl MySQLQueryHelper {
+    pub fn get_user_by_id_query() -> String {
+        format!(
+            "SELECT id, created_at, active, username, password_hash, permissions, group_permissions FROM {} WHERE id = ?",
+            CardSQLTableNames::Users
+        )
+        .to_string()
+    }
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",

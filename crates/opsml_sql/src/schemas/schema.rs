@@ -766,6 +766,7 @@ pub struct User {
     pub password_hash: String,
     pub permissions: Vec<String>,
     pub group_permissions: Vec<String>,
+    pub refresh_token: Option<String>,
 }
 
 impl User {
@@ -783,6 +784,7 @@ impl User {
             password_hash,
             permissions: permissions.unwrap_or(vec!["read".to_string()]),
             group_permissions: group_permissions.unwrap_or(vec!["user".to_string()]),
+            refresh_token: None,
         }
     }
 
@@ -796,6 +798,7 @@ impl User {
         String,
         String,
         String,
+        Option<String>,
     ) {
         (
             self.id,
@@ -805,6 +808,7 @@ impl User {
             self.password_hash.clone(),
             serde_json::to_string(&self.permissions).unwrap(),
             serde_json::to_string(&self.group_permissions).unwrap(),
+            self.refresh_token.clone(),
         )
     }
 }

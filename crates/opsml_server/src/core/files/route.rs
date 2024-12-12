@@ -22,13 +22,14 @@ use opsml_contracts::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
     UploadResponse,
 };
-use opsml_settings::config::StorageType;
-
+use opsml_settings::config::{OpsmlAuthSettings, StorageType};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::ReaderStream;
 
+use crate::core::auth::middleware::auth_api_middleware;
 use anyhow::{Context, Result};
+use axum::middleware;
 use opsml_error::error::ServerError;
 
 /// Route for debugging information
@@ -274,9 +275,13 @@ pub async fn download_file(
     (StatusCode::OK, body).into_response()
 }
 
-pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
+pub async fn get_file_router(
+    opsml_auth: &OpsmlAuthSettings,
+    app_state: &Arc<AppState>,
+    prefix: &str,
+) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
-        Router::new()
+        let mut router = Router::new()
             .route(
                 &format!("{}/files/multipart", prefix),
                 get(create_multipart_upload),
@@ -292,7 +297,16 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             .route(&format!("{}/files", prefix), get(download_file))
             .route(&format!("{}/files/list", prefix), get(list_files))
             .route(&format!("{}/files/list/info", prefix), get(list_file_info))
-            .route(&format!("{}/files/delete", prefix), delete(delete_file))
+            .route(&format!("{}/files/delete", prefix), delete(delete_file));
+
+        if opsml_auth.enabled {
+            info!("✅ Auth enabled for file routes");
+            router = router.route_layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_api_middleware,
+            ));
+        }
+        router
     }));
 
     match result {

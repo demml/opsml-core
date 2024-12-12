@@ -56,7 +56,7 @@ pub struct OpsmlDatabaseSettings {
 
 #[derive(Debug, Clone, Default)]
 pub struct OpsmlAuthSettings {
-    pub opsml_auth: bool,
+    pub enabled: bool,
 }
 
 /// OpsmlConfig for use with both server and client implementations
@@ -78,7 +78,7 @@ pub struct OpsmlConfig {
     pub download_chunk_size: usize,
     pub upload_chunk_size: usize,
     pub opsml_jwt_secret: String,
-    pub opsml_jwt_algorithm: String,
+    pub opsml_refresh_secret: String,
     pub opsml_username: Option<String>,
     pub opsml_password: Option<String>,
     pub scouter_server_uri: Option<String>,
@@ -121,8 +121,8 @@ impl Default for OpsmlConfig {
 
             opsml_jwt_secret: env::var("OPSML_JWT_SECRET")
                 .unwrap_or_else(|_| generate_jwt_secret()),
-            opsml_jwt_algorithm: env::var("OPSML_JWT_ALGORITHM")
-                .unwrap_or_else(|_| "HS256".to_string()),
+            opsml_refresh_secret: env::var("OPSML_REFRESH_SECRET")
+                .unwrap_or_else(|_| generate_jwt_secret()),
 
             opsml_username: env::var("OPSML_USERNAME").ok(),
             opsml_password: env::var("OPSML_PASSWORD").ok(),
@@ -202,7 +202,7 @@ impl OpsmlConfig {
 
     pub fn auth_settings(&self) -> OpsmlAuthSettings {
         OpsmlAuthSettings {
-            opsml_auth: self.opsml_auth,
+            enabled: self.opsml_auth,
         }
     }
 
@@ -399,14 +399,14 @@ mod tests {
             ..Default::default()
         };
         let auth_settings = opsml_config.auth_settings();
-        assert!(auth_settings.opsml_auth);
+        assert!(auth_settings.enabled);
 
         let opsml_config = OpsmlConfig {
             opsml_auth: false,
             ..Default::default()
         };
         let auth_settings = opsml_config.auth_settings();
-        assert!(!auth_settings.opsml_auth);
+        assert!(!auth_settings.enabled);
         cleanup();
     }
 
@@ -431,7 +431,7 @@ mod tests {
         assert!(!opsml_config.opsml_testing);
         assert_eq!(opsml_config.download_chunk_size, 31457280);
         assert_eq!(opsml_config.upload_chunk_size, 31457280);
-        assert_eq!(opsml_config.opsml_jwt_algorithm, "HS256");
+        assert_eq!(opsml_config.opsml_jwt_secret.len(), 32);
         assert_eq!(opsml_config.opsml_username, None);
         assert_eq!(opsml_config.opsml_password, None);
         assert_eq!(opsml_config.scouter_server_uri, None);
