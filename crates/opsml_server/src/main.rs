@@ -82,6 +82,7 @@ mod tests {
         http::{header, Request, StatusCode},
     };
 
+    use axum::response::Response;
     use http_body_util::BodyExt; // for `collect`
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_sql::base::SqlClient;
@@ -132,112 +133,108 @@ mod tests {
         client.query(&script).await;
     }
 
-    #[tokio::test]
-    async fn test_opsml_server_healthcheck() {
-        cleanup();
+    pub struct TestHelper {
+        app: Router,
+        token: JwtToken,
+    }
 
-        let app = create_app().await.unwrap();
+    impl TestHelper {
+        pub async fn new() -> Self {
+            // set OPSML_AUTH to true
+            env::set_var("OPSML_AUTH", "true");
 
-        // `Router` implements `tower::Service<Request<Body>>` so we can
-        // call it like any tower service, no need to run an HTTP server.
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/opsml/healthcheck")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+            cleanup();
 
-        assert_eq!(response.status(), StatusCode::OK);
+            // create the app
+            let app = create_app().await.unwrap();
 
-        let body = response.into_body().collect().await.unwrap().to_bytes();
+            // populate db
+            setup().await;
 
-        // check if Alive
-        let response: Alive = serde_json::from_slice(&body).unwrap();
+            // retrieve the token
+            let token = TestHelper::login(&app).await;
 
-        assert_eq!(response.status, "Alive");
+            Self { app, token }
+        }
 
-        cleanup();
+        pub async fn login(app: &Router) -> JwtToken {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/opsml/auth/api/login")
+                        .header("Username", "admin")
+                        .header("Password", "test_password")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let token: JwtToken = serde_json::from_slice(&body).unwrap();
+
+            token
+        }
+
+        pub fn with_auth_header(&self, mut request: Request<Body>) -> Request<Body> {
+            request.headers_mut().insert(
+                header::AUTHORIZATION,
+                format!("Bearer {}", self.token.token).parse().unwrap(),
+            );
+
+            request
+        }
+
+        pub async fn send_oneshot(&self, request: Request<Body>, use_auth: bool) -> Response<Body> {
+            if use_auth {
+                self.app
+                    .clone()
+                    .oneshot(self.with_auth_header(request))
+                    .await
+                    .unwrap()
+            } else {
+                self.app.clone().oneshot(request).await.unwrap()
+            }
+        }
+
+        pub fn cleanup(&self) {
+            cleanup();
+        }
     }
 
     #[tokio::test]
     async fn test_opsml_server_login() {
-        // set OPSML_AUTH to true
-        env::set_var("OPSML_AUTH", "true");
+        let helper = TestHelper::new().await;
 
-        cleanup();
-
-        let app = create_app().await.unwrap();
-
-        // setup the database
-        setup().await;
-
-        // `Router` implements `tower::Service<Request<Body>>` so we can
-        // call it like any tower service, no need to run an HTTP server.
-        // create header map
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .uri("/opsml/auth/api/login")
-                    .header("Username", "admin")
-                    .header("Password", "test_password")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
+        let request = Request::builder()
+            .uri("/opsml/healthcheck")
+            .body(Body::empty())
             .unwrap();
 
+        let response = helper.send_oneshot(request, true).await;
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-
-        let token: JwtToken = serde_json::from_slice(&body).unwrap();
-
-        // call the healthcheck endpoint with the token
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .uri("/opsml/healthcheck")
-                    .header(header::AUTHORIZATION, format!("Bearer {}", token.token))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
+        // add invalid token
+        let request = Request::builder()
+            .uri("/opsml/healthcheck")
+            .header(header::AUTHORIZATION, format!("Bearer {}", "invalid_token"))
+            .body(Body::empty())
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .uri("/opsml/healthcheck")
-                    .header(header::AUTHORIZATION, format!("Bearer {}", "invalid_token"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
+        // false will use the invalid token
+        let response = helper.send_oneshot(request, false).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
         // refresh token
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .uri("/opsml/auth/api/refresh")
-                    .header(header::AUTHORIZATION, format!("Bearer {}", token.token))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
+        let request = Request::builder()
+            .uri("/opsml/auth/api/refresh")
+            .body(Body::empty())
             .unwrap();
 
+        let response = helper.send_oneshot(request, true).await;
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
@@ -245,8 +242,14 @@ mod tests {
         let new_token: JwtToken = serde_json::from_slice(&body).unwrap();
 
         // check if the new token is different from the old token
-        assert_ne!(token.token, new_token.token);
+        assert_ne!(helper.token.token, new_token.token);
 
-        cleanup();
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_card_routes() {
+        let helper = TestHelper::new().await;
+        helper.cleanup();
     }
 }
