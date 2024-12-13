@@ -3,6 +3,8 @@ use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
+// TODO: Move this to opsml_types. mayble under contracts.rs
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[pyclass]
 pub struct FileInfo {

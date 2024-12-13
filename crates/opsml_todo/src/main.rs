@@ -70,9 +70,13 @@ fn main() -> io::Result<()> {
                 .to_string();
 
             let file = File::open(entry.path()).unwrap();
+
             let reader = io::BufReader::new(file);
 
             for (index, line) in reader.lines().enumerate() {
+                if line.is_err() {
+                    continue;
+                }
                 let line = line.unwrap();
                 if let Some(pos) = line.find("TODO:") {
                     // Check if TODO is surrounded by quotation marks

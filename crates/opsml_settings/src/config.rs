@@ -5,6 +5,7 @@ use std::default::Default;
 use std::env;
 use std::path::PathBuf;
 
+// TODO: Move this to opsml_types
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum StorageType {
@@ -14,6 +15,7 @@ pub enum StorageType {
     Azure,
 }
 
+// TODO: Move this to opsml_types
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SqlType {
     Postgres,
