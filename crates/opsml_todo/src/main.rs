@@ -5,9 +5,7 @@ use std::env;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use tabled::settings::object::{Columns, Object, Rows};
-use tabled::settings::panel::Header;
-use tabled::settings::themes::ColumnNames;
+use tabled::settings::object::{Columns, Rows};
 use tabled::settings::Alignment;
 use tabled::settings::{format::Format, Color, Style, Width};
 use tabled::{Table, Tabled};
@@ -22,8 +20,19 @@ struct Cli {
     path: Option<String>,
 }
 
-#[derive(Tabled)]
 struct Todo {
+    line: String,
+
+    file: String,
+
+    comment: String,
+}
+
+#[derive(Tabled)]
+struct TableRecord {
+    #[tabled(rename = "#")]
+    idx: String,
+
     #[tabled(rename = "Line")]
     line: String,
 
@@ -73,7 +82,7 @@ fn main() -> io::Result<()> {
                         let comment = after.trim().to_string();
                         let line_num = format!("{}", index + 1).to_string();
                         file_todos.push(Todo {
-                            line: LogColors::purple(&line_num),
+                            line: line_num,
                             file: file_path.clone() + ":" + &(index + 1).to_string(),
                             comment,
                         });
@@ -86,17 +95,29 @@ fn main() -> io::Result<()> {
         .collect();
 
     if todos.is_empty() {
-        println!("{}", LogColors::green("No TODOs found"));
+        println!("{}", LogColors::green("******** No TODOs to do! ********"));
         return Ok(());
     }
-    // TODO: Add table formatting
+
+    // iterate and enumerate the todos and add them to TableRecord
+    let todos: Vec<TableRecord> = todos
+        .iter()
+        .enumerate()
+        .map(|(idx, todo)| TableRecord {
+            idx: LogColors::purple(&format!("{}", idx + 1)),
+            line: todo.line.clone(),
+            file: todo.file.clone(),
+            comment: todo.comment.clone(),
+        })
+        .collect();
 
     let mut table = Table::new(todos);
 
     table.with(Style::sharp());
     table.modify(Columns::single(0), Width::wrap(10).keep_words(true));
-    table.modify(Columns::single(1), Width::wrap(50));
-    table.modify(Columns::single(2), Width::wrap(100).keep_words(true));
+    table.modify(Columns::single(1), Width::wrap(10).keep_words(true));
+    table.modify(Columns::single(2), Width::wrap(50));
+    table.modify(Columns::single(3), Width::wrap(100).keep_words(true));
 
     table.modify(
         Rows::new(0..1),
@@ -106,9 +127,6 @@ fn main() -> io::Result<()> {
             Color::BOLD,
         ),
     );
-
-    // TODO: Center and color
-    // Color the column names
 
     println!("{}", &table);
     Ok(())
