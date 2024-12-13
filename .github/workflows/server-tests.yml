@@ -1,4 +1,4 @@
-name: opsml_server-tests
+name: OpsML Server Tests
 
 on:
   push:

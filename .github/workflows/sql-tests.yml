@@ -1,4 +1,4 @@
-name: opsml_sql-tests
+name: OpsML SQL Tests
 
 on:
   push:
