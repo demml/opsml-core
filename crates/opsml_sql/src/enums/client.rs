@@ -11,7 +11,8 @@ use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
-use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings, SqlType};
+use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings};
+use opsml_types::SqlType;
 
 #[derive(Debug, Clone)]
 pub enum SqlClientEnum {
@@ -290,6 +291,7 @@ mod tests {
     use crate::schemas::schema::{
         AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
     };
+    use opsml_utils::utils::get_utc_datetime;
     use std::env;
 
     fn get_connection_uri() -> String {
@@ -325,8 +327,6 @@ mod tests {
 
         client
     }
-    use opsml_settings::config::SqlType;
-    use opsml_utils::utils::get_utc_datetime;
 
     #[tokio::test]
     async fn test_enum() {

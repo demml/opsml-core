@@ -8,6 +8,7 @@ description = "Opsml settings rust and python bindings"
 
 [dependencies]
 opsml-error = { workspace = true }
+opsml-types = { workspace = true }
 
 colored = { workspace = true}
 pyo3 = { workspace = true }

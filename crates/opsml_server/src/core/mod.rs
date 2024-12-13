@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod cards;
 pub mod debug;
 pub mod error;
 pub mod files;

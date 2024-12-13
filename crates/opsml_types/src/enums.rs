@@ -1,12 +1,20 @@
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum StorageType {
     Google,
     AWS,
     Local,
     Azure,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum SqlType {
+    Postgres,
+    Sqlite,
+    MySql,
 }
 
 #[pyclass(eq, eq_int)]

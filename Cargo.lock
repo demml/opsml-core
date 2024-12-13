@@ -3023,26 +3023,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "opsml-constants"
-version = "0.1.0"
-
-[[package]]
-name = "opsml-contracts"
-version = "0.1.0"
-dependencies = [
- "opsml-settings",
- "opsml-utils",
- "pyo3",
- "serde",
-]
-
-[[package]]
 name = "opsml-core"
 version = "0.1.0"
 dependencies = [
- "opsml-contracts",
  "opsml-settings",
  "opsml-storage",
+ "opsml-types",
  "pyo3",
 ]
 
@@ -3079,8 +3065,6 @@ dependencies = [
  "mockall",
  "mockito",
  "opsml-auth",
- "opsml-constants",
- "opsml-contracts",
  "opsml-error",
  "opsml-logging",
  "opsml-settings",
@@ -3107,6 +3091,7 @@ version = "0.1.0"
 dependencies = [
  "colored",
  "opsml-error",
+ "opsml-types",
  "pyo3",
  "rand 0.8.5",
  "serde",
@@ -3157,8 +3142,6 @@ dependencies = [
  "indicatif",
  "mockall",
  "mockito",
- "opsml-constants",
- "opsml-contracts",
  "opsml-error",
  "opsml-settings",
  "opsml-types",
@@ -3193,6 +3176,7 @@ dependencies = [
 name = "opsml-types"
 version = "0.1.0"
 dependencies = [
+ "opsml-utils",
  "pyo3",
  "serde",
 ]

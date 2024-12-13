@@ -931,7 +931,7 @@ mod tests {
 
     use super::*;
     use crate::schemas::schema::ProjectCardRecord;
-    use opsml_settings::config::SqlType;
+    use opsml_types::SqlType;
     use opsml_utils::utils::get_utc_datetime;
     use std::env;
 

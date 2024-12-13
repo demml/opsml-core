@@ -25,8 +25,6 @@ google-cloud-auth = { workspace = true }
 google-cloud-storage = { workspace = true }
 google-cloud-token = { workspace = true }
 indicatif = { workspace = true }
-opsml-constants = { workspace = true }
-opsml-contracts = { workspace = true }
 opsml-error = { workspace = true }
 opsml-settings = { workspace = true }
 opsml-types = { workspace = true }
