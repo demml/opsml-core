@@ -56,7 +56,7 @@ pub async fn create_multipart_upload(
         })?;
 
         // check if user has permission to write to the repo
-        if !perms.has_write_permission(&repository_id.to_str().unwrap()) {
+        if !perms.has_write_permission(repository_id.to_str().unwrap()) {
             return Err((
                 StatusCode::FORBIDDEN,
                 Json(json!({ "error": "Permission denied" })),
@@ -258,7 +258,7 @@ pub async fn delete_file(
             )
         })?;
 
-        if !perms.has_delete_permission(&repository_id.to_str().unwrap()) {
+        if !perms.has_delete_permission(repository_id.to_str().unwrap()) {
             return Err((
                 StatusCode::FORBIDDEN,
                 Json(json!({ "error": "Permission denied" })),

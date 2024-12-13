@@ -121,7 +121,7 @@ fn main() -> io::Result<()> {
     table.modify(
         Rows::new(0..1),
         (
-            Format::content(|s| format!("{}", LogColors::green(s))),
+            Format::content(|s| LogColors::green(s).to_string()),
             Alignment::center(),
             Color::BOLD,
         ),
