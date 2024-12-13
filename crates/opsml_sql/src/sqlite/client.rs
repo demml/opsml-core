@@ -1,4 +1,4 @@
-use crate::base::{CardSQLTableNames, SqlClient};
+use crate::base::SqlClient;
 
 use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::ProjectCardRecord;
@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_types::CardSQLTableNames;
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
 use sqlx::{
@@ -119,6 +120,31 @@ impl SqlClient for SqliteClient {
             .map_err(|e| SqlError::MigrationError(format!("{}", e)))?;
 
         Ok(())
+    }
+
+    /// Check if uid exists in the database for a table
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `uid` - The uid to check
+    ///
+    /// # Returns
+    ///
+    /// * `bool` - True if the uid exists, false otherwise
+    async fn check_uid_exists(
+        &self,
+        uid: &str,
+        table: &CardSQLTableNames,
+    ) -> Result<bool, SqlError> {
+        let query = SqliteQueryHelper::get_uid_query(&table);
+        let exists: Option<String> = sqlx::query_scalar(&query)
+            .bind(uid)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(exists.is_some())
     }
 
     /// Primary query for retrieving versions from the database. Mainly used to get most recent version when determining version increment
@@ -1063,6 +1089,14 @@ mod tests {
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
         sqlx::query(&script).execute(&client.pool).await.unwrap();
 
+        // check if uid exists
+        let exists = client
+            .check_uid_exists("fake", &CardSQLTableNames::Data)
+            .await
+            .unwrap();
+
+        assert_eq!(exists, false);
+
         // try name and repository
         let card_args = CardQueryArgs {
             name: Some("Data1".to_string()),
@@ -1144,6 +1178,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(results.len(), 1);
+
+        // check if uid exists
+        let exists = client
+            .check_uid_exists(
+                "550e8400-e29b-41d4-a716-446655440000",
+                &CardSQLTableNames::Data,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(exists, true);
 
         cleanup();
     }

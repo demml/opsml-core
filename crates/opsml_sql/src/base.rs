@@ -6,38 +6,8 @@ use crate::schemas::schema::{
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_types::CardSQLTableNames;
 use opsml_utils::semver::VersionParser;
-use std::fmt;
-pub enum CardSQLTableNames {
-    Data,
-    Model,
-    Run,
-    Project,
-    Audit,
-    Pipeline,
-    Metrics,
-    HardwareMetrics,
-    Parameters,
-    Users,
-}
-
-impl fmt::Display for CardSQLTableNames {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let table_name = match self {
-            CardSQLTableNames::Data => "opsml_data_registry",
-            CardSQLTableNames::Model => "opsml_model_registry",
-            CardSQLTableNames::Run => "opsml_run_registry",
-            CardSQLTableNames::Project => "opsml_project_registry",
-            CardSQLTableNames::Audit => "opsml_audit_registry",
-            CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
-            CardSQLTableNames::Metrics => "opsml_run_metrics",
-            CardSQLTableNames::HardwareMetrics => "opsml_run_hardware_metrics",
-            CardSQLTableNames::Parameters => "opsml_run_parameters",
-            CardSQLTableNames::Users => "opsml_users",
-        };
-        write!(f, "{}", table_name)
-    }
-}
 
 pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), SqlError> {
     let version_bounds = VersionParser::get_version_to_search(version)
@@ -243,4 +213,20 @@ pub trait SqlClient: Sized {
     ///
     /// * `Result<(), SqlError>` - The result of the operation
     async fn update_user(&self, user: &User) -> Result<(), SqlError>;
+
+    /// Check if uid exists
+    ///
+    /// # Arguments
+    ///
+    /// * `uid` - The unique identifier of the card
+    /// * `table` - The table to search
+    ///
+    /// # Returns
+    ///
+    /// * `bool` - True if the uid exists
+    async fn check_uid_exists(
+        &self,
+        uid: &str,
+        table: &CardSQLTableNames,
+    ) -> Result<bool, SqlError>;
 }

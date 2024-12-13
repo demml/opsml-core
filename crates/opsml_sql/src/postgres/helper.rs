@@ -1,8 +1,8 @@
 use opsml_error::error::SqlError;
 
 /// this file contains helper logic for generating sql queries across different databases
-use crate::base::CardSQLTableNames;
 use crate::schemas::arguments::CardQueryArgs;
+use opsml_types::CardSQLTableNames;
 use opsml_utils::semver::VersionParser;
 use opsml_utils::utils::is_valid_uuid4;
 
@@ -54,6 +54,10 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
 pub struct PostgresQueryHelper;
 
 impl PostgresQueryHelper {
+    pub fn get_uid_query(table: &CardSQLTableNames) -> String {
+        format!("SELECT uid FROM {} WHERE uid = $1", table).to_string()
+    }
+
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES ($1, $2, $3, $4)",

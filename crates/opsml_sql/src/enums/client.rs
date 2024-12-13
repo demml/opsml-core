@@ -1,4 +1,4 @@
-use crate::base::{CardSQLTableNames, SqlClient};
+use crate::base::SqlClient;
 use crate::mysql::client::MySqlClient;
 use crate::postgres::client::PostgresClient;
 use crate::schemas::arguments::CardQueryArgs;
@@ -12,6 +12,7 @@ use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings};
+use opsml_types::CardSQLTableNames;
 use opsml_types::SqlType;
 
 #[derive(Debug, Clone)]
@@ -62,6 +63,19 @@ impl SqlClient for SqlClientEnum {
             }
         }
     }
+
+    async fn check_uid_exists(
+        &self,
+        uid: &str,
+        table: &CardSQLTableNames,
+    ) -> Result<bool, SqlError> {
+        match self {
+            SqlClientEnum::Postgres(client) => client.check_uid_exists(uid, table).await,
+            SqlClientEnum::Sqlite(client) => client.check_uid_exists(uid, table).await,
+            SqlClientEnum::MySql(client) => client.check_uid_exists(uid, table).await,
+        }
+    }
+
     async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.insert_card(table, card).await,
@@ -400,6 +414,14 @@ mod tests {
     async fn test_enum_query_cards() {
         let client = get_client().await;
 
+        // check if uid exists
+        let exists = client
+            .check_uid_exists("fake", &CardSQLTableNames::Data)
+            .await
+            .unwrap();
+
+        assert_eq!(exists, false);
+
         // try name and repository
         let card_args = CardQueryArgs {
             name: Some("Data1".to_string()),
@@ -481,6 +503,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(results.len(), 1);
+
+        // check if uid exists
+        let exists = client
+            .check_uid_exists(
+                "550e8400-e29b-41d4-a716-446655440000",
+                &CardSQLTableNames::Data,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(exists, true);
 
         cleanup();
     }

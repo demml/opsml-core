@@ -1,12 +1,16 @@
 use opsml_error::error::SqlError;
 
 /// this file contains helper logic for generating sql queries across different databases
-use crate::base::{add_version_bounds, CardSQLTableNames};
+use crate::base::add_version_bounds;
 use crate::schemas::arguments::CardQueryArgs;
+use opsml_types::CardSQLTableNames;
 use opsml_utils::utils::is_valid_uuid4;
 pub struct SqliteQueryHelper;
 
 impl SqliteQueryHelper {
+    pub fn get_uid_query(table: &CardSQLTableNames) -> String {
+        format!("SELECT uid FROM {} WHERE uid = ?", table).to_string()
+    }
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",

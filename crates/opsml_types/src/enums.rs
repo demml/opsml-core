@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -409,6 +410,71 @@ impl PresignableTypes {
             PresignableTypes::Py => ".py",
             PresignableTypes::Yml => ".yml",
             PresignableTypes::Yaml => ".yaml",
+        }
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum RegistryType {
+    Data,
+    Model,
+    Run,
+    Project,
+    Audit,
+    Pipeline,
+    Metrics,
+    HardwareMetrics,
+    Parameters,
+    Users,
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum CardSQLTableNames {
+    Data,
+    Model,
+    Run,
+    Project,
+    Audit,
+    Pipeline,
+    Metrics,
+    HardwareMetrics,
+    Parameters,
+    Users,
+}
+
+impl fmt::Display for CardSQLTableNames {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let table_name = match self {
+            CardSQLTableNames::Data => "opsml_data_registry",
+            CardSQLTableNames::Model => "opsml_model_registry",
+            CardSQLTableNames::Run => "opsml_run_registry",
+            CardSQLTableNames::Project => "opsml_project_registry",
+            CardSQLTableNames::Audit => "opsml_audit_registry",
+            CardSQLTableNames::Pipeline => "opsml_pipeline_registry",
+            CardSQLTableNames::Metrics => "opsml_run_metrics",
+            CardSQLTableNames::HardwareMetrics => "opsml_run_hardware_metrics",
+            CardSQLTableNames::Parameters => "opsml_run_parameters",
+            CardSQLTableNames::Users => "opsml_users",
+        };
+        write!(f, "{}", table_name)
+    }
+}
+
+impl CardSQLTableNames {
+    pub fn from_registry_type(registry_type: &RegistryType) -> Self {
+        match registry_type {
+            RegistryType::Data => CardSQLTableNames::Data,
+            RegistryType::Model => CardSQLTableNames::Model,
+            RegistryType::Run => CardSQLTableNames::Run,
+            RegistryType::Project => CardSQLTableNames::Project,
+            RegistryType::Audit => CardSQLTableNames::Audit,
+            RegistryType::Pipeline => CardSQLTableNames::Pipeline,
+            RegistryType::Metrics => CardSQLTableNames::Metrics,
+            RegistryType::HardwareMetrics => CardSQLTableNames::HardwareMetrics,
+            RegistryType::Parameters => CardSQLTableNames::Parameters,
+            RegistryType::Users => CardSQLTableNames::Users,
         }
     }
 }

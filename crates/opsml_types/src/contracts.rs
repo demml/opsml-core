@@ -1,4 +1,4 @@
-use crate::enums::StorageType;
+use crate::{enums::StorageType, RegistryType};
 use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -68,4 +68,15 @@ pub struct UploadPartArgs {
     pub chunk_size: u64,
     pub chunk_index: u64,
     pub this_chunk_size: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UidRequest {
+    pub uid: String,
+    pub registry_type: RegistryType,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UidResponse {
+    pub exists: bool,
 }
