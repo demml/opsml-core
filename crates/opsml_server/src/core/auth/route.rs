@@ -1,10 +1,10 @@
-use crate::core::auth::schema::JwtToken;
 use crate::core::state::AppState;
 use anyhow::{Context, Result};
 /// Route for debugging information
 use axum::extract::State;
 use axum::{http::header, http::header::HeaderMap, http::StatusCode, routing::get, Json, Router};
 use opsml_sql::base::SqlClient;
+use opsml_types::types::JwtToken;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use tracing::error;

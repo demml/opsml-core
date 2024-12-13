@@ -8,7 +8,6 @@ description = "Opsml settings rust and python bindings"
 
 [dependencies]
 clap = { workspace = true }
-opsml-error = { workspace = true }
 opsml-utils = { workspace = true }
 rayon = { workspace = true }
 tabled = { workspace = true }

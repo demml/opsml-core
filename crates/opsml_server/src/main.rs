@@ -82,12 +82,12 @@ mod tests {
         http::{header, Request, StatusCode},
     };
 
-    use crate::core::auth::schema::JwtToken;
     use http_body_util::BodyExt; // for `collect`
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_settings::config::SqlType;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
+    use opsml_types::types::JwtToken;
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 

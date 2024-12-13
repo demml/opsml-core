@@ -40,3 +40,8 @@ pub struct HardwareMetrics {
     pub network: NetworkRates,
     pub gpu: Option<GPUMetrics>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct JwtToken {
+    pub token: String,
+}
