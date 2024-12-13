@@ -118,7 +118,6 @@ fn main() -> io::Result<()> {
     table.modify(Columns::single(1), Width::wrap(10).keep_words(true));
     table.modify(Columns::single(2), Width::wrap(50));
     table.modify(Columns::single(3), Width::wrap(100).keep_words(true));
-
     table.modify(
         Rows::new(0..1),
         (

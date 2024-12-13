@@ -2,6 +2,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use opsml_error::error::AuthError;
 use opsml_sql::schemas::schema::User;
 use password_auth::verify_password;
+use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -11,6 +12,7 @@ pub struct Claims {
     exp: usize,
     pub permissions: Vec<String>,
     pub group_permissions: Vec<String>,
+    salt: String,
 }
 
 pub struct AuthManager {
@@ -25,6 +27,14 @@ impl AuthManager {
         }
     }
 
+    fn generate_salt(&self) -> String {
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(16)
+            .map(char::from)
+            .collect()
+    }
+
     pub fn generate_jwt(&self, user: &User) -> String {
         let expiration = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -37,6 +47,7 @@ impl AuthManager {
             exp: expiration as usize,
             permissions: user.permissions.clone(),
             group_permissions: user.group_permissions.clone(),
+            salt: self.generate_salt(),
         };
 
         encode(
@@ -59,6 +70,7 @@ impl AuthManager {
             exp: expiration as usize,
             permissions: user.permissions.clone(),
             group_permissions: user.group_permissions.clone(),
+            salt: self.generate_salt(),
         };
 
         encode(

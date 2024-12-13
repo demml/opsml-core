@@ -4,32 +4,34 @@ use opsml_settings::config::OpsmlConfig;
 use opsml_sql::enums::client::{get_sql_client, SqlClientEnum};
 use opsml_storage::storage::enums::client::{get_storage_system, StorageClientEnum};
 use opsml_utils::color::LogColors;
-use tracing::info;
+use tracing::{debug, info};
 
 pub async fn setup_components() -> AnyhowResult<(OpsmlConfig, StorageClientEnum, SqlClientEnum)> {
     // setup config
     let config = OpsmlConfig::default();
 
     // start logging
-    setup_logging()
-        .await
-        .context(LogColors::purple("Failed to setup logging"))?;
+    let logging = setup_logging().await;
+
+    if logging.is_err() {
+        debug!("Failed to setup logging");
+    }
 
     info!("Starting OpsML Server ....");
 
     // setup storage client
     let storage = get_storage_system(&config)
         .await
-        .context(LogColors::purple("Failed to setup storage client"))?;
+        .context(LogColors::purple("❌ Failed to setup storage client"))?;
 
-    info!("Storage client: {}", storage.name());
+    info!("✅ Storage client: {}", storage.name());
 
     // setup storage client
     let sql = get_sql_client(&config)
         .await
-        .context(LogColors::purple("Failed to setup sql client"))?;
+        .context(LogColors::purple("❌ Failed to setup sql client"))?;
 
-    info!("Sql client: {}", sql.name());
+    info!("✅ Sql client: {}", sql.name());
 
     Ok((config, storage, sql))
 }

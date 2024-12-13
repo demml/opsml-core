@@ -13,6 +13,7 @@ axum-login = { workspace = true }
 chrono = { workspace = true }
 password-auth = { workspace = true }
 jsonwebtoken = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 

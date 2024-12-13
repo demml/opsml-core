@@ -7,13 +7,14 @@ use axum::Router;
 use opsml_auth::auth::AuthManager;
 use opsml_utils::color::LogColors;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 mod core;
 
 async fn create_app() -> Result<Router> {
     // setup components (config, logging, storage client)
     let (config, storage_client, sql_client) = setup_components().await?;
+    let auth_enabled = config.opsml_auth;
 
     // Create shared state for the application (storage client, auth manager, config)
     let app_state = Arc::new(AppState {
@@ -26,12 +27,18 @@ async fn create_app() -> Result<Router> {
         config: Arc::new(config),
     });
 
-    info!("Application state created");
+    info!("✅ Application state created");
 
     // create the router
     let app = create_router(app_state).await?;
 
-    info!("Router created");
+    info!("✅ Router created");
+
+    if auth_enabled {
+        info!("✅ Auth enabled");
+    } else {
+        warn!("Auth disabled");
+    }
 
     Ok(app)
 }
@@ -72,9 +79,18 @@ mod tests {
     use crate::core::health::schema::Alive;
     use axum::{
         body::Body,
-        http::{Request, StatusCode},
+        http::{header, Request, StatusCode},
     };
+
+    use crate::core::auth::schema::JwtToken;
     use http_body_util::BodyExt; // for `collect`
+    use opsml_auth::auth::AuthManager;
+    use opsml_settings::config::OpsmlDatabaseSettings;
+    use opsml_settings::config::SqlType;
+    use opsml_sql::base::SqlClient;
+    use opsml_sql::enums::client::SqlClientEnum;
+    use rand::{distributions::Alphanumeric, Rng};
+    use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
     fn cleanup() {
@@ -92,9 +108,36 @@ mod tests {
         }
     }
 
+    fn get_connection_uri() -> String {
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("opsml.db");
+
+        format!(
+            "sqlite://{}",
+            current_dir
+                .to_str()
+                .expect("Failed to convert path to string")
+        )
+    }
+
+    async fn setup() {
+        let config = OpsmlDatabaseSettings {
+            connection_uri: get_connection_uri(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        let client = SqlClientEnum::new(&config).await.unwrap();
+
+        // Run the SQL script to populate the database
+        let script = std::fs::read_to_string("tests/populate_db.sql").unwrap();
+        client.query(&script).await;
+    }
+
     #[tokio::test]
     async fn test_opsml_server_healthcheck() {
         cleanup();
+
         let app = create_app().await.unwrap();
 
         // `Router` implements `tower::Service<Request<Body>>` so we can
@@ -117,6 +160,94 @@ mod tests {
         let response: Alive = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(response.status, "Alive");
+
+        cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_login() {
+        // set OPSML_AUTH to true
+        env::set_var("OPSML_AUTH", "true");
+
+        cleanup();
+
+        let app = create_app().await.unwrap();
+
+        // setup the database
+        setup().await;
+
+        // `Router` implements `tower::Service<Request<Body>>` so we can
+        // call it like any tower service, no need to run an HTTP server.
+        // create header map
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/opsml/auth/api/login")
+                    .header("Username", "admin")
+                    .header("Password", "test_password")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+
+        let token: JwtToken = serde_json::from_slice(&body).unwrap();
+
+        // call the healthcheck endpoint with the token
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/opsml/healthcheck")
+                    .header(header::AUTHORIZATION, format!("Bearer {}", token.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/opsml/healthcheck")
+                    .header(header::AUTHORIZATION, format!("Bearer {}", "invalid_token"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // refresh token
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/opsml/auth/api/refresh")
+                    .header(header::AUTHORIZATION, format!("Bearer {}", token.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+
+        let new_token: JwtToken = serde_json::from_slice(&body).unwrap();
+
+        // check if the new token is different from the old token
+        assert_ne!(token.token, new_token.token);
 
         cleanup();
     }
