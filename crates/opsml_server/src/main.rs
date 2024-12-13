@@ -76,18 +76,21 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::health::schema::Alive;
     use axum::{
         body::Body,
         http::{header, Request, StatusCode},
     };
+    use serde_qs;
 
     use axum::response::Response;
     use http_body_util::BodyExt; // for `collect`
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
-    use opsml_types::{JwtToken, SqlType, UidRequest, UidResponse};
+    use opsml_types::{
+        JwtToken, RegistryType, RepositoryRequest, RepositoryResponse, SqlType, UidRequest,
+        UidResponse,
+    };
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
@@ -249,6 +252,80 @@ mod tests {
     #[tokio::test]
     async fn test_opsml_server_card_routes() {
         let helper = TestHelper::new().await;
+
+        /////////////////////// Test check uid ///////////////////////
+
+        // Test if a card UID exists - should be false
+        let params = UidRequest {
+            uid: "test_uid".to_string(),
+            registry_type: RegistryType::Data,
+        };
+
+        let query_string = serde_qs::to_string(&params).unwrap();
+
+        // check if a card UID exists (get request with UidRequest params)
+        let request = Request::builder()
+            .uri(format!("/opsml/card?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let uid_response: UidResponse = serde_json::from_slice(&body).unwrap();
+
+        // assert false
+        assert_eq!(uid_response.exists, false);
+
+        // Test if a card UID exists - should be True
+        let params = UidRequest {
+            uid: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+            registry_type: RegistryType::Data,
+        };
+
+        let query_string = serde_qs::to_string(&params).unwrap();
+
+        // check if a card UID exists (get request with UidRequest params)
+        let request = Request::builder()
+            .uri(format!("/opsml/card?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let uid_response: UidResponse = serde_json::from_slice(&body).unwrap();
+
+        // assert true
+        assert_eq!(uid_response.exists, true);
+
+        /////////////////////// Test respositories ///////////////////////
+        let params = RepositoryRequest {
+            registry_type: RegistryType::Model,
+        };
+
+        let query_string = serde_qs::to_string(&params).unwrap();
+
+        // check if a card UID exists (get request with UidRequest params)
+        let request = Request::builder()
+            .uri(format!("/opsml/card/repositories?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let repository_response: RepositoryResponse = serde_json::from_slice(&body).unwrap();
+
+        // assert 10
+        assert_eq!(repository_response.repositories.len(), 10);
+
         helper.cleanup();
     }
 }
