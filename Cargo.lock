@@ -3177,9 +3177,12 @@ dependencies = [
 name = "opsml-types"
 version = "0.1.0"
 dependencies = [
- "opsml-utils",
+ "chrono",
+ "colored_json",
+ "opsml-error",
  "pyo3",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3188,12 +3191,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "colored",
- "colored_json",
  "opsml-error",
- "pyo3",
+ "opsml-types",
  "semver",
- "serde",
- "serde_json",
  "uuid",
 ]
 

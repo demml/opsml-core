@@ -115,7 +115,7 @@ pub struct QueryStats {
     pub nbr_versions: i32,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct CardSummary {
     pub repository: String,
     pub name: String,

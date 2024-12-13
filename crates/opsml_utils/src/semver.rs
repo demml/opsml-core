@@ -1,38 +1,13 @@
 use opsml_error::error::VersionError;
+use opsml_types::enums::VersionType;
 use semver::{BuildMetadata, Prerelease, Version};
-use std::str::FromStr;
 
+#[derive(Debug, PartialEq)]
 pub struct VersionArgs {
     pub version: String,
     pub version_type: VersionType,
     pub pre: Option<String>,
     pub build: Option<String>,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum VersionType {
-    Major,
-    Minor,
-    Patch,
-    Pre,
-    Build,
-    PreBuild,
-}
-
-impl FromStr for VersionType {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<VersionType, Self::Err> {
-        match input.to_lowercase().as_str() {
-            "major" => Ok(VersionType::Major),
-            "minor" => Ok(VersionType::Minor),
-            "patch" => Ok(VersionType::Patch),
-            "pre" => Ok(VersionType::Pre),
-            "build" => Ok(VersionType::Build),
-            "pre_build" => Ok(VersionType::PreBuild),
-            _ => Err(()),
-        }
-    }
 }
 
 pub struct VersionValidator {}
@@ -47,36 +22,28 @@ impl VersionValidator {
 
     pub fn bump_version(version_args: &VersionArgs) -> Result<String, VersionError> {
         // parse the version
-        let mut version = match Version::parse(&version_args.version) {
+        let version = match Version::parse(&version_args.version) {
             Ok(v) => v,
             Err(e) => return Err(VersionError::InvalidVersion(e.to_string())),
         };
 
-        // get major minor patch
-        let (major, minor, patch) = (version.major, version.minor, version.patch);
+        let mut new_version = Version::new(version.major, version.minor, version.patch);
 
         // check if version type is major, minor, or patch. If not, return the version as is
-        let mut new_version = match version_args.version_type {
+        match version_args.version_type {
             VersionType::Major => {
-                version.major += 1;
-                version.minor = 0;
-                version.patch = 0;
-                version
+                new_version.major += 1;
+                new_version.minor = 0;
+                new_version.patch = 0;
             }
             VersionType::Minor => {
-                version.minor += 1;
-                version.patch = 0;
-                version
+                new_version.minor += 1;
+                new_version.patch = 0;
             }
-            VersionType::Patch => {
-                version.patch += 1;
-                version
-            }
+            VersionType::Patch => new_version.patch += 1,
 
-            // we handle pre and build separately
-            VersionType::Pre => Version::new(major, minor, patch),
-            VersionType::Build => Version::new(major, minor, patch),
-            VersionType::PreBuild => Version::new(major, minor, patch),
+            // do nothing for pre and build
+            VersionType::Pre | VersionType::Build | VersionType::PreBuild => {}
         };
 
         // its possible someone creates a major, minor, patch version with a pre or build, or both

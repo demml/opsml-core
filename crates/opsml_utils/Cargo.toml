@@ -9,11 +9,8 @@ doctest = false
 
 [dependencies]
 opsml-error = { workspace = true }
+opsml-types = { workspace = true }
 chrono = { workspace = true }
 colored = { workspace = true}
-colored_json = { workspace = true}
-pyo3 = { workspace = true }
 semver = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 uuid = { workspace = true }

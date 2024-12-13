@@ -88,7 +88,7 @@ pub trait SqlClient: Sized {
     async fn query_page(
         &self,
         sort_by: &str,
-        page: i64,
+        page: i32,
         search_term: Option<&str>,
         repository: Option<&str>,
         table: &CardSQLTableNames,

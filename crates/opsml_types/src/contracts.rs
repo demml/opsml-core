@@ -1,8 +1,8 @@
+use crate::helper::PyHelperFuncs;
+use crate::VersionType;
 use crate::{enums::StorageType, RegistryType};
-use opsml_utils::utils::PyHelperFuncs;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-
 // TODO: Move this to opsml_types. mayble under contracts.rs
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -89,4 +89,39 @@ pub struct RepositoryRequest {
 #[derive(Serialize, Deserialize)]
 pub struct RepositoryResponse {
     pub repositories: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RegistryStatsRequest {
+    pub registry_type: RegistryType,
+    pub search_term: Option<String>,
+}
+
+// RegistryStatsResponse is sourced from sql schema
+
+#[derive(Serialize, Deserialize)]
+pub struct QueryPageRequest {
+    pub registry_type: RegistryType,
+    pub sort_by: Option<String>,
+    pub repository: Option<String>,
+    pub search_term: Option<String>,
+    pub page: Option<i32>,
+}
+
+// QueryPageResponse is sourced from sql schema
+
+#[derive(Serialize, Deserialize)]
+pub struct CardVersionRequest {
+    pub registry_type: RegistryType,
+    pub name: String,
+    pub repository: String,
+    pub version: Option<String>,
+    pub version_type: VersionType,
+    pub pre_tag: Option<String>,
+    pub build_tag: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CardVersionResponse {
+    pub version: String,
 }

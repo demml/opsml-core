@@ -685,7 +685,7 @@ impl SqlClient for PostgresClient {
     async fn query_page(
         &self,
         sort_by: &str,
-        page: i64,
+        page: i32,
         search_term: Option<&str>,
         repository: Option<&str>,
         table: &CardSQLTableNames,

@@ -1,6 +1,7 @@
 pub mod constants;
 pub mod contracts;
 pub mod enums;
+pub mod helper;
 pub mod types;
 
 pub use constants::*;

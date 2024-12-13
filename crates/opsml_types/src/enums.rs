@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -479,6 +480,32 @@ impl CardSQLTableNames {
     }
 }
 
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+pub enum VersionType {
+    Major,
+    Minor,
+    Patch,
+    Pre,
+    Build,
+    PreBuild,
+}
+
+impl FromStr for VersionType {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<VersionType, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "major" => Ok(VersionType::Major),
+            "minor" => Ok(VersionType::Minor),
+            "patch" => Ok(VersionType::Patch),
+            "pre" => Ok(VersionType::Pre),
+            "build" => Ok(VersionType::Build),
+            "pre_build" => Ok(VersionType::PreBuild),
+            _ => Err(()),
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

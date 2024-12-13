@@ -43,6 +43,24 @@ pub enum UtilError {
     #[error("Util Error: {0}")]
     Error(String),
 
+    #[error("Failed to validate uuid")]
+    UuidError,
+
+    #[error("Failed to parse date")]
+    DateError,
+}
+
+impl From<UtilError> for PyErr {
+    fn from(err: UtilError) -> PyErr {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum TypeError {
+    #[error("Type Error: {0}")]
+    Error(String),
+
     #[error("Error serializing data")]
     SerializationError,
 
@@ -58,15 +76,12 @@ pub enum UtilError {
     #[error("Failed to write to file")]
     WriteError,
 
-    #[error("Failed to validate uuid")]
-    UuidError,
-
     #[error("Failed to parse date")]
     DateError,
 }
 
-impl From<UtilError> for PyErr {
-    fn from(err: UtilError) -> PyErr {
+impl From<TypeError> for PyErr {
+    fn from(err: TypeError) -> PyErr {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
     }
 }
