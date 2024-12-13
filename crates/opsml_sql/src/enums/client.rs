@@ -290,19 +290,31 @@ mod tests {
     use crate::schemas::schema::{
         AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
     };
+    use std::env;
+
+    fn get_connection_uri() -> String {
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        format!(
+            "sqlite://{}",
+            current_dir
+                .to_str()
+                .expect("Failed to convert path to string")
+        )
+    }
 
     pub fn cleanup() {
         // delete ./test.db if exists
-        if std::path::Path::new("./test.db").exists() {
-            std::fs::remove_file("./test.db").unwrap();
-        }
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        let _ = std::fs::remove_file(current_dir);
     }
 
     pub async fn get_client() -> SqlClientEnum {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
