@@ -27,7 +27,7 @@ pub async fn check_card_uid(
             )
         })?;
 
-    Ok(Json(UidResponse { exists: exists }))
+    Ok(Json(UidResponse { exists }))
 }
 
 /// Get card respositories

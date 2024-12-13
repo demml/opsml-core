@@ -420,7 +420,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(exists, false);
+        assert!(!exists);
 
         // try name and repository
         let card_args = CardQueryArgs {
@@ -513,7 +513,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(exists, true);
+        assert!(exists);
 
         cleanup();
     }

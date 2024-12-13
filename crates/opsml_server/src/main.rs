@@ -80,7 +80,6 @@ mod tests {
         body::Body,
         http::{header, Request, StatusCode},
     };
-    use serde_qs;
 
     use axum::response::Response;
     use http_body_util::BodyExt; // for `collect`
@@ -277,7 +276,7 @@ mod tests {
         let uid_response: UidResponse = serde_json::from_slice(&body).unwrap();
 
         // assert false
-        assert_eq!(uid_response.exists, false);
+        assert!(!uid_response.exists);
 
         // Test if a card UID exists - should be True
         let params = UidRequest {
@@ -301,7 +300,7 @@ mod tests {
         let uid_response: UidResponse = serde_json::from_slice(&body).unwrap();
 
         // assert true
-        assert_eq!(uid_response.exists, true);
+        assert!(uid_response.exists);
 
         /////////////////////// Test respositories ///////////////////////
         let params = RepositoryRequest {

@@ -137,7 +137,7 @@ impl SqlClient for SqliteClient {
         uid: &str,
         table: &CardSQLTableNames,
     ) -> Result<bool, SqlError> {
-        let query = SqliteQueryHelper::get_uid_query(&table);
+        let query = SqliteQueryHelper::get_uid_query(table);
         let exists: Option<String> = sqlx::query_scalar(&query)
             .bind(uid)
             .fetch_optional(&self.pool)
@@ -167,7 +167,7 @@ impl SqlClient for SqliteClient {
         version: Option<&str>,
     ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let query = SqliteQueryHelper::get_versions_query(&table, version)?;
+        let query = SqliteQueryHelper::get_versions_query(table, version)?;
         let cards: Vec<VersionResult> = sqlx::query_as(&query)
             .bind(name)
             .bind(repository)
@@ -203,7 +203,7 @@ impl SqlClient for SqliteClient {
         table: &CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        let query = SqliteQueryHelper::get_query_cards_query(&table, query_args)?;
+        let query = SqliteQueryHelper::get_query_cards_query(table, query_args)?;
 
         match table {
             CardSQLTableNames::Data => {
@@ -702,7 +702,7 @@ impl SqlClient for SqliteClient {
         table: &CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        let query = SqliteQueryHelper::get_query_stats_query(&table);
+        let query = SqliteQueryHelper::get_query_stats_query(table);
 
         // if search_term is not None, format with %search_term%, else None
         let stats: QueryStats = sqlx::query_as(&query)
@@ -735,7 +735,7 @@ impl SqlClient for SqliteClient {
         repository: Option<&str>,
         table: &CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = SqliteQueryHelper::get_query_page_query(&table, sort_by);
+        let query = SqliteQueryHelper::get_query_page_query(table, sort_by);
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
@@ -1095,7 +1095,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(exists, false);
+        assert!(!exists);
 
         // try name and repository
         let card_args = CardQueryArgs {
@@ -1188,7 +1188,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(exists, true);
+        assert!(exists);
 
         cleanup();
     }
@@ -1621,7 +1621,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, None, &&CardSQLTableNames::Data)
+            .query_page("name", 0, None, None, &CardSQLTableNames::Data)
             .await
             .unwrap();
 
@@ -1629,7 +1629,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, None, &&CardSQLTableNames::Model)
+            .query_page("name", 0, None, None, &CardSQLTableNames::Model)
             .await
             .unwrap();
 
@@ -1637,7 +1637,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, Some("repo3"), &&CardSQLTableNames::Model)
+            .query_page("name", 0, None, Some("repo3"), &CardSQLTableNames::Model)
             .await
             .unwrap();
 

@@ -104,7 +104,7 @@ impl SqlClient for PostgresClient {
         uid: &str,
         table: &CardSQLTableNames,
     ) -> Result<bool, SqlError> {
-        let query = PostgresQueryHelper::get_uid_query(&table);
+        let query = PostgresQueryHelper::get_uid_query(table);
         let exists: Option<String> = sqlx::query_scalar(&query)
             .bind(uid)
             .fetch_optional(&self.pool)
@@ -134,7 +134,7 @@ impl SqlClient for PostgresClient {
         version: Option<&str>,
     ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let query = PostgresQueryHelper::get_versions_query(&table, version)?;
+        let query = PostgresQueryHelper::get_versions_query(table, version)?;
 
         let cards: Vec<VersionResult> = sqlx::query_as(&query)
             .bind(name)
@@ -171,7 +171,7 @@ impl SqlClient for PostgresClient {
         table: &CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        let query = PostgresQueryHelper::get_query_cards_query(&table, query_args)?;
+        let query = PostgresQueryHelper::get_query_cards_query(table, query_args)?;
         match table {
             CardSQLTableNames::Data => {
                 let card: Vec<DataCardRecord> = sqlx::query_as(&query)
@@ -657,7 +657,7 @@ impl SqlClient for PostgresClient {
         table: &CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        let query = PostgresQueryHelper::get_query_stats_query(&table);
+        let query = PostgresQueryHelper::get_query_stats_query(table);
 
         // if search_term is not None, format with %search_term%, else None
         let stats: QueryStats = sqlx::query_as(&query)
@@ -690,7 +690,7 @@ impl SqlClient for PostgresClient {
         repository: Option<&str>,
         table: &CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = PostgresQueryHelper::get_query_page_query(&table, sort_by);
+        let query = PostgresQueryHelper::get_query_page_query(table, sort_by);
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
@@ -1068,11 +1068,11 @@ mod tests {
 
         // check if uid exists
         let exists = client
-            .check_uid_exists("fake", &&CardSQLTableNames::Data)
+            .check_uid_exists("fake", &CardSQLTableNames::Data)
             .await
             .unwrap();
 
-        assert_eq!(exists, false);
+        assert!(!exists);
 
         // try name and repository
         let card_args = CardQueryArgs {
@@ -1160,12 +1160,12 @@ mod tests {
         let exists = client
             .check_uid_exists(
                 "550e8400-e29b-41d4-a716-446655440000",
-                &&CardSQLTableNames::Data,
+                &CardSQLTableNames::Data,
             )
             .await
             .unwrap();
 
-        assert_eq!(exists, true);
+        assert!(exists);
 
         cleanup(&client.pool).await;
     }
