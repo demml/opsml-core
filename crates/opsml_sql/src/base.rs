@@ -61,7 +61,7 @@ pub trait SqlClient: Sized {
     async fn run_migrations(&self) -> Result<(), SqlError>;
     async fn get_versions(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         name: &str,
         repository: &str,
         version: Option<&str>,
@@ -69,19 +69,19 @@ pub trait SqlClient: Sized {
 
     async fn query_cards(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError>;
 
-    async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
-    async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
+    async fn insert_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
+    async fn update_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
     async fn get_unique_repository_names(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError>;
     async fn query_stats(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError>;
 
@@ -91,10 +91,10 @@ pub trait SqlClient: Sized {
         page: i64,
         search_term: Option<&str>,
         repository: Option<&str>,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError>;
 
-    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError>;
+    async fn delete_card(&self, table: &CardSQLTableNames, uid: &str) -> Result<(), SqlError>;
 
     // db specific functions
     // get project_id

@@ -80,3 +80,13 @@ pub struct UidRequest {
 pub struct UidResponse {
     pub exists: bool,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct RepositoryRequest {
+    pub registry_type: RegistryType,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RepositoryResponse {
+    pub repositories: Vec<String>,
+}

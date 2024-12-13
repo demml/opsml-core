@@ -87,8 +87,7 @@ mod tests {
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
-    use opsml_types::types::JwtToken;
-    use opsml_types::SqlType;
+    use opsml_types::{JwtToken, SqlType, UidRequest, UidResponse};
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
