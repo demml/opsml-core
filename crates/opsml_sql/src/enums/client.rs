@@ -1,7 +1,6 @@
 use crate::base::SqlClient;
 use crate::mysql::client::MySqlClient;
 use crate::postgres::client::PostgresClient;
-use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::{
     Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
     QueryStats, User,
@@ -12,8 +11,7 @@ use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings};
-use opsml_types::CardSQLTableNames;
-use opsml_types::SqlType;
+use opsml_types::{CardQueryArgs, CardSQLTableNames, SqlType};
 
 #[derive(Debug, Clone)]
 pub enum SqlClientEnum {

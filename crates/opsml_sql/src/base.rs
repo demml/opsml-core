@@ -1,4 +1,3 @@
-use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::{
     Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
     QueryStats, User,
@@ -6,7 +5,7 @@ use crate::schemas::schema::{
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_settings::config::OpsmlDatabaseSettings;
-use opsml_types::CardSQLTableNames;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionParser;
 
 pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), SqlError> {

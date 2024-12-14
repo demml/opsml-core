@@ -636,8 +636,8 @@ impl ProjectCardRecord {
 }
 
 // create enum that takes vec of cards
-
-#[derive(Debug)]
+// TODO: There should also be a client side enum that matches this (don't want to install opsml_sql on client)
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CardResults {
     Data(Vec<DataCardRecord>),
     Model(Vec<ModelCardRecord>),

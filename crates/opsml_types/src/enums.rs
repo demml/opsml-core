@@ -506,6 +506,7 @@ impl FromStr for VersionType {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

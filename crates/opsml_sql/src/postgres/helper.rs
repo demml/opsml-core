@@ -1,8 +1,7 @@
 use opsml_error::error::SqlError;
 
 /// this file contains helper logic for generating sql queries across different databases
-use crate::schemas::arguments::CardQueryArgs;
-use opsml_types::CardSQLTableNames;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionParser;
 use opsml_utils::utils::is_valid_uuid4;
 

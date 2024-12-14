@@ -1,18 +1,16 @@
 use crate::base::SqlClient;
 use crate::mysql::helper::MySQLQueryHelper;
-use crate::schemas::arguments::CardQueryArgs;
-use crate::schemas::schema::Card;
-use crate::schemas::schema::QueryStats;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, RunCardRecord, User,
+    AuditCardRecord, Card, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, QueryStats,
+    RunCardRecord, User,
 };
 use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
-use opsml_types::CardSQLTableNames;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
 use sqlx::{

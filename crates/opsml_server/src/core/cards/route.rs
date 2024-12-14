@@ -4,9 +4,11 @@ use anyhow::{Context, Result};
 use axum::extract::{Query, State};
 use axum::{http::StatusCode, routing::get, Json, Router};
 use opsml_sql::base::SqlClient;
+use opsml_sql::schemas::schema::CardResults;
 use opsml_types::{
-    CardSQLTableNames, CardVersionRequest, CardVersionResponse, QueryPageRequest,
-    RegistryStatsRequest, RepositoryRequest, RepositoryResponse, UidRequest, UidResponse,
+    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, ListCardRequest,
+    QueryPageRequest, RegistryStatsRequest, RepositoryRequest, RepositoryResponse, UidRequest,
+    UidResponse,
 };
 use opsml_utils::semver::{VersionArgs, VersionValidator};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -160,6 +162,44 @@ pub async fn get_next_version(
     }))
 }
 
+pub async fn list_cards(
+    State(state): State<Arc<AppState>>,
+    params: Query<ListCardRequest>,
+) -> Result<Json<CardResults>, (StatusCode, Json<serde_json::Value>)> {
+    let table = CardSQLTableNames::from_registry_type(&params.registry_type);
+    let card_args = CardQueryArgs {
+        name: params.name.clone(),
+        repository: params.repository.clone(),
+        version: params.version.clone(),
+        uid: params.uid.clone(),
+        max_date: params.max_date.clone(),
+        tags: params.tags.clone(),
+        limit: params.limit.clone(),
+        sort_by_timestamp: params.sort_by_timestamp.clone(),
+    };
+
+    let cards = state
+        .sql_client
+        .query_cards(&table, &card_args)
+        .await
+        .map_err(|e| {
+            error!("Failed to get unique repository names: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?;
+
+    Ok(Json(cards))
+}
+
+pub async fn create_card(
+    State(state): State<Arc<AppState>>,
+    params: Query<ListCardRequest>,
+) -> Result<Json<CardResults>, (StatusCode, Json<serde_json::Value>)> {
+    let table = CardSQLTableNames::from_registry_type(&params.registry_type);
+}
+
 pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -174,6 +214,7 @@ pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             )
             .route(&format!("{}/card/registry/page", prefix), get(get_page))
             .route(&format!("{}/card/version", prefix), get(get_next_version))
+            .route(&format!("{}/card/list", prefix), get(list_cards))
     }));
 
     match result {

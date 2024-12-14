@@ -87,10 +87,11 @@ mod tests {
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
+    use opsml_sql::schemas::schema::CardResults;
     use opsml_types::{
-        CardVersionRequest, CardVersionResponse, JwtToken, QueryPageRequest, RegistryStatsRequest,
-        RegistryType, RepositoryRequest, RepositoryResponse, SqlType, UidRequest, UidResponse,
-        VersionType,
+        CardVersionRequest, CardVersionResponse, JwtToken, ListCardRequest, QueryPageRequest,
+        RegistryStatsRequest, RegistryType, RepositoryRequest, RepositoryResponse, SqlType,
+        UidRequest, UidResponse, VersionType,
     };
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
@@ -251,7 +252,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_opsml_server_card_routes() {
+    async fn test_opsml_server_card_uid() {
         let helper = TestHelper::new().await;
 
         /////////////////////// Test check uid ///////////////////////
@@ -304,6 +305,13 @@ mod tests {
         // assert true
         assert!(uid_response.exists);
 
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_card_repositories() {
+        let helper = TestHelper::new().await;
+
         /////////////////////// Test respositories ///////////////////////
         let params = RepositoryRequest {
             registry_type: RegistryType::Model,
@@ -326,6 +334,13 @@ mod tests {
 
         // assert 10
         assert_eq!(repository_response.repositories.len(), 10);
+
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_card_stats_and_query() {
+        let helper = TestHelper::new().await;
 
         /////////////////////// Test registry stats ///////////////////////
 
@@ -393,8 +408,6 @@ mod tests {
 
         assert_eq!(page_response.summaries.len(), 10);
 
-        helper.cleanup();
-
         let args = QueryPageRequest {
             registry_type: RegistryType::Model,
             sort_by: None,
@@ -419,7 +432,14 @@ mod tests {
 
         assert_eq!(page_response.summaries.len(), 1);
 
-        ////// Card Versions//////
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_card_versions() {
+        let helper = TestHelper::new().await;
+
+        /////////////////////////// Card Versions/////////////////////
         let args = CardVersionRequest {
             registry_type: RegistryType::Data,
             name: "Data1".to_string(),
@@ -445,6 +465,69 @@ mod tests {
         let version_response: CardVersionResponse = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(version_response.version, "3.1.0");
+
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_list_cards() {
+        let helper = TestHelper::new().await;
+
+        let args = ListCardRequest {
+            uid: None,
+            name: None,
+            repository: None,
+            version: None,
+            max_date: None,
+            tags: None,
+            limit: None,
+            sort_by_timestamp: None,
+            registry_type: RegistryType::Data,
+        };
+
+        let query_string = serde_qs::to_string(&args).unwrap();
+
+        let request = Request::builder()
+            .uri(format!("/opsml/card/list?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let card_results: CardResults = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(card_results.len(), 10);
+
+        let args = ListCardRequest {
+            uid: None,
+            name: None,
+            repository: Some("repo1".to_string()),
+            version: None,
+            max_date: None,
+            tags: None,
+            limit: None,
+            sort_by_timestamp: None,
+            registry_type: RegistryType::Model,
+        };
+
+        let query_string = serde_qs::to_string(&args).unwrap();
+
+        let request = Request::builder()
+            .uri(format!("/opsml/card/list?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let card_results: CardResults = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(card_results.len(), 1);
 
         helper.cleanup();
     }
