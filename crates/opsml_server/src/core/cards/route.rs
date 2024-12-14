@@ -551,6 +551,7 @@ pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             .route(&format!("{}/card/version", prefix), get(get_next_version))
             .route(&format!("{}/card/list", prefix), get(list_cards))
             .route(&format!("{}/card/create", prefix), post(create_card))
+            .route(&format!("{}/card/update", prefix), post(update_card))
     }));
 
     match result {

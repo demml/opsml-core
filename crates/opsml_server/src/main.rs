@@ -96,7 +96,7 @@ mod tests {
         RunCardClientRecord, SqlType, UidRequest, UidResponse, UpdateCardRequest,
         UpdateCardResponse, VersionType,
     };
-    use std::env;
+    use std::{collections::HashMap, env};
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
     fn cleanup() {
@@ -612,7 +612,12 @@ mod tests {
                 uid: Some(card.uid),
                 app_env: Some(card.app_env),
                 created_at: Some(card.created_at.unwrap()),
-                ..DataCardClientRecord::default()
+                runcard_uid: Some(card.runcard_uid),
+                pipelinecard_uid: Some(card.pipelinecard_uid),
+                auditcard_uid: Some(card.auditcard_uid),
+                interface_type: Some(card.interface_type),
+                data_type: card.data_type,
+                tags: card.tags.0,
             }),
         };
 
