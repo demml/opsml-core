@@ -80,6 +80,36 @@ impl SqliteQueryHelper {
         )
         .to_string()
     }
+
+    pub fn get_run_metrics_insert_query(nbr_records: usize) -> String {
+        // values will be a vec of tuples
+        let mut query = format!(
+            "INSERT INTO {} (
+                run_uid, 
+                name, 
+                value,
+                step,
+                timestamp
+            ) VALUES ",
+            CardSQLTableNames::Metrics
+        )
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push_str(";");
+            }
+        }
+
+        query
+
+        // remove last co
+    }
     pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
@@ -295,16 +325,29 @@ impl SqliteQueryHelper {
 
         Ok(query)
     }
-    pub fn get_run_parameter_insert_query() -> String {
-        format!(
+    pub fn get_run_parameters_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 name, 
                 value
-            ) VALUES (?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::Parameters
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?) ");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push_str(";");
+            }
+        }
+
+        query
     }
     pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
@@ -333,8 +376,8 @@ impl SqliteQueryHelper {
 
         (query, bindings)
     }
-    pub fn get_hardware_metric_insert_query() -> String {
-        format!(
+    pub fn get_hardware_metrics_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 created_at,
@@ -355,10 +398,23 @@ impl SqliteQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::HardwareMetrics
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push_str(";");
+            }
+        }
+
+        query
     }
 
     pub fn get_projectcard_insert_query() -> String {

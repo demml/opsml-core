@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -44,4 +45,15 @@ pub struct HardwareMetrics {
 #[derive(Serialize, Deserialize)]
 pub struct JwtToken {
     pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metric {
+    pub run_uid: String,
+    pub name: String,
+    pub value: f64,
+    pub step: Option<i32>,
+    pub timestamp: Option<i64>,
+    pub created_at: Option<NaiveDateTime>,
+    pub idx: Option<i32>,
 }

@@ -109,6 +109,9 @@ pub trait SqlClient: Sized {
     ///
     async fn insert_run_metric(&self, record: &MetricRecord) -> Result<(), SqlError>;
 
+    /// Insert run metrics
+    async fn insert_run_metrics(&self, record: &Vec<MetricRecord>) -> Result<(), SqlError>;
+
     /// insert run parameter
     ///
     /// # Arguments
@@ -117,7 +120,7 @@ pub trait SqlClient: Sized {
     ///
     /// # Returns
     ///
-    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError>;
+    async fn insert_run_parameters(&self, records: &Vec<ParameterRecord>) -> Result<(), SqlError>;
 
     /// Get run metric
     ///
@@ -170,7 +173,10 @@ pub trait SqlClient: Sized {
     ///
     /// * `metric_record` - The hardware metrics
     ///
-    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError>;
+    async fn insert_hardware_metrics(
+        &self,
+        records: &Vec<HardwareMetricsRecord>,
+    ) -> Result<(), SqlError>;
 
     /// Get hardware metrics
     ///

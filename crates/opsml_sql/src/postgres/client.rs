@@ -746,6 +746,28 @@ impl SqlClient for PostgresClient {
         Ok(())
     }
 
+    async fn insert_run_metrics(&self, records: &Vec<MetricRecord>) -> Result<(), SqlError> {
+        let query = PostgresQueryHelper::get_run_metrics_insert_query(records.len());
+
+        let mut query_builder = sqlx::query(&query);
+
+        for r in records {
+            query_builder = query_builder
+                .bind(&r.run_uid)
+                .bind(&r.name)
+                .bind(r.value)
+                .bind(r.step)
+                .bind(r.timestamp);
+        }
+
+        query_builder
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
     async fn get_run_metric(
         &self,
         uid: &str,
@@ -782,29 +804,38 @@ impl SqlClient for PostgresClient {
         Ok(records)
     }
 
-    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError> {
-        let query = PostgresQueryHelper::get_hardware_metric_insert_query();
+    async fn insert_hardware_metrics(
+        &self,
+        record: &Vec<HardwareMetricsRecord>,
+    ) -> Result<(), SqlError> {
+        let query = PostgresQueryHelper::get_hardware_metrics_insert_query(record.len());
 
-        sqlx::query(&query)
-            .bind(&record.run_uid)
-            .bind(record.created_at)
-            .bind(record.cpu_percent_utilization)
-            .bind(&record.cpu_percent_per_core)
-            .bind(record.compute_overall)
-            .bind(record.compute_utilized)
-            .bind(record.load_avg)
-            .bind(record.sys_ram_total)
-            .bind(record.sys_ram_used)
-            .bind(record.sys_ram_available)
-            .bind(record.sys_ram_percent_used)
-            .bind(record.sys_swap_total)
-            .bind(record.sys_swap_used)
-            .bind(record.sys_swap_free)
-            .bind(record.sys_swap_percent)
-            .bind(record.bytes_recv)
-            .bind(record.bytes_sent)
-            .bind(record.gpu_percent_utilization)
-            .bind(&record.gpu_percent_per_core)
+        let mut query_builder = sqlx::query(&query);
+
+        for r in record {
+            query_builder = query_builder
+                .bind(&r.run_uid)
+                .bind(r.created_at)
+                .bind(r.cpu_percent_utilization)
+                .bind(&r.cpu_percent_per_core)
+                .bind(r.compute_overall)
+                .bind(r.compute_utilized)
+                .bind(r.load_avg)
+                .bind(r.sys_ram_total)
+                .bind(r.sys_ram_used)
+                .bind(r.sys_ram_available)
+                .bind(r.sys_ram_percent_used)
+                .bind(r.sys_swap_total)
+                .bind(r.sys_swap_used)
+                .bind(r.sys_swap_free)
+                .bind(r.sys_swap_percent)
+                .bind(r.bytes_recv)
+                .bind(r.bytes_sent)
+                .bind(r.gpu_percent_utilization)
+                .bind(&r.gpu_percent_per_core);
+        }
+
+        query_builder
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -824,13 +855,19 @@ impl SqlClient for PostgresClient {
         Ok(records)
     }
 
-    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError> {
-        let query = PostgresQueryHelper::get_run_parameter_insert_query();
+    async fn insert_run_parameters(&self, records: &Vec<ParameterRecord>) -> Result<(), SqlError> {
+        let query = PostgresQueryHelper::get_run_parameters_insert_query(records.len());
 
-        sqlx::query(&query)
-            .bind(&record.run_uid)
-            .bind(&record.name)
-            .bind(&record.value)
+        let mut query_builder = sqlx::query(&query);
+
+        for record in records {
+            query_builder = query_builder
+                .bind(&record.run_uid)
+                .bind(&record.name)
+                .bind(&record.value);
+        }
+
+        query_builder
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -921,7 +958,7 @@ mod tests {
     use crate::schemas::schema::ProjectCardRecord;
     use opsml_types::SqlType;
     use opsml_utils::utils::get_utc_datetime;
-    use std::env;
+    use std::{env, vec};
     pub async fn cleanup(pool: &Pool<Postgres>) {
         sqlx::raw_sql(
             r#"
@@ -1756,10 +1793,7 @@ mod tests {
                 run_uid: uid.clone(),
                 name: name.to_string(),
                 value: 1.0,
-                step: None,
-                timestamp: None,
-                created_at: None,
-                idx: None,
+                ..Default::default()
             };
 
             client.insert_run_metric(&metric).await.unwrap();
@@ -1773,6 +1807,28 @@ mod tests {
 
         // assert names = "metric1"
         assert_eq!(names.len(), 3);
+
+        // insert vec
+        let records = vec![
+            MetricRecord {
+                run_uid: uid.clone(),
+                name: "vec1".to_string(),
+                value: 1.0,
+                ..Default::default()
+            },
+            MetricRecord {
+                run_uid: uid.clone(),
+                name: "vec2".to_string(),
+                value: 1.0,
+                ..Default::default()
+            },
+        ];
+
+        client.insert_run_metrics(&records).await.unwrap();
+
+        let records = client.get_run_metric(&uid, None).await.unwrap();
+
+        assert_eq!(records.len(), 5);
 
         cleanup(&client.pool).await;
     }
@@ -1793,6 +1849,7 @@ mod tests {
         sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut metrics = vec![];
 
         // create a loop of 10
         for _ in 0..10 {
@@ -1802,9 +1859,10 @@ mod tests {
                 ..Default::default()
             };
 
-            client.insert_hardware_metric(&metric).await.unwrap();
+            metrics.push(metric);
         }
 
+        client.insert_hardware_metrics(&metrics).await.unwrap();
         let records = client.get_hardware_metric(&uid).await.unwrap();
 
         assert_eq!(records.len(), 10);
@@ -1828,6 +1886,7 @@ mod tests {
         sqlx::raw_sql(&script).execute(&client.pool).await.unwrap();
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut params = vec![];
 
         // create a loop of 10
         for i in 0..10 {
@@ -1837,9 +1896,10 @@ mod tests {
                 ..Default::default()
             };
 
-            client.insert_run_parameter(&param).await.unwrap();
+            params.push(param);
         }
 
+        client.insert_run_parameters(&params).await.unwrap();
         let records = client.get_run_parameter(&uid, None).await.unwrap();
 
         assert_eq!(records.len(), 10);

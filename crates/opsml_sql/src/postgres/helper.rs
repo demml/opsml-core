@@ -108,6 +108,35 @@ impl PostgresQueryHelper {
         )
         .to_string()
     }
+
+    pub fn get_run_metrics_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
+            "INSERT INTO {} (
+                run_uid, 
+                name, 
+                value,
+                step,
+                timestamp
+            ) VALUES ",
+            CardSQLTableNames::Metrics
+        );
+
+        for i in 0..nbr_records {
+            if i > 0 {
+                query.push_str(", ");
+            }
+            query.push_str(&format!(
+                "(${}, ${}, ${}, ${}, ${})",
+                5 * i + 1,
+                5 * i + 2,
+                5 * i + 3,
+                5 * i + 4,
+                5 * i + 5
+            ));
+        }
+
+        query
+    }
     pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
@@ -313,16 +342,25 @@ impl PostgresQueryHelper {
 
         Ok(query)
     }
-    pub fn get_run_parameter_insert_query() -> String {
-        format!(
+    pub fn get_run_parameters_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 name, 
                 value
-            ) VALUES ($1, $2, $3)",
+            ) VALUES ",
             CardSQLTableNames::Parameters
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            if i > 0 {
+                query.push_str(", ");
+            }
+            query.push_str(&format!("(${}, ${}, ${})", 3 * i + 1, 3 * i + 2, 3 * i + 3));
+        }
+
+        query
     }
     pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
         let mut query = format!(
@@ -352,8 +390,8 @@ impl PostgresQueryHelper {
 
         (query, bindings)
     }
-    pub fn get_hardware_metric_insert_query() -> String {
-        format!(
+    pub fn get_hardware_metrics_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 created_at,
@@ -374,10 +412,21 @@ impl PostgresQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
+            ) VALUES ",
             CardSQLTableNames::HardwareMetrics
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str(&format!("(${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${})", 19 * i + 1, 19 * i + 2, 19 * i + 3, 19 * i + 4, 19 * i + 5, 19 * i + 6, 19 * i + 7, 19 * i + 8, 19 * i + 9, 19 * i + 10, 19 * i + 11, 19 * i + 12, 19 * i + 13, 19 * i + 14, 19 * i + 15, 19 * i + 16, 19 * i + 17, 19 * i + 18, 19 * i + 19));
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push_str(";");
+            }
+        }
+
+        query
     }
     pub fn get_projectcard_insert_query() -> String {
         format!(

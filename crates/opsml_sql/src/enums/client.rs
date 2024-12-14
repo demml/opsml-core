@@ -205,6 +205,14 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
+    async fn insert_run_metrics(&self, records: &Vec<MetricRecord>) -> Result<(), SqlError> {
+        match self {
+            SqlClientEnum::Postgres(client) => client.insert_run_metrics(records).await,
+            SqlClientEnum::Sqlite(client) => client.insert_run_metrics(records).await,
+            SqlClientEnum::MySql(client) => client.insert_run_metrics(records).await,
+        }
+    }
+
     async fn get_run_metric(
         &self,
         uid: &str,
@@ -225,11 +233,14 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError> {
+    async fn insert_hardware_metrics(
+        &self,
+        record: &Vec<HardwareMetricsRecord>,
+    ) -> Result<(), SqlError> {
         match self {
-            SqlClientEnum::Postgres(client) => client.insert_hardware_metric(record).await,
-            SqlClientEnum::Sqlite(client) => client.insert_hardware_metric(record).await,
-            SqlClientEnum::MySql(client) => client.insert_hardware_metric(record).await,
+            SqlClientEnum::Postgres(client) => client.insert_hardware_metrics(record).await,
+            SqlClientEnum::Sqlite(client) => client.insert_hardware_metrics(record).await,
+            SqlClientEnum::MySql(client) => client.insert_hardware_metrics(record).await,
         }
     }
 
@@ -241,11 +252,11 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError> {
+    async fn insert_run_parameters(&self, record: &Vec<ParameterRecord>) -> Result<(), SqlError> {
         match self {
-            SqlClientEnum::Postgres(client) => client.insert_run_parameter(record).await,
-            SqlClientEnum::Sqlite(client) => client.insert_run_parameter(record).await,
-            SqlClientEnum::MySql(client) => client.insert_run_parameter(record).await,
+            SqlClientEnum::Postgres(client) => client.insert_run_parameters(record).await,
+            SqlClientEnum::Sqlite(client) => client.insert_run_parameters(record).await,
+            SqlClientEnum::MySql(client) => client.insert_run_parameters(record).await,
         }
     }
 
@@ -1030,6 +1041,7 @@ mod tests {
         let client = get_client().await;
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut metrics = vec![];
 
         // create a loop of 10
         for _ in 0..10 {
@@ -1039,9 +1051,10 @@ mod tests {
                 ..Default::default()
             };
 
-            client.insert_hardware_metric(&metric).await.unwrap();
+            metrics.push(metric);
         }
 
+        client.insert_hardware_metrics(&metrics).await.unwrap();
         let records = client.get_hardware_metric(&uid).await.unwrap();
 
         assert_eq!(records.len(), 10);
@@ -1054,6 +1067,7 @@ mod tests {
         let client = get_client().await;
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut params = vec![];
 
         // create a loop of 10
         for i in 0..10 {
@@ -1063,9 +1077,10 @@ mod tests {
                 ..Default::default()
             };
 
-            client.insert_run_parameter(&parameter).await.unwrap();
+            params.push(parameter);
         }
 
+        client.insert_run_parameters(&params).await.unwrap();
         let records = client.get_run_parameter(&uid, None).await.unwrap();
 
         assert_eq!(records.len(), 10);

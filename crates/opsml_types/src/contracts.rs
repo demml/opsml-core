@@ -1,6 +1,6 @@
 use crate::helper::PyHelperFuncs;
-use crate::VersionType;
 use crate::{enums::StorageType, RegistryType};
+use crate::{Metric, VersionType};
 use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -426,4 +426,10 @@ pub struct UpdateCardRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateCardResponse {
     pub updated: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MetricRequest {
+    pub run_uid: String,
+    pub metrics: Vec<Metric>,
 }

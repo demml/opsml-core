@@ -40,6 +40,20 @@ impl MetricRecord {
     }
 }
 
+impl Default for MetricRecord {
+    fn default() -> Self {
+        MetricRecord {
+            run_uid: Uuid::new_v4().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            value: 0.0,
+            step: None,
+            timestamp: None,
+            created_at: None,
+            idx: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ParameterRecord {
     pub run_uid: String,
