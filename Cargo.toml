@@ -41,7 +41,7 @@ aws-smithy-types = { version = "1.2.9", features = ["rt-tokio", "http-body-0-4-x
 aws-types = "1.*"
 base64 = "0.*"
 bytes = "1.*"
-axum = { version = "0.7.7", features = ["multipart"] }
+axum = { version = "0.7.7", features = ["multipart", "macros"] }
 axum-extra = { version =  "0.*", features = ["cookie"] }
 clap = { version = "4.*", features = ["derive"] }
 chrono = { version = "0.*", features = ["serde"] }

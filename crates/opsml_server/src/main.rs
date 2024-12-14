@@ -89,9 +89,11 @@ mod tests {
     use opsml_sql::enums::client::SqlClientEnum;
     use opsml_sql::schemas::schema::CardResults;
     use opsml_types::{
-        CardVersionRequest, CardVersionResponse, JwtToken, ListCardRequest, QueryPageRequest,
-        RegistryStatsRequest, RegistryType, RepositoryRequest, RepositoryResponse, SqlType,
-        UidRequest, UidResponse, VersionType,
+        AuditCardClientRecord, CardVersionRequest, CardVersionResponse, ClientCard,
+        CreateCardRequest, CreateCardResponse, DataCardClientRecord, JwtToken, ListCardRequest,
+        ModelCardClientRecord, PipelineCardClientRecord, ProjectCardClientRecord, QueryPageRequest,
+        RegistryStatsRequest, RegistryType, RepositoryRequest, RepositoryResponse,
+        RunCardClientRecord, SqlType, UidRequest, UidResponse, VersionType,
     };
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
@@ -528,6 +530,180 @@ mod tests {
         let card_results: CardResults = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
+
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_create_card() {
+        let helper = TestHelper::new().await;
+
+        // DataCard
+        let card_request = CreateCardRequest {
+            card: ClientCard::Data(DataCardClientRecord {
+                name: "DataCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                contact: "test".to_string(),
+                ..DataCardClientRecord::default()
+            }),
+            registry_type: RegistryType::Data,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
+
+        // ModelCard
+        let card_request = CreateCardRequest {
+            card: ClientCard::Model(ModelCardClientRecord {
+                name: "ModelCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                contact: "test".to_string(),
+                ..ModelCardClientRecord::default()
+            }),
+            registry_type: RegistryType::Model,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
+
+        // RunCard
+        let card_request = CreateCardRequest {
+            card: ClientCard::Run(RunCardClientRecord {
+                name: "RunCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                contact: "test".to_string(),
+                ..RunCardClientRecord::default()
+            }),
+            registry_type: RegistryType::Run,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
+
+        // PipelineCard
+        let card_request = CreateCardRequest {
+            card: ClientCard::Pipeline(PipelineCardClientRecord {
+                name: "PipelineCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                contact: "test".to_string(),
+                ..PipelineCardClientRecord::default()
+            }),
+            registry_type: RegistryType::Pipeline,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
+
+        // Audit
+        let card_request = CreateCardRequest {
+            card: ClientCard::Audit(AuditCardClientRecord {
+                name: "AuditCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                contact: "test".to_string(),
+                ..AuditCardClientRecord::default()
+            }),
+            registry_type: RegistryType::Audit,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
+
+        // Project
+        let card_request = CreateCardRequest {
+            card: ClientCard::Project(ProjectCardClientRecord {
+                name: "ProjectCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.0".to_string(),
+                project_id: 1,
+            }),
+            registry_type: RegistryType::Project,
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/create")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(create_response.registered);
 
         helper.cleanup();
     }

@@ -1,14 +1,22 @@
 use crate::core::cards::schema::{QueryPageResponse, RegistryStatsResponse};
 use crate::core::state::AppState;
 use anyhow::{Context, Result};
-use axum::extract::{Query, State};
-use axum::{http::StatusCode, routing::get, Json, Router};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use opsml_sql::base::SqlClient;
-use opsml_sql::schemas::schema::CardResults;
+use opsml_sql::schemas::schema::{
+    AuditCardRecord, Card, CardResults, DataCardRecord, ModelCardRecord, PipelineCardRecord,
+    ProjectCardRecord, RunCardRecord,
+};
 use opsml_types::{
-    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, ListCardRequest,
-    QueryPageRequest, RegistryStatsRequest, RepositoryRequest, RepositoryResponse, UidRequest,
-    UidResponse,
+    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, ClientCard,
+    CreateCardRequest, CreateCardResponse, ListCardRequest, QueryPageRequest, RegistryStatsRequest,
+    RepositoryRequest, RepositoryResponse, UidRequest, UidResponse,
 };
 use opsml_utils::semver::{VersionArgs, VersionValidator};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -174,8 +182,8 @@ pub async fn list_cards(
         uid: params.uid.clone(),
         max_date: params.max_date.clone(),
         tags: params.tags.clone(),
-        limit: params.limit.clone(),
-        sort_by_timestamp: params.sort_by_timestamp.clone(),
+        limit: params.limit,
+        sort_by_timestamp: params.sort_by_timestamp,
     };
 
     let cards = state
@@ -195,9 +203,117 @@ pub async fn list_cards(
 
 pub async fn create_card(
     State(state): State<Arc<AppState>>,
-    params: Query<ListCardRequest>,
-) -> Result<Json<CardResults>, (StatusCode, Json<serde_json::Value>)> {
-    let table = CardSQLTableNames::from_registry_type(&params.registry_type);
+    Json(card_request): Json<CreateCardRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let table = CardSQLTableNames::from_registry_type(&card_request.registry_type);
+
+    // match on registry type
+    let card = match card_request.card {
+        ClientCard::Data(client_card) => {
+            let server_card = DataCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.contact,
+                client_card.tags,
+                client_card.data_type,
+                client_card.runcard_uid,
+                client_card.pipelinecard_uid,
+                client_card.auditcard_uid,
+                client_card.interface_type,
+            );
+            Card::Data(server_card)
+        }
+        ClientCard::Model(client_card) => {
+            let server_card = ModelCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.contact,
+                client_card.tags,
+                client_card.datacard_uid,
+                client_card.sample_data_type,
+                client_card.model_type,
+                client_card.runcard_uid,
+                client_card.pipelinecard_uid,
+                client_card.auditcard_uid,
+                client_card.interface_type,
+                client_card.task_type,
+            );
+            Card::Model(server_card)
+        }
+
+        ClientCard::Project(client_card) => {
+            let server_card = ProjectCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.project_id,
+            );
+            Card::Project(server_card)
+        }
+
+        ClientCard::Run(client_card) => {
+            let server_card = RunCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.contact,
+                client_card.tags,
+                client_card.datacard_uids,
+                client_card.modelcard_uids,
+                client_card.pipelinecard_uid,
+                client_card.project,
+                client_card.artifact_uris,
+                client_card.compute_environment,
+            );
+            Card::Run(server_card)
+        }
+
+        ClientCard::Pipeline(client_card) => {
+            let server_card = PipelineCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.contact,
+                client_card.tags,
+                client_card.pipeline_code_uri,
+                client_card.datacard_uids,
+                client_card.modelcard_uids,
+                client_card.runcard_uids,
+            );
+            Card::Pipeline(server_card)
+        }
+
+        ClientCard::Audit(client_card) => {
+            let server_card = AuditCardRecord::new(
+                client_card.name,
+                client_card.repository,
+                client_card.version.parse().unwrap(),
+                client_card.contact,
+                client_card.tags,
+                client_card.approved,
+                client_card.datacard_uids,
+                client_card.modelcard_uids,
+                client_card.runcard_uids,
+            );
+            Card::Audit(server_card)
+        }
+    };
+
+    state
+        .sql_client
+        .insert_card(&table, &card)
+        .await
+        .map_err(|e| {
+            error!("Failed to insert card: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?;
+
+    Ok(Json(CreateCardResponse { registered: true }))
 }
 
 pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
@@ -215,6 +331,7 @@ pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             .route(&format!("{}/card/registry/page", prefix), get(get_page))
             .route(&format!("{}/card/version", prefix), get(get_next_version))
             .route(&format!("{}/card/list", prefix), get(list_cards))
+            .route(&format!("{}/card/create", prefix), post(create_card))
     }));
 
     match result {

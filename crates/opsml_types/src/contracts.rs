@@ -1,7 +1,6 @@
 use crate::helper::PyHelperFuncs;
 use crate::VersionType;
 use crate::{enums::StorageType, RegistryType};
-use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,6 +179,23 @@ pub struct DataCardClientRecord {
     pub interface_type: Option<String>,
 }
 
+impl Default for DataCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            contact: "".to_string(),
+            tags: HashMap::new(),
+            data_type: "".to_string(),
+            runcard_uid: None,
+            pipelinecard_uid: None,
+            auditcard_uid: None,
+            interface_type: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelCardClientRecord {
     pub name: String,
@@ -197,6 +213,26 @@ pub struct ModelCardClientRecord {
     pub task_type: Option<String>,
 }
 
+impl Default for ModelCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            contact: "".to_string(),
+            tags: HashMap::new(),
+            datacard_uid: None,
+            sample_data_type: "".to_string(),
+            model_type: "".to_string(),
+            runcard_uid: None,
+            pipelinecard_uid: None,
+            auditcard_uid: None,
+            interface_type: None,
+            task_type: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunCardClientRecord {
     pub name: String,
@@ -212,6 +248,24 @@ pub struct RunCardClientRecord {
     pub compute_environment: Option<HashMap<String, String>>,
 }
 
+impl Default for RunCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            contact: "".to_string(),
+            tags: HashMap::new(),
+            datacard_uids: None,
+            modelcard_uids: None,
+            pipelinecard_uid: None,
+            project: "".to_string(),
+            artifact_uris: None,
+            compute_environment: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditCardClientRecord {
     pub name: String,
@@ -223,6 +277,22 @@ pub struct AuditCardClientRecord {
     pub datacard_uids: Option<Vec<String>>,
     pub modelcard_uids: Option<Vec<String>>,
     pub runcard_uids: Option<Vec<String>>,
+}
+
+impl Default for AuditCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            contact: "".to_string(),
+            tags: HashMap::new(),
+            approved: false,
+            datacard_uids: None,
+            modelcard_uids: None,
+            runcard_uids: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,10 +308,58 @@ pub struct PipelineCardClientRecord {
     pub runcard_uids: Option<Vec<String>>,
 }
 
+impl Default for PipelineCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            contact: "".to_string(),
+            tags: HashMap::new(),
+            pipeline_code_uri: "".to_string(),
+            datacard_uids: None,
+            modelcard_uids: None,
+            runcard_uids: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectCardClientRecord {
     pub name: String,
     pub repository: String,
     pub version: String,
     pub project_id: i32,
+}
+
+impl Default for ProjectCardClientRecord {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            repository: "".to_string(),
+            version: "".to_string(),
+            project_id: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ClientCard {
+    Data(DataCardClientRecord),
+    Model(ModelCardClientRecord),
+    Run(RunCardClientRecord),
+    Audit(AuditCardClientRecord),
+    Pipeline(PipelineCardClientRecord),
+    Project(ProjectCardClientRecord),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateCardRequest {
+    pub registry_type: RegistryType,
+    pub card: ClientCard,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateCardResponse {
+    pub registered: bool,
 }
