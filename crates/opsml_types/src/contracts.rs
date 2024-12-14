@@ -166,6 +166,22 @@ pub struct ListCardRequest {
     pub registry_type: RegistryType,
 }
 
+impl Default for ListCardRequest {
+    fn default() -> Self {
+        Self {
+            uid: None,
+            name: None,
+            repository: None,
+            version: None,
+            max_date: None,
+            tags: None,
+            limit: None,
+            sort_by_timestamp: None,
+            registry_type: RegistryType::Data,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataCardClientRecord {
     pub uid: Option<String>,
@@ -359,7 +375,6 @@ impl Default for PipelineCardClientRecord {
 pub struct ProjectCardClientRecord {
     pub uid: Option<String>,
     pub created_at: Option<NaiveDateTime>,
-    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -371,7 +386,6 @@ impl Default for ProjectCardClientRecord {
         Self {
             uid: None,
             created_at: None,
-            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),

@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use opsml_sql::base::SqlClient;
@@ -535,6 +535,26 @@ pub async fn update_card(
     Ok(Json(UpdateCardResponse { updated: true }))
 }
 
+pub async fn delete_card(
+    State(state): State<Arc<AppState>>,
+    params: Query<UidRequest>,
+) -> Result<Json<UidResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let table = CardSQLTableNames::from_registry_type(&params.registry_type);
+    state
+        .sql_client
+        .delete_card(&table, &params.uid)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete card: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?;
+
+    Ok(Json(UidResponse { exists: false }))
+}
+
 pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -552,6 +572,7 @@ pub async fn get_card_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
             .route(&format!("{}/card/list", prefix), get(list_cards))
             .route(&format!("{}/card/create", prefix), post(create_card))
             .route(&format!("{}/card/update", prefix), post(update_card))
+            .route(&format!("{}/card/delete", prefix), delete(delete_card))
     }));
 
     match result {
