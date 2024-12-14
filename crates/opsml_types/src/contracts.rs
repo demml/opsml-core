@@ -1,6 +1,7 @@
 use crate::helper::PyHelperFuncs;
 use crate::VersionType;
 use crate::{enums::StorageType, RegistryType};
+use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -167,6 +168,9 @@ pub struct ListCardRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -182,6 +186,9 @@ pub struct DataCardClientRecord {
 impl Default for DataCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -198,6 +205,9 @@ impl Default for DataCardClientRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -216,6 +226,9 @@ pub struct ModelCardClientRecord {
 impl Default for ModelCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -235,6 +248,9 @@ impl Default for ModelCardClientRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -251,6 +267,9 @@ pub struct RunCardClientRecord {
 impl Default for RunCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -268,6 +287,9 @@ impl Default for RunCardClientRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -282,6 +304,9 @@ pub struct AuditCardClientRecord {
 impl Default for AuditCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -297,6 +322,9 @@ impl Default for AuditCardClientRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -311,6 +339,9 @@ pub struct PipelineCardClientRecord {
 impl Default for PipelineCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -326,6 +357,9 @@ impl Default for PipelineCardClientRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectCardClientRecord {
+    pub uid: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub app_env: Option<String>,
     pub name: String,
     pub repository: String,
     pub version: String,
@@ -335,6 +369,9 @@ pub struct ProjectCardClientRecord {
 impl Default for ProjectCardClientRecord {
     fn default() -> Self {
         Self {
+            uid: None,
+            created_at: None,
+            app_env: None,
             name: "".to_string(),
             repository: "".to_string(),
             version: "".to_string(),
@@ -362,4 +399,17 @@ pub struct CreateCardRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateCardResponse {
     pub registered: bool,
+    pub uid: String,
+}
+
+/// Duplicating card request to be explicit with naming
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateCardRequest {
+    pub registry_type: RegistryType,
+    pub card: ClientCard,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateCardResponse {
+    pub updated: bool,
 }

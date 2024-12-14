@@ -708,6 +708,19 @@ pub enum Card {
     Project(ProjectCardRecord),
 }
 
+impl Card {
+    pub fn uid(&self) -> String {
+        match self {
+            Card::Data(card) => card.uid.clone(),
+            Card::Model(card) => card.uid.clone(),
+            Card::Run(card) => card.uid.clone(),
+            Card::Audit(card) => card.uid.clone(),
+            Card::Pipeline(card) => card.uid.clone(),
+            Card::Project(card) => card.uid.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct HardwareMetricsRecord {
     pub run_uid: String,

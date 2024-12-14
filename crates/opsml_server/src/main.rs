@@ -93,7 +93,8 @@ mod tests {
         CreateCardRequest, CreateCardResponse, DataCardClientRecord, JwtToken, ListCardRequest,
         ModelCardClientRecord, PipelineCardClientRecord, ProjectCardClientRecord, QueryPageRequest,
         RegistryStatsRequest, RegistryType, RepositoryRequest, RepositoryResponse,
-        RunCardClientRecord, SqlType, UidRequest, UidResponse, VersionType,
+        RunCardClientRecord, SqlType, UidRequest, UidResponse, UpdateCardRequest,
+        UpdateCardResponse, VersionType,
     };
     use std::env;
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
@@ -566,6 +567,73 @@ mod tests {
         let create_response: CreateCardResponse = serde_json::from_slice(&body).unwrap();
         assert!(create_response.registered);
 
+        // get card by uid
+        let list_cards = ListCardRequest {
+            uid: Some(create_response.uid),
+            name: None,
+            repository: None,
+            version: None,
+            max_date: None,
+            tags: None,
+            limit: None,
+            sort_by_timestamp: None,
+            registry_type: RegistryType::Data,
+        };
+
+        let query_string = serde_qs::to_string(&list_cards).unwrap();
+
+        let request = Request::builder()
+            .uri(format!("/opsml/card/list?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let card_results: CardResults = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(card_results.len(), 1);
+
+        // Update the card (get card from CardResults)
+        let card = match card_results {
+            CardResults::Data(cards) => cards[0].clone(),
+            _ => panic!("Card not found"),
+        };
+
+        let card_request = UpdateCardRequest {
+            registry_type: RegistryType::Data,
+            card: ClientCard::Data(DataCardClientRecord {
+                name: "DataCard".to_string(),
+                repository: "repo1".to_string(),
+                version: "1.0.1".to_string(),
+                contact: "test".to_string(),
+                uid: Some(card.uid),
+                app_env: Some(card.app_env),
+                created_at: Some(card.created_at.unwrap()),
+                ..DataCardClientRecord::default()
+            }),
+        };
+
+        let body = serde_json::to_string(&card_request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/card/update")
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let update_response: UpdateCardResponse = serde_json::from_slice(&body).unwrap();
+        assert!(update_response.updated);
+
+        //
+
         // ModelCard
         let card_request = CreateCardRequest {
             card: ClientCard::Model(ModelCardClientRecord {
@@ -685,6 +753,7 @@ mod tests {
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
                 project_id: 1,
+                ..Default::default()
             }),
             registry_type: RegistryType::Project,
         };
