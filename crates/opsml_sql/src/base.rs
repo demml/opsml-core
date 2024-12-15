@@ -136,7 +136,7 @@ pub trait SqlClient: Sized {
     async fn get_run_metric(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<MetricRecord>, SqlError>;
 
     /// Get run metric names
@@ -164,7 +164,7 @@ pub trait SqlClient: Sized {
     async fn get_run_parameter(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<ParameterRecord>, SqlError>;
 
     /// Insert hardware metrics

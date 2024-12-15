@@ -137,7 +137,7 @@ impl PostgresQueryHelper {
 
         query
     }
-    pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_metric_query(names: &Vec<String>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -148,19 +148,17 @@ impl PostgresQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
         let mut param_index = 2; // Start from 2 because $1 is used for run_uid
 
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str(&format!("name = ${}", param_index));
-                    bindings.push(name.to_string());
-                    param_index += 1;
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str(&format!("name = ${}", param_index));
+                bindings.push(name.to_string());
+                param_index += 1;
             }
+            query.push(')');
         }
 
         (query, bindings)
@@ -362,7 +360,7 @@ impl PostgresQueryHelper {
 
         query
     }
-    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_parameter_query(names: &Vec<String>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -373,19 +371,17 @@ impl PostgresQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
         let mut param_index = 2; // Start from 2 because $1 is used for run_uid
 
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str(&format!("name = ${}", param_index));
-                    bindings.push(name.to_string());
-                    param_index += 1;
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str(&format!("name = ${}", param_index));
+                bindings.push(name.to_string());
+                param_index += 1;
             }
+            query.push(')');
         }
 
         (query, bindings)

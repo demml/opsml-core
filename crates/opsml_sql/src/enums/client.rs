@@ -216,7 +216,7 @@ impl SqlClient for SqlClientEnum {
     async fn get_run_metric(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<MetricRecord>, SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.get_run_metric(uid, names).await,
@@ -263,7 +263,7 @@ impl SqlClient for SqlClientEnum {
     async fn get_run_parameter(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<ParameterRecord>, SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.get_run_parameter(uid, names).await,
@@ -1024,7 +1024,7 @@ mod tests {
             client.insert_run_metric(&metric).await.unwrap();
         }
 
-        let records = client.get_run_metric(&uid, None).await.unwrap();
+        let records = client.get_run_metric(&uid, &Vec::new()).await.unwrap();
 
         let names = client.get_run_metric_names(&uid).await.unwrap();
 
@@ -1081,12 +1081,12 @@ mod tests {
         }
 
         client.insert_run_parameters(&params).await.unwrap();
-        let records = client.get_run_parameter(&uid, None).await.unwrap();
+        let records = client.get_run_parameter(&uid, &Vec::new()).await.unwrap();
 
         assert_eq!(records.len(), 10);
 
         let param_records = client
-            .get_run_parameter(&uid, Some(&vec!["param1"]))
+            .get_run_parameter(&uid, &vec!["param1".to_string()])
             .await
             .unwrap();
 

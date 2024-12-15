@@ -18,20 +18,20 @@ pub struct GPUMetrics {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct MemoryMetrics {
-    pub sys_ram_total: i64,
-    pub sys_ram_used: i64,
-    pub sys_ram_available: i64,
+    pub sys_ram_total: i32,
+    pub sys_ram_used: i32,
+    pub sys_ram_available: i32,
     pub sys_ram_percent_used: f64,
-    pub sys_swap_total: Option<i64>,
-    pub sys_swap_used: Option<i64>,
-    pub sys_swap_free: Option<i64>,
+    pub sys_swap_total: Option<i32>,
+    pub sys_swap_used: Option<i32>,
+    pub sys_swap_free: Option<i32>,
     pub sys_swap_percent: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NetworkRates {
-    pub bytes_recv: i64,
-    pub bytes_sent: i64,
+    pub bytes_recv: i32,
+    pub bytes_sent: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -49,11 +49,48 @@ pub struct JwtToken {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metric {
-    pub run_uid: String,
     pub name: String,
     pub value: f64,
     pub step: Option<i32>,
     pub timestamp: Option<i64>,
     pub created_at: Option<NaiveDateTime>,
-    pub idx: Option<i32>,
+}
+
+impl Default for Metric {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            value: 0.0,
+            step: None,
+            timestamp: None,
+            created_at: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Parameter {
+    pub name: String,
+    pub value: String,
+    pub created_at: Option<NaiveDateTime>,
+}
+
+impl Parameter {
+    pub fn new(name: String, value: String) -> Self {
+        Self {
+            name,
+            value,
+            created_at: None,
+        }
+    }
+}
+
+impl Default for Parameter {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            value: "".to_string(),
+            created_at: None,
+        }
+    }
 }

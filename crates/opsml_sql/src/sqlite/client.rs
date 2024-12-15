@@ -816,7 +816,7 @@ impl SqlClient for SqliteClient {
     async fn get_run_metric(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<MetricRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_metric_query(names);
         let mut query_builder = sqlx::query_as::<sqlx::Sqlite, MetricRecord>(&query).bind(uid);
@@ -825,8 +825,7 @@ impl SqlClient for SqliteClient {
             query_builder = query_builder.bind(binding);
         }
 
-        let records: Vec<MetricRecord> = sqlx::query_as(&query)
-            .bind(uid)
+        let records: Vec<MetricRecord> = query_builder
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -923,7 +922,7 @@ impl SqlClient for SqliteClient {
     async fn get_run_parameter(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &Vec<String>,
     ) -> Result<Vec<ParameterRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_parameter_query(names);
         let mut query_builder = sqlx::query_as::<_, ParameterRecord>(&query).bind(uid);
@@ -1811,7 +1810,7 @@ mod tests {
             client.insert_run_metric(&metric).await.unwrap();
         }
 
-        let records = client.get_run_metric(&uid, None).await.unwrap();
+        let records = client.get_run_metric(&uid, &Vec::new()).await.unwrap();
         let names = client.get_run_metric_names(&uid).await.unwrap();
 
         assert_eq!(records.len(), 3);
@@ -1837,7 +1836,7 @@ mod tests {
 
         client.insert_run_metrics(&records).await.unwrap();
 
-        let records = client.get_run_metric(&uid, None).await.unwrap();
+        let records = client.get_run_metric(&uid, &Vec::new()).await.unwrap();
 
         assert_eq!(records.len(), 5);
 
@@ -1914,12 +1913,12 @@ mod tests {
         }
 
         client.insert_run_parameters(&params).await.unwrap();
-        let records = client.get_run_parameter(&uid, None).await.unwrap();
+        let records = client.get_run_parameter(&uid, &Vec::new()).await.unwrap();
 
         assert_eq!(records.len(), 10);
 
         let param_records = client
-            .get_run_parameter(&uid, Some(&vec!["param1"]))
+            .get_run_parameter(&uid, &vec!["param1".to_string()])
             .await
             .unwrap();
 

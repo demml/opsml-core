@@ -88,15 +88,8 @@ mod tests {
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
     use opsml_sql::schemas::schema::CardResults;
-    use opsml_types::{
-        AuditCardClientRecord, CardVersionRequest, CardVersionResponse, ClientCard,
-        CreateCardRequest, CreateCardResponse, DataCardClientRecord, JwtToken, ListCardRequest,
-        ModelCardClientRecord, PipelineCardClientRecord, ProjectCardClientRecord, QueryPageRequest,
-        RegistryStatsRequest, RegistryType, RepositoryRequest, RepositoryResponse,
-        RunCardClientRecord, SqlType, UidRequest, UidResponse, UpdateCardRequest,
-        UpdateCardResponse, VersionType,
-    };
-    use std::env;
+    use opsml_types::*;
+    use std::{env, vec};
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
     fn cleanup() {
@@ -1218,6 +1211,200 @@ mod tests {
         let delete_response: UidResponse = serde_json::from_slice(&body).unwrap();
 
         assert!(!delete_response.exists);
+
+        helper.cleanup();
+    }
+
+    #[tokio::test]
+    async fn test_opsml_server_run_routes() {
+        let helper = TestHelper::new().await;
+        let run_uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+
+        let request = MetricRequest {
+            run_uid: run_uid.clone(),
+            metrics: vec![
+                Metric {
+                    name: "metric1".to_string(),
+                    value: 1.0,
+                    ..Default::default()
+                },
+                Metric {
+                    name: "metric2".to_string(),
+                    value: 1.0,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        let body = serde_json::to_string(&request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/run/metrics")
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let query_string = serde_qs::to_string(&GetMetricNamesRequest {
+            run_uid: run_uid.clone(),
+        })
+        .unwrap();
+
+        let request = Request::builder()
+            .uri(format!("/opsml/run/metrics/names?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let metric_names: Vec<String> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(metric_names.len(), 2);
+
+        // get metric by run_uid
+        let body = GetMetricRequest::new(run_uid.clone(), None);
+
+        let request = Request::builder()
+            .uri("/opsml/run/metrics") // should be post
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let metrics: Vec<Metric> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(metrics.len(), 2);
+
+        // get metric by run_uid
+        let body = GetMetricRequest::new(run_uid.clone(), Some(vec!["metric1".to_string()]));
+
+        let request = Request::builder()
+            .uri("/opsml/run/metrics") // should be post
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let metrics: Vec<Metric> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(metrics.len(), 1);
+
+        // insert parameter
+
+        let request = ParameterRequest {
+            run_uid: run_uid.clone(),
+            parameters: vec![
+                Parameter {
+                    name: "param1".to_string(),
+                    value: "value1".to_string(),
+                    ..Default::default()
+                },
+                Parameter {
+                    name: "param2".to_string(),
+                    value: "value2".to_string(),
+                    ..Default::default()
+                },
+            ],
+        };
+
+        let body = serde_json::to_string(&request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/run/parameters")
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // get parameters by run_uid
+        let body = GetParameterRequest::new(run_uid.clone(), None);
+        let request = Request::builder()
+            .uri("/opsml/run/parameters") // should be post
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let parameters: Vec<Parameter> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parameters.len(), 2);
+
+        // get parameters by run_uid and parameter name
+        let body = GetParameterRequest::new(run_uid.clone(), Some(vec!["param1".to_string()]));
+
+        let request = Request::builder()
+            .uri("/opsml/run/parameters") // should be post
+            .method("POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let parameters: Vec<Parameter> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parameters.len(), 1);
+
+        // insert hardware metrics
+
+        let request = HardwareMetricRequest {
+            run_uid: run_uid.clone(),
+            metrics: vec![HardwareMetrics::default(), HardwareMetrics::default()],
+        };
+
+        let body = serde_json::to_string(&request).unwrap();
+
+        let request = Request::builder()
+            .uri("/opsml/run/hardware/metrics")
+            .method("PUT")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // get hardware metrics by run_uid
+        let body = GetHardwareMetricRequest {
+            run_uid: run_uid.clone(),
+        };
+
+        let query_string = serde_qs::to_string(&body).unwrap();
+
+        let request = Request::builder()
+            .uri(format!("/opsml/run/hardware/metrics?{}", query_string))
+            .method("GET")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = helper.send_oneshot(request, true).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let metrics: Vec<HardwareMetrics> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(metrics.len(), 2);
 
         helper.cleanup();
     }

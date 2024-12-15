@@ -1,6 +1,7 @@
 use crate::helper::PyHelperFuncs;
+use crate::HardwareMetrics;
 use crate::{enums::StorageType, RegistryType};
-use crate::{Metric, VersionType};
+use crate::{Metric, Parameter, VersionType};
 use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -432,4 +433,86 @@ pub struct UpdateCardResponse {
 pub struct MetricRequest {
     pub run_uid: String,
     pub metrics: Vec<Metric>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetMetricRequest {
+    pub run_uid: String,
+    pub names: Vec<String>,
+}
+
+impl GetMetricRequest {
+    pub fn new(run_uid: String, names: Option<Vec<String>>) -> Self {
+        Self {
+            run_uid,
+            names: names.unwrap_or(vec![]),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetMetricNamesRequest {
+    pub run_uid: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetMetricNamesResponse {
+    pub names: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MetricResponse {
+    pub success: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ParameterRequest {
+    pub run_uid: String,
+    pub parameters: Vec<Parameter>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetParameterRequest {
+    pub run_uid: String,
+    pub names: Vec<String>,
+}
+
+impl GetParameterRequest {
+    pub fn new(run_uid: String, names: Option<Vec<String>>) -> Self {
+        Self {
+            run_uid,
+            names: names.unwrap_or(vec![]),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetParameterResponse {
+    pub parameters: Vec<Parameter>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ParameterResponse {
+    pub success: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HardwareMetricRequest {
+    pub run_uid: String,
+    pub metrics: Vec<HardwareMetrics>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetHardwareMetricRequest {
+    pub run_uid: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HardwareMetricResponse {
+    pub success: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetHardwareMetricResponse {
+    pub metrics: Vec<HardwareMetrics>,
 }

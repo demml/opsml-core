@@ -110,29 +110,27 @@ impl SqliteQueryHelper {
 
         // remove last co
     }
-    pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_metric_query(names: &Vec<String>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
-            WHERE run_uid = ?1",
+            WHERE run_uid = ?",
             CardSQLTableNames::Metrics
         );
 
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
@@ -349,7 +347,7 @@ impl SqliteQueryHelper {
 
         query
     }
-    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_parameter_query(names: &Vec<String>) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -360,18 +358,17 @@ impl SqliteQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
