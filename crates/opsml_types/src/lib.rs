@@ -7,4 +7,5 @@ pub mod types;
 pub use constants::*;
 pub use contracts::*;
 pub use enums::*;
-pub use types::*;
+pub use types::auth::*;
+pub use types::run::*;

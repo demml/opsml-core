@@ -42,11 +42,6 @@ pub struct HardwareMetrics {
     pub gpu: Option<GPUMetrics>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct JwtToken {
-    pub token: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metric {
     pub name: String,

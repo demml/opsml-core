@@ -5,10 +5,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings};
-use opsml_types::types::JwtToken;
 use opsml_types::{
-    DeleteFileResponse, FileInfo, ListFileInfoResponse, ListFileResponse, MultiPartSession,
-    PresignedUrl, StorageSettings, StorageType, DOWNLOAD_CHUNK_SIZE,
+    DeleteFileResponse, FileInfo, JwtToken, ListFileInfoResponse, ListFileResponse,
+    MultiPartSession, PresignedUrl, StorageSettings, StorageType, DOWNLOAD_CHUNK_SIZE,
 };
 use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
