@@ -1,5 +1,8 @@
+use crate::GraphStyle;
 use chrono::NaiveDateTime;
+use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CPUMetrics {
@@ -86,6 +89,72 @@ impl Default for Parameter {
             name: "".to_string(),
             value: "".to_string(),
             created_at: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[pyclass]
+pub struct RunLineGraph {
+    name: String,
+    x_label: String,
+    y_label: String,
+    x: Vec<f64>,
+    y: Vec<f64>,
+    graph_style: GraphStyle,
+}
+
+#[pymethods]
+impl RunLineGraph {
+    #[new]
+    fn new(
+        name: String,
+        x_label: String,
+        y_label: String,
+        x: Vec<f64>,
+        y: Vec<f64>,
+        graph_style: GraphStyle,
+    ) -> Self {
+        Self {
+            name,
+            x_label,
+            y_label,
+            x,
+            y,
+            graph_style,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[pyclass]
+pub struct RunMultiLineGraph {
+    name: String,
+    x_label: String,
+    y_label: String,
+    x: Vec<f64>,
+    y: HashMap<String, Vec<f64>>,
+    graph_style: GraphStyle,
+}
+
+#[pymethods]
+impl RunMultiLineGraph {
+    #[new]
+    fn new(
+        name: String,
+        x_label: String,
+        y_label: String,
+        x: Vec<f64>,
+        y: HashMap<String, Vec<f64>>,
+        graph_style: GraphStyle,
+    ) -> Self {
+        Self {
+            name,
+            x_label,
+            y_label,
+            x,
+            y,
+            graph_style,
         }
     }
 }

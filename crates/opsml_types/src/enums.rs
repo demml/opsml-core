@@ -5,6 +5,13 @@ use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum GraphStyle {
+    Line,
+    MultiLine,
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum StorageType {
     Google,
     AWS,
