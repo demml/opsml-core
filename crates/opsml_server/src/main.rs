@@ -76,19 +76,20 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{
-        body::Body,
-        http::{header, Request, StatusCode},
-    };
-
     use crate::core::cards::schema::{QueryPageResponse, RegistryStatsResponse};
     use axum::response::Response;
+    use axum::{
+        body::Body,
+        extract::Path,
+        http::{header, Request, StatusCode},
+    };
     use http_body_util::BodyExt; // for `collect`
     use opsml_settings::config::OpsmlDatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
     use opsml_sql::schemas::schema::CardResults;
     use opsml_types::*;
+    use std::path::PathBuf;
     use std::{env, vec};
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
 
@@ -136,6 +137,7 @@ mod tests {
     pub struct TestHelper {
         app: Router,
         token: JwtToken,
+        write_dir: String,
     }
 
     impl TestHelper {
@@ -154,7 +156,18 @@ mod tests {
             // retrieve the token
             let token = TestHelper::login(&app).await;
 
-            Self { app, token }
+            let write_dir = env::current_dir()
+                .unwrap()
+                .join("opsml_registries")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            Self {
+                app,
+                token,
+                write_dir,
+            }
         }
 
         pub async fn login(app: &Router) -> JwtToken {
@@ -1405,6 +1418,22 @@ mod tests {
         let metrics: Vec<HardwareMetrics> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(metrics.len(), 2);
+
+        helper.cleanup();
+    }
+    #[tokio::test]
+    async fn test_opsml_server_run_graphs() {
+        let helper = TestHelper::new().await;
+
+        let single_run_graph = RunLineGraph {
+            ..Default::default()
+        };
+
+        let write_path = format!("{}/opsml_run_regisry/test/graphs", helper.write_dir);
+
+        // create pathBuf
+        let path = PathBuf::from(write_path.clone());
+        single_run_graph.save_to_json(Some(path.clone()));
 
         helper.cleanup();
     }

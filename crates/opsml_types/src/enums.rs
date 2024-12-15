@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
@@ -8,6 +9,21 @@ use std::str::FromStr;
 pub enum GraphStyle {
     Line,
     MultiLine,
+}
+
+impl Default for GraphStyle {
+    fn default() -> Self {
+        GraphStyle::Line
+    }
+}
+
+impl Display for GraphStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GraphStyle::Line => write!(f, "line"),
+            GraphStyle::MultiLine => write!(f, "multiline"),
+        }
+    }
 }
 
 #[pyclass(eq, eq_int)]
@@ -331,6 +347,12 @@ impl Suffix {
             Suffix::Dmatrix => ".dmatrix",
             Suffix::Model => ".model",
         }
+    }
+}
+
+impl Display for Suffix {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_string())
     }
 }
 

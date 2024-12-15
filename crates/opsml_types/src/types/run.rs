@@ -1,8 +1,10 @@
-use crate::GraphStyle;
+use crate::{GraphStyle, PyHelperFuncs, Suffix};
 use chrono::NaiveDateTime;
+use opsml_error::error::TypeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CPUMetrics {
@@ -93,15 +95,15 @@ impl Default for Parameter {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[pyclass]
 pub struct RunLineGraph {
-    name: String,
-    x_label: String,
-    y_label: String,
-    x: Vec<f64>,
-    y: Vec<f64>,
-    graph_style: GraphStyle,
+    pub name: String,
+    pub x_label: String,
+    pub y_label: String,
+    pub x: Vec<f64>,
+    pub y: Vec<f64>,
+    pub graph_style: GraphStyle,
 }
 
 #[pymethods]
@@ -126,15 +128,22 @@ impl RunLineGraph {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl RunLineGraph {
+    pub fn save_to_json(&self, path: Option<PathBuf>) -> Result<(), TypeError> {
+        let filename = format!("{}_{}{}", self.name, self.graph_style, Suffix::Json);
+        PyHelperFuncs::save_to_json(self, path, &filename)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[pyclass]
 pub struct RunMultiLineGraph {
-    name: String,
-    x_label: String,
-    y_label: String,
-    x: Vec<f64>,
-    y: HashMap<String, Vec<f64>>,
-    graph_style: GraphStyle,
+    pub name: String,
+    pub x_label: String,
+    pub y_label: String,
+    pub x: Vec<f64>,
+    pub y: HashMap<String, Vec<f64>>,
+    pub graph_style: GraphStyle,
 }
 
 #[pymethods]
@@ -156,5 +165,12 @@ impl RunMultiLineGraph {
             y,
             graph_style,
         }
+    }
+}
+
+impl RunMultiLineGraph {
+    pub fn save_to_json(&self, path: Option<PathBuf>) -> Result<(), TypeError> {
+        let filename = format!("{}_{}{}", self.name, self.graph_style, Suffix::Json);
+        PyHelperFuncs::save_to_json(self, path, &filename)
     }
 }
