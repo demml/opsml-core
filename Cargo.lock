@@ -3091,6 +3091,7 @@ dependencies = [
  "serde_json",
  "serde_qs",
  "sqlx",
+ "tempfile",
  "thiserror 2.0.3",
  "time",
  "tokio 1.41.1",
@@ -3191,6 +3192,7 @@ dependencies = [
 name = "opsml-types"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "colored_json",
  "opsml-error",

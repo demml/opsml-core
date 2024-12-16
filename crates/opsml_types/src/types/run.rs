@@ -1,4 +1,4 @@
-use crate::{GraphStyle, PyHelperFuncs, Suffix};
+use crate::{GraphStyle, GraphType, PyHelperFuncs, Suffix};
 use chrono::NaiveDateTime;
 use opsml_error::error::TypeError;
 use pyo3::prelude::*;
@@ -97,80 +97,88 @@ impl Default for Parameter {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[pyclass]
-pub struct RunLineGraph {
+pub struct RunGraph {
     pub name: String,
     pub x_label: String,
     pub y_label: String,
     pub x: Vec<f64>,
     pub y: Vec<f64>,
+    pub y_group: HashMap<String, Vec<f64>>,
     pub graph_style: GraphStyle,
+    pub graph_type: GraphType,
 }
 
 #[pymethods]
-impl RunLineGraph {
+impl RunGraph {
     #[new]
-    fn new(
+    #[pyo3(signature = (name, graph_style, x_label, y_label, x, y=None, y_group=None))]
+    pub fn new(
         name: String,
+        graph_style: GraphStyle,
         x_label: String,
         y_label: String,
         x: Vec<f64>,
-        y: Vec<f64>,
-        graph_style: GraphStyle,
-    ) -> Self {
-        Self {
+        y: Option<Vec<f64>>,
+        y_group: Option<HashMap<String, Vec<f64>>>,
+    ) -> anyhow::Result<Self> {
+        // ensure that y_group and y are not both provided
+        if y.is_some() && y_group.is_some() {
+            return Err(anyhow::anyhow!(
+                "y and y_group cannot both be provided. Provide only one."
+            ));
+        }
+
+        let graph_type = if y.is_some() {
+            // assert length of y matches length of x
+            if y.as_ref().unwrap().len() != x.len() {
+                return Err(anyhow::anyhow!(
+                    "Length of y must match length of x. Length of y: {}, Length of x: {}",
+                    y.as_ref().unwrap().len(),
+                    x.len()
+                ));
+            }
+            GraphType::Single
+        } else {
+            // assert length of each member of y_group matches length of x
+            for (group_name, group_values) in y_group.as_ref().unwrap() {
+                if group_values.len() != x.len() {
+                    return Err(anyhow::anyhow!(
+                        "Length of y_group member '{}' must match length of x. Length of y_group member '{}': {}, Length of x: {}",
+                        group_name,
+                        group_name,
+                        group_values.len(),
+                        x.len()
+                    ));
+                }
+            }
+            GraphType::Group
+        };
+
+        Ok(Self {
             name,
             x_label,
             y_label,
             x,
-            y,
+            y: y.unwrap_or_default(),
+            y_group: y_group.unwrap_or_default(),
             graph_style,
-        }
+            graph_type,
+        })
     }
 }
 
-impl RunLineGraph {
+impl RunGraph {
     pub fn save_to_json(&self, path: Option<PathBuf>) -> Result<(), TypeError> {
-        let filename = format!("{}_{}{}", self.name, self.graph_style, Suffix::Json);
-        PyHelperFuncs::save_to_json(self, path, &filename)
-    }
-}
+        // check if path is provided
+        let mut path = path.unwrap_or_else(|| PathBuf::new());
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[pyclass]
-pub struct RunMultiLineGraph {
-    pub name: String,
-    pub x_label: String,
-    pub y_label: String,
-    pub x: Vec<f64>,
-    pub y: HashMap<String, Vec<f64>>,
-    pub graph_style: GraphStyle,
-}
-
-#[pymethods]
-impl RunMultiLineGraph {
-    #[new]
-    fn new(
-        name: String,
-        x_label: String,
-        y_label: String,
-        x: Vec<f64>,
-        y: HashMap<String, Vec<f64>>,
-        graph_style: GraphStyle,
-    ) -> Self {
-        Self {
-            name,
-            x_label,
-            y_label,
-            x,
-            y,
-            graph_style,
+        // check if path is a file
+        if !path.is_file() {
+            // append filename to path
+            let filename = format!("{}_{}{}", self.name, self.graph_style, Suffix::Json);
+            path.push(filename);
         }
-    }
-}
 
-impl RunMultiLineGraph {
-    pub fn save_to_json(&self, path: Option<PathBuf>) -> Result<(), TypeError> {
-        let filename = format!("{}_{}{}", self.name, self.graph_style, Suffix::Json);
-        PyHelperFuncs::save_to_json(self, path, &filename)
+        PyHelperFuncs::save_to_json(self, path)
     }
 }

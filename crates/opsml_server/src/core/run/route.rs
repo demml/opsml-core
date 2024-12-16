@@ -8,19 +8,17 @@ use axum::{
     Json, Router,
 };
 use opsml_sql::base::SqlClient;
-use opsml_sql::schemas::schema::{HardwareMetricsRecord, MetricRecord, ParameterRecord};
-use opsml_types::{
-    CPUMetrics, GPUMetrics, GetHardwareMetricRequest, GetMetricNamesRequest, GetMetricRequest,
-    GetParameterRequest, HardwareMetricRequest, HardwareMetricResponse, HardwareMetrics,
-    MemoryMetrics, Metric, MetricRequest, MetricResponse, NetworkRates, Parameter,
-    ParameterRequest, ParameterResponse,
+use opsml_sql::schemas::schema::{
+    CardResults, HardwareMetricsRecord, MetricRecord, ParameterRecord,
 };
+use opsml_types::*;
 
 use opsml_utils::utils::get_utc_datetime;
-
 use sqlx::types::Json as SqlxJson;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::Path;
 use std::sync::Arc;
+use tempfile::TempDir;
 use tracing::error;
 
 pub async fn insert_metrics(
@@ -273,6 +271,130 @@ pub async fn get_hardware_metrics(
     Ok(Json(metrics))
 }
 
+pub async fn get_run_graphs(
+    State(state): State<Arc<AppState>>,
+    Query(req): Query<GetRunGraphsRequest>,
+) -> Result<Json<Vec<RunGraph>>, (StatusCode, Json<serde_json::Value>)> {
+    // get the run card
+    let args = CardQueryArgs {
+        uid: Some(req.run_uid.clone()),
+        ..Default::default()
+    };
+
+    let card_result = state
+        .sql_client
+        .query_cards(&CardSQLTableNames::Run, &args)
+        .await
+        .map_err(|e| {
+            error!("Failed to get run graphs: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?;
+
+    // get first run card from CardResults enum
+    let (repo, name, version) = match card_result {
+        CardResults::Run(card) => {
+            // get the card UID
+            let run_card = card.get(0).ok_or_else(|| {
+                error!("Failed to get run card");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({})),
+                )
+            })?;
+
+            (
+                run_card.repository.clone(),
+                run_card.name.clone(),
+                run_card.version.clone(),
+            )
+        }
+
+        _ => {
+            error!("Failed to get run card");
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            ));
+        }
+    };
+
+    // format uri to get the run graphs (this is a standardized route for all run graphs)
+    let uri = format!(
+        "{}/{}/{}/v{}/{}",
+        CardSQLTableNames::Run.to_string(),
+        repo,
+        name,
+        version,
+        SaveName::Graphs.to_string()
+    );
+
+    let rpath = Path::new(&uri);
+
+    // create temporary directory
+    let tmp_dir = TempDir::new().map_err(|e| {
+        error!("Failed to create temporary directory: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({})),
+        )
+    })?;
+
+    let tmp_path = tmp_dir.path();
+
+    state
+        .storage_client
+        .get(tmp_path, rpath, true)
+        .await
+        .map_err(|e| {
+            error!("Failed to get run graphs: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?;
+
+    // load all files in the temp directory as Vec<RunGraph>
+
+    let files: Vec<RunGraph> = std::fs::read_dir(tmp_path)
+        .map_err(|e| {
+            error!("Failed to read temp directory: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({})),
+            )
+        })?
+        .filter_map(|entry| {
+            entry.ok().and_then(|e| {
+                let path = e.path();
+                let run_graph = match std::fs::read_to_string(&path) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        error!("Failed to read file: {}", e);
+                        return None;
+                    }
+                };
+
+                let run_graph: RunGraph = match serde_json::from_str(&run_graph) {
+                    Ok(parsed) => parsed,
+                    Err(e) => {
+                        error!("Failed to parse run graph: {}", e);
+                        return None;
+                    }
+                };
+
+                Some(run_graph)
+            })
+        })
+        .collect();
+
+    Ok(Json(files))
+
+    // load all run graphs. Can be either SingleRunGraph or MultiRunGraph
+}
+
 pub async fn get_run_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -295,6 +417,7 @@ pub async fn get_run_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
                 &format!("{}/run/hardware/metrics", prefix),
                 get(get_hardware_metrics),
             )
+            .route(&format!("{}/run/graphs", prefix), get(get_run_graphs))
     }));
 
     match result {

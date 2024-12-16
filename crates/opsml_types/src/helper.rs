@@ -37,7 +37,7 @@ impl PyHelperFuncs {
         }
     }
 
-    pub fn save_to_json<T>(model: T, path: Option<PathBuf>, filename: &str) -> Result<(), TypeError>
+    pub fn save_to_json<T>(model: T, mut path: PathBuf) -> Result<(), TypeError>
     where
         T: Serialize,
     {
@@ -45,27 +45,17 @@ impl PyHelperFuncs {
         let json =
             serde_json::to_string_pretty(&model).map_err(|_| TypeError::SerializationError)?;
 
-        // check if path is provided
-        let write_path = if path.is_some() {
-            let mut new_path = path.ok_or(TypeError::CreatePathError)?;
+        // ensure .json extension
+        path.set_extension("json");
 
-            // ensure .json extension
-            new_path.set_extension("json");
+        if !path.exists() {
+            // ensure path exists, create if not
+            let parent_path = path.parent().ok_or(TypeError::GetParentPathError)?;
 
-            if !new_path.exists() {
-                // ensure path exists, create if not
-                let parent_path = new_path.parent().ok_or(TypeError::GetParentPathError)?;
+            std::fs::create_dir_all(parent_path).map_err(|_| TypeError::CreateDirectoryError)?;
+        }
 
-                std::fs::create_dir_all(parent_path)
-                    .map_err(|_| TypeError::CreateDirectoryError)?;
-            }
-
-            new_path
-        } else {
-            PathBuf::from(filename)
-        };
-
-        std::fs::write(write_path, json).map_err(|_| TypeError::WriteError)?;
+        std::fs::write(path, json).map_err(|_| TypeError::WriteError)?;
 
         Ok(())
     }

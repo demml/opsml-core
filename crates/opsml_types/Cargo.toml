@@ -9,6 +9,7 @@ doctest = false
 
 
 [dependencies]
+anyhow = { workspace = true }
 chrono = { workspace = true }
 colored_json = { workspace = true }
 opsml-error = { workspace = true }

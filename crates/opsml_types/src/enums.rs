@@ -8,7 +8,7 @@ use std::str::FromStr;
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum GraphStyle {
     Line,
-    MultiLine,
+    Scatter,
 }
 
 impl Default for GraphStyle {
@@ -21,7 +21,29 @@ impl Display for GraphStyle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             GraphStyle::Line => write!(f, "line"),
-            GraphStyle::MultiLine => write!(f, "multiline"),
+            GraphStyle::Scatter => write!(f, "scatter"),
+        }
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum GraphType {
+    Single,
+    Group,
+}
+
+impl Default for GraphType {
+    fn default() -> Self {
+        GraphType::Single
+    }
+}
+
+impl Display for GraphType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GraphType::Single => write!(f, "single"),
+            GraphType::Group => write!(f, "group"),
         }
     }
 }
@@ -285,6 +307,12 @@ impl SaveName {
             SaveName::Dataset => "dataset",
             SaveName::DriftProfile => "drift-profile",
         }
+    }
+}
+
+impl Display for SaveName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_string())
     }
 }
 
