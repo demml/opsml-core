@@ -10,8 +10,10 @@ doctest = false
 [dependencies]
 opsml-error = { workspace = true }
 opsml-types = { workspace = true }
+opsml-settings = { workspace = true }
 opsml-sql = { workspace = true, optional = true }
 opsml-storage = { workspace = true }
+pyo3 = { workspace = true }
 
 [features]
 server = ["opsml-sql"]

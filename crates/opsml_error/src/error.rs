@@ -160,3 +160,9 @@ pub enum AuthError {
     #[error("Refresh token is invalid")]
     InvalidRefreshToken,
 }
+
+#[derive(Error, Debug)]
+pub enum RegistryError {
+    #[error("Failed to initialize registry - {0}")]
+    NewError(String),
+}

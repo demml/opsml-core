@@ -3068,9 +3068,11 @@ name = "opsml-registry"
 version = "0.1.0"
 dependencies = [
  "opsml-error",
+ "opsml-settings",
  "opsml-sql",
  "opsml-storage",
  "opsml-types",
+ "pyo3",
 ]
 
 [[package]]
