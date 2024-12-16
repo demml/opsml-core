@@ -7,6 +7,7 @@ license = "MIT"
 description = "Core rust library for the opsml project"
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 opsml-error = { workspace = true }

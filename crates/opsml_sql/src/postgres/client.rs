@@ -17,23 +17,56 @@ use opsml_settings::config::OpsmlDatabaseSettings;
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
 use sqlx::{
-    postgres::{PgPoolOptions, Postgres},
-    Pool,
+    postgres::{PgPoolOptions, PgRow, Postgres},
+    types::chrono::NaiveDateTime,
+    FromRow, Pool, Row,
 };
 use tracing::info;
 
+impl FromRow<'_, PgRow> for User {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+        let id: Option<i32> = row.try_get("id")?;
+        let created_at: Option<NaiveDateTime> = row.try_get("created_at")?;
+        let active: bool = row.try_get("active")?;
+        let username: String = row.try_get("username")?;
+        let password_hash: String = row.try_get("password_hash")?;
+
+        // Deserialize JSON strings into Vec<String>
+        let permissions: serde_json::Value = row.try_get("permissions")?;
+        let permissions: Vec<String> = serde_json::from_value(permissions).unwrap_or_default();
+
+        let group_permissions: serde_json::Value = row.try_get("group_permissions")?;
+        let group_permissions: Vec<String> =
+            serde_json::from_value(group_permissions).unwrap_or_default();
+
+        let refresh_token: Option<String> = row.try_get("refresh_token")?;
+
+        Ok(User {
+            id,
+            created_at,
+            active,
+            username,
+            password_hash,
+            permissions,
+            group_permissions,
+            refresh_token,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct PostgresClient {
     pub pool: Pool<Postgres>,
 }
 
 #[async_trait]
 impl SqlClient for PostgresClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Self {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
         let pool = PgPoolOptions::new()
             .max_connections(settings.max_connections)
             .connect(&settings.connection_uri)
             .await
-            .expect("Failed to connect to Postgres database");
+            .map_err(|e| SqlError::ConnectionError(format!("{}", e)))?;
 
         // attempt to start logging, silently fail if it fails
         let _ = (setup_logging().await).is_ok();
@@ -41,12 +74,9 @@ impl SqlClient for PostgresClient {
         let client = Self { pool };
 
         // run migrations
-        client
-            .run_migrations()
-            .await
-            .expect("Failed to run migrations");
+        client.run_migrations().await?;
 
-        client
+        Ok(client)
     }
 
     async fn run_migrations(&self) -> Result<(), SqlError> {
@@ -806,11 +836,17 @@ impl SqlClient for PostgresClient {
     async fn insert_user(&self, user: &User) -> Result<(), SqlError> {
         let query = PostgresQueryHelper::get_user_insert_query();
 
+        let group_permissions = serde_json::to_value(&user.group_permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        let permissions = serde_json::to_value(&user.permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
         sqlx::query(&query)
             .bind(&user.username)
             .bind(&user.password_hash)
-            .bind(&user.permissions)
-            .bind(&user.group_permissions)
+            .bind(&permissions)
+            .bind(&group_permissions)
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -833,11 +869,18 @@ impl SqlClient for PostgresClient {
     async fn update_user(&self, user: &User) -> Result<(), SqlError> {
         let query = PostgresQueryHelper::get_user_update_query();
 
+        let group_permissions = serde_json::to_value(&user.group_permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        let permissions = serde_json::to_value(&user.permissions)
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
         sqlx::query(&query)
             .bind(user.active)
             .bind(&user.password_hash)
-            .bind(&user.permissions)
-            .bind(&user.group_permissions)
+            .bind(&permissions)
+            .bind(&group_permissions)
+            .bind(&user.refresh_token)
             .bind(&user.username)
             .execute(&self.pool)
             .await
@@ -902,7 +945,7 @@ mod tests {
             sql_type: SqlType::Postgres,
         };
 
-        let _client = PostgresClient::new(&config).await;
+        let _client = PostgresClient::new(&config).await.unwrap();
         // Add assertions or further test logic here
     }
 
@@ -915,7 +958,7 @@ mod tests {
             sql_type: SqlType::Postgres,
         };
 
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
 
         cleanup(&client.pool).await;
 
@@ -989,7 +1032,7 @@ mod tests {
             sql_type: SqlType::Postgres,
         };
 
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
 
         cleanup(&client.pool).await;
 
@@ -1091,7 +1134,7 @@ mod tests {
             sql_type: SqlType::Postgres,
         };
 
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
 
         cleanup(&client.pool).await;
 
@@ -1219,7 +1262,7 @@ mod tests {
             sql_type: SqlType::Postgres,
         };
 
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
 
         cleanup(&client.pool).await;
 
@@ -1439,7 +1482,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1465,7 +1508,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1525,7 +1568,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1601,7 +1644,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1654,7 +1697,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1698,7 +1741,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1733,7 +1776,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         // Run the SQL script to populate the database
@@ -1775,7 +1818,7 @@ mod tests {
             max_connections: 1,
             sql_type: SqlType::Postgres,
         };
-        let client = PostgresClient::new(&config).await;
+        let client = PostgresClient::new(&config).await.unwrap();
         cleanup(&client.pool).await;
 
         let user = User::new("user".to_string(), "pass".to_string(), None, None);
@@ -1786,10 +1829,12 @@ mod tests {
 
         // update user
         user.active = false;
+        user.refresh_token = Some("token".to_string());
 
         client.update_user(&user).await.unwrap();
         let user = client.get_user("user").await.unwrap();
         assert!(!user.active);
+        assert_eq!(user.refresh_token.unwrap(), "token");
 
         cleanup(&client.pool).await;
     }

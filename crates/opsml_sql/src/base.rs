@@ -86,8 +86,8 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
 }
 
 #[async_trait]
-pub trait SqlClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Self;
+pub trait SqlClient: Sized {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError>;
     async fn run_migrations(&self) -> Result<(), SqlError>;
     async fn get_versions(
         &self,

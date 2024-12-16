@@ -330,7 +330,6 @@ impl StorageClient for AWSStorageClient {
     }
     async fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
         // create a resuable runtime for client
-        println!("settings: {:?}", settings);
         let client = if !settings.client_mode {
             let creds = AWSCreds::new().await?;
             Client::new(&creds.config)

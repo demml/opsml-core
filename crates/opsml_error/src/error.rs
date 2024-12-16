@@ -108,6 +108,9 @@ pub enum SqlError {
 
     #[error("Error - {0}")]
     GeneralError(String),
+
+    #[error("Failed to connect to the database - {0}")]
+    ConnectionError(String),
 }
 
 #[derive(Error, Debug)]
@@ -123,4 +126,22 @@ pub enum VersionError {
 
     #[error("Invalid build: {0}")]
     InvalidBuild(String),
+}
+
+#[derive(Error, Debug)]
+pub enum AuthError {
+    #[error("Invalid username provided")]
+    InvalidUser,
+
+    #[error("Invalid password provided")]
+    InvalidPassword,
+
+    #[error("Session timeout for user occured")]
+    SessionTimeout,
+
+    #[error("JWT token provided is invalid")]
+    InvalidJwtToken,
+
+    #[error("Refresh token is invalid")]
+    InvalidRefreshToken,
 }

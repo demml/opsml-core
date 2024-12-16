@@ -7,10 +7,13 @@ use crate::schemas::schema::{
     QueryStats, User,
 };
 use crate::sqlite::client::SqliteClient;
+use anyhow::Context;
+use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
-use opsml_settings::config::{OpsmlDatabaseSettings, SqlType};
+use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings, SqlType};
 
+#[derive(Debug, Clone)]
 pub enum SqlClientEnum {
     Postgres(PostgresClient),
     Sqlite(SqliteClient),
@@ -18,6 +21,13 @@ pub enum SqlClientEnum {
 }
 
 impl SqlClientEnum {
+    pub fn name(&self) -> String {
+        match self {
+            SqlClientEnum::Postgres(_) => "Postgres".to_string(),
+            SqlClientEnum::Sqlite(_) => "Sqlite".to_string(),
+            SqlClientEnum::MySql(_) => "MySql".to_string(),
+        }
+    }
     pub async fn query(&self, sql: &str) {
         match self {
             SqlClientEnum::Postgres(client) => {
@@ -35,19 +45,19 @@ impl SqlClientEnum {
 
 #[async_trait]
 impl SqlClient for SqlClientEnum {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Self {
+    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
         match settings.sql_type {
             SqlType::Postgres => {
-                let client = PostgresClient::new(settings).await;
-                SqlClientEnum::Postgres(client)
+                let client = PostgresClient::new(settings).await?;
+                Ok(SqlClientEnum::Postgres(client))
             }
             SqlType::Sqlite => {
-                let client = SqliteClient::new(settings).await;
-                SqlClientEnum::Sqlite(client)
+                let client = SqliteClient::new(settings).await?;
+                Ok(SqlClientEnum::Sqlite(client))
             }
             SqlType::MySql => {
-                let client = MySqlClient::new(settings).await;
-                SqlClientEnum::MySql(client)
+                let client = MySqlClient::new(settings).await?;
+                Ok(SqlClientEnum::MySql(client))
             }
         }
     }
@@ -263,6 +273,16 @@ impl SqlClient for SqlClientEnum {
     }
 }
 
+pub async fn get_sql_client(config: &OpsmlConfig) -> AnyhowResult<SqlClientEnum> {
+    let settings = &config.database_settings();
+    SqlClientEnum::new(settings).await.with_context(|| {
+        format!(
+            "Failed to create sql client for sql type: {:?}",
+            settings.sql_type
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -270,24 +290,36 @@ mod tests {
     use crate::schemas::schema::{
         AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, RunCardRecord,
     };
+    use std::env;
+
+    fn get_connection_uri() -> String {
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        format!(
+            "sqlite://{}",
+            current_dir
+                .to_str()
+                .expect("Failed to convert path to string")
+        )
+    }
 
     pub fn cleanup() {
         // delete ./test.db if exists
-        if std::path::Path::new("./test.db").exists() {
-            std::fs::remove_file("./test.db").unwrap();
-        }
+        let mut current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.push("test.db");
+        let _ = std::fs::remove_file(current_dir);
     }
 
     pub async fn get_client() -> SqlClientEnum {
         cleanup();
 
         let config = OpsmlDatabaseSettings {
-            connection_uri: "sqlite:./test.db".to_string(),
+            connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
         };
 
-        let client = SqlClientEnum::new(&config).await;
+        let client = SqlClientEnum::new(&config).await.unwrap();
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
         client.query(&script).await;
 

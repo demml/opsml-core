@@ -757,15 +757,16 @@ impl Default for HardwareMetricsRecord {
     }
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub id: Option<i32>,
     pub created_at: Option<NaiveDateTime>,
     pub active: bool,
     pub username: String,
     pub password_hash: String,
-    pub permissions: Json<Vec<String>>,
-    pub group_permissions: Json<Vec<String>>,
+    pub permissions: Vec<String>,
+    pub group_permissions: Vec<String>,
+    pub refresh_token: Option<String>,
 }
 
 impl User {
@@ -781,8 +782,22 @@ impl User {
             active: true,
             username,
             password_hash,
-            permissions: Json(permissions.unwrap_or(vec!["read".to_string()])),
-            group_permissions: Json(group_permissions.unwrap_or(vec!["user".to_string()])),
+            permissions: permissions.unwrap_or(vec!["read".to_string()]),
+            group_permissions: group_permissions.unwrap_or(vec!["user".to_string()]),
+            refresh_token: None,
         }
+    }
+}
+
+impl std::fmt::Debug for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("User")
+            .field("id", &self.id)
+            .field("username", &self.username)
+            .field("active", &self.active)
+            .field("password_hash", &"[redacted]")
+            .field("permissions", &"[redacted]")
+            .field("group_permissions", &"[redacted]")
+            .finish()
     }
 }

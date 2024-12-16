@@ -17,7 +17,7 @@ impl SqliteQueryHelper {
 
     pub fn get_user_query() -> String {
         format!(
-            "SELECT id, created_at, active, username, password_hash, permissions, group_permissions FROM {} WHERE username = ?",
+            "SELECT id, created_at, active, username, password_hash, permissions, group_permissions, refresh_token FROM {} WHERE username = ?",
             CardSQLTableNames::Users
         )
         .to_string()
@@ -29,7 +29,8 @@ impl SqliteQueryHelper {
             active = ?, 
             password_hash = ?, 
             permissions = ?, 
-            group_permissions = ? 
+            group_permissions = ? ,
+            refresh_token = ? 
             WHERE username = ?",
             CardSQLTableNames::Users
         )

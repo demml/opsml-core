@@ -10,6 +10,7 @@ use opsml_contracts::{FileInfo, StorageSettings};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
+use opsml_types::types::JwtToken;
 use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
 use reqwest::Response;
@@ -17,12 +18,13 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 
 const TIMEOUT_SECS: u64 = 30;
+const REDACTED: &str = "REDACTED";
 
 #[derive(Debug, Clone)]
 pub enum RequestType {
@@ -42,6 +44,8 @@ pub enum Routes {
     DeleteFiles,
     Healthcheck,
     StorageSettings,
+    AuthApiRefresh,
+    AuthApiLogin,
 }
 
 impl Routes {
@@ -55,6 +59,8 @@ impl Routes {
             Routes::Healthcheck => "healthcheck",
             Routes::StorageSettings => "storage/settings",
             Routes::DeleteFiles => "files/delete",
+            Routes::AuthApiRefresh => "auth/api/refresh",
+            Routes::AuthApiLogin => "auth/api/login",
         }
     }
 }
@@ -97,40 +103,77 @@ impl OpsmlApiClient {
         };
 
         if settings.api_settings.use_auth {
-            api_client.refresh_token().await?;
+            api_client.get_jwt_token().await?;
+
+            // mask the username and password
+            api_client.settings.api_settings.username = REDACTED.to_string();
+            api_client.settings.api_settings.password = REDACTED.to_string();
+
+            // mask the env variables
+            std::env::set_var("OPSML_USERNAME", REDACTED);
+            std::env::set_var("OPSML_PASSWORD", REDACTED);
         }
 
         Ok(api_client)
     }
 
+    async fn get_jwt_token(&mut self) -> Result<(), ApiError> {
+        if !self.settings.api_settings.use_auth {
+            return Ok(());
+        }
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Username",
+            HeaderValue::from_str(&self.settings.api_settings.username).map_err(|e| {
+                ApiError::Error(format!("Failed to create header with error: {}", e))
+            })?,
+        );
+
+        headers.insert(
+            "Password",
+            HeaderValue::from_str(&self.settings.api_settings.password).map_err(|e| {
+                ApiError::Error(format!("Failed to create header with error: {}", e))
+            })?,
+        );
+
+        let url = format!("{}/{}", self.base_path, Routes::AuthApiLogin.as_str());
+        let response = self
+            .client
+            .get(url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
+            .json::<JwtToken>()
+            .await
+            .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
+
+        self.settings.api_settings.auth_token = response.token;
+
+        Ok(())
+    }
+
+    /// Refresh the JWT token when it expires
+    /// This function is called with the old JWT token, which is then verified with the server refresh token
     async fn refresh_token(&mut self) -> Result<(), ApiError> {
         if !self.settings.api_settings.use_auth {
             return Ok(());
         }
 
-        let form = json!({
-            "username": self.settings.api_settings.username,
-            "password": self.settings.api_settings.password,
-        });
-
-        let url = format!("{}/{}", self.base_path, "auth/token");
+        let url = format!("{}/{}", self.base_path, Routes::AuthApiRefresh.as_str());
         let response = self
             .client
-            .post(url)
-            .json(&form)
+            .get(url)
+            .bearer_auth(&self.settings.api_settings.auth_token)
             .send()
             .await
             .map_err(|e| ApiError::Error(format!("Failed to send request with error: {}", e)))?
-            .json::<Value>()
+            .json::<JwtToken>()
             .await
             .map_err(|e| ApiError::Error(format!("Failed to parse response with error: {}", e)))?;
 
-        // check if the response has "access_token" field
-        let token = response["access_token"]
-            .as_str()
-            .ok_or_else(|| ApiError::Error("Failed to get access token".to_string()))?;
-
-        self.settings.api_settings.auth_token = token.to_string();
+        self.settings.api_settings.auth_token = response.token;
 
         Ok(())
     }
@@ -152,7 +195,7 @@ impl OpsmlApiClient {
                 .get(url)
                 .headers(headers)
                 .query(&query_params)
-                .bearer_auth(self.settings.api_settings.auth_token)
+                .bearer_auth(&self.settings.api_settings.auth_token)
                 .send()
                 .await
                 .map_err(|e| {

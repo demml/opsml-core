@@ -1,3 +1,5 @@
+use crate::core::auth::middleware::auth_api_middleware;
+use crate::core::auth::route::get_auth_router;
 use crate::core::debug::route::get_debug_router;
 use crate::core::files::route::get_file_router;
 use crate::core::health::route::get_health_router;
@@ -8,7 +10,7 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
 };
-use axum::Router;
+use axum::{middleware, Router};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
@@ -30,12 +32,23 @@ pub async fn create_router(app_state: Arc<AppState>) -> Result<Router> {
     let health_routes = get_health_router(ROUTE_PREFIX).await?;
     let file_routes = get_file_router(ROUTE_PREFIX).await?;
     let settings_routes = get_settings_router(ROUTE_PREFIX).await?;
+    let auth_routes = get_auth_router(ROUTE_PREFIX).await?;
 
-    Ok(Router::new()
+    // merge all the routes except the auth routes
+    // All routes except the auth routes will be protected by the auth middleware
+    let merged_routes = Router::new()
         .merge(debug_routes)
         .merge(health_routes)
         .merge(settings_routes)
         .merge(file_routes)
-        .with_state(app_state)
-        .layer(cors))
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth_api_middleware,
+        ));
+
+    Ok(Router::new()
+        .merge(merged_routes)
+        .merge(auth_routes)
+        .layer(cors)
+        .with_state(app_state))
 }
