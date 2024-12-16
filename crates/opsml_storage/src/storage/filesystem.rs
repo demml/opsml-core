@@ -1,9 +1,9 @@
 use crate::storage::enums::client::StorageClientEnum;
 use crate::storage::http::client::HttpFSStorageClient;
 use async_trait::async_trait;
-use opsml_contracts::FileInfo;
 use opsml_error::error::StorageError;
-use opsml_settings::config::{OpsmlStorageSettings, StorageType};
+use opsml_settings::config::OpsmlStorageSettings;
+use opsml_types::{FileInfo, StorageType};
 use pyo3::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
@@ -330,7 +330,7 @@ impl PyFileSystemStorage {
 mod tests {
     use super::*;
 
-    use opsml_settings::config::{OpsmlConfig, StorageType};
+    use opsml_settings::config::OpsmlConfig;
     use rand::distributions::Alphanumeric;
     use rand::thread_rng;
     use rand::Rng;

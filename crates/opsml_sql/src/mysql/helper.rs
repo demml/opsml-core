@@ -1,10 +1,14 @@
-use crate::base::{add_version_bounds, CardSQLTableNames};
-use crate::schemas::arguments::CardQueryArgs;
+use crate::base::add_version_bounds;
 use opsml_error::error::SqlError;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::utils::is_valid_uuid4;
 pub struct MySQLQueryHelper;
 
 impl MySQLQueryHelper {
+    pub fn get_uid_query(table: &CardSQLTableNames) -> String {
+        format!("SELECT uid FROM {} WHERE uid = ?", table).to_string()
+    }
+
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",
@@ -55,7 +59,38 @@ impl MySQLQueryHelper {
         )
         .to_string()
     }
-    pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+
+    pub fn get_run_metrics_insert_query(nbr_records: usize) -> String {
+        // values will be a vec of tuples
+        let mut query = format!(
+            "INSERT INTO {} (
+                run_uid, 
+                name, 
+                value,
+                step,
+                timestamp
+            ) VALUES ",
+            CardSQLTableNames::Metrics
+        )
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?) ");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
+
+        // remove last co
+    }
+
+    pub fn get_run_metric_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -66,18 +101,17 @@ impl MySQLQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
@@ -272,19 +306,33 @@ impl MySQLQueryHelper {
 
         Ok(query)
     }
-    pub fn get_run_parameter_insert_query() -> String {
-        format!(
+
+    pub fn get_run_parameters_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 name, 
                 value
-            ) VALUES (?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::Parameters
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
     }
 
-    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_parameter_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -295,27 +343,25 @@ impl MySQLQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
     }
-    pub fn get_hardware_metric_insert_query() -> String {
-        format!(
+    pub fn get_hardware_metrics_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
-                created_at, 
+                created_at,
                 cpu_percent_utilization, 
                 cpu_percent_per_core, 
                 compute_overall, 
@@ -333,11 +379,25 @@ impl MySQLQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::HardwareMetrics
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
     }
+
     pub fn get_projectcard_insert_query() -> String {
         "INSERT INTO opsml_project_registry (uid, name, repository, project_id, major, minor, patch, version, pre_tag, build_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".to_string()
     }

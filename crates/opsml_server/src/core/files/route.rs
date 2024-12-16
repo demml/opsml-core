@@ -13,10 +13,9 @@ use axum::{
     Extension, Router,
 };
 use opsml_auth::permission::UserPermissions;
-use opsml_constants::MAX_FILE_SIZE;
-use opsml_contracts::{
+use opsml_types::{
     DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
-    UploadResponse,
+    UploadResponse, MAX_FILE_SIZE,
 };
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;

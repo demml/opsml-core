@@ -1,18 +1,17 @@
-use crate::base::{CardSQLTableNames, SqlClient};
+use crate::base::SqlClient;
 
-use crate::schemas::arguments::CardQueryArgs;
 use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
-    AuditCardRecord, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, RunCardRecord,
+    AuditCardRecord, Card, CardResults, CardSummary, DataCardRecord, HardwareMetricsRecord,
+    MetricRecord, ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, Repository,
+    RunCardRecord, User, VersionResult,
 };
-use crate::schemas::schema::{Card, User};
-use crate::schemas::schema::{CardResults, Repository, VersionResult};
 use crate::sqlite::helper::SqliteQueryHelper;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
 use sqlx::{
@@ -121,6 +120,31 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
+    /// Check if uid exists in the database for a table
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table to query
+    /// * `uid` - The uid to check
+    ///
+    /// # Returns
+    ///
+    /// * `bool` - True if the uid exists, false otherwise
+    async fn check_uid_exists(
+        &self,
+        uid: &str,
+        table: &CardSQLTableNames,
+    ) -> Result<bool, SqlError> {
+        let query = SqliteQueryHelper::get_uid_query(table);
+        let exists: Option<String> = sqlx::query_scalar(&query)
+            .bind(uid)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(exists.is_some())
+    }
+
     /// Primary query for retrieving versions from the database. Mainly used to get most recent version when determining version increment
     ///
     /// # Arguments
@@ -135,13 +159,13 @@ impl SqlClient for SqliteClient {
     /// * `Vec<String>` - A vector of strings representing the sorted (desc) versions of the card
     async fn get_versions(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         name: &str,
         repository: &str,
         version: Option<&str>,
     ) -> Result<Vec<String>, SqlError> {
         // if version is None, get the latest version
-        let query = SqliteQueryHelper::get_versions_query(&table, version)?;
+        let query = SqliteQueryHelper::get_versions_query(table, version)?;
         let cards: Vec<VersionResult> = sqlx::query_as(&query)
             .bind(name)
             .bind(repository)
@@ -174,10 +198,10 @@ impl SqlClient for SqliteClient {
     /// * `CardResults` - The results of the query
     async fn query_cards(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError> {
-        let query = SqliteQueryHelper::get_query_cards_query(&table, query_args)?;
+        let query = SqliteQueryHelper::get_query_cards_query(table, query_args)?;
 
         match table {
             CardSQLTableNames::Data => {
@@ -267,7 +291,7 @@ impl SqlClient for SqliteClient {
         }
     }
 
-    async fn insert_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn insert_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
         match table {
             CardSQLTableNames::Data => match card {
                 Card::Data(data) => {
@@ -465,7 +489,7 @@ impl SqlClient for SqliteClient {
         }
     }
 
-    async fn update_card(&self, table: CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn update_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
         match table {
             CardSQLTableNames::Data => match card {
                 Card::Data(data) => {
@@ -649,7 +673,7 @@ impl SqlClient for SqliteClient {
     /// * `Vec<String>` - A vector of unique repository names
     async fn get_unique_repository_names(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError> {
         let query = format!("SELECT DISTINCT repository FROM {}", table);
         let repos: Vec<Repository> = sqlx::query_as(&query)
@@ -673,10 +697,10 @@ impl SqlClient for SqliteClient {
     ///
     async fn query_stats(
         &self,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
         search_term: Option<&str>,
     ) -> Result<QueryStats, SqlError> {
-        let query = SqliteQueryHelper::get_query_stats_query(&table);
+        let query = SqliteQueryHelper::get_query_stats_query(table);
 
         // if search_term is not None, format with %search_term%, else None
         let stats: QueryStats = sqlx::query_as(&query)
@@ -704,12 +728,12 @@ impl SqlClient for SqliteClient {
     async fn query_page(
         &self,
         sort_by: &str,
-        page: i64,
+        page: i32,
         search_term: Option<&str>,
         repository: Option<&str>,
-        table: CardSQLTableNames,
+        table: &CardSQLTableNames,
     ) -> Result<Vec<CardSummary>, SqlError> {
-        let query = SqliteQueryHelper::get_query_page_query(&table, sort_by);
+        let query = SqliteQueryHelper::get_query_page_query(table, sort_by);
 
         let lower_bound = page * 30;
         let upper_bound = lower_bound + 30;
@@ -727,7 +751,7 @@ impl SqlClient for SqliteClient {
         Ok(records)
     }
 
-    async fn delete_card(&self, table: CardSQLTableNames, uid: &str) -> Result<(), SqlError> {
+    async fn delete_card(&self, table: &CardSQLTableNames, uid: &str) -> Result<(), SqlError> {
         let query = format!("DELETE FROM {} WHERE uid = ?1", table);
         sqlx::query(&query)
             .bind(uid)
@@ -767,10 +791,35 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
-    async fn get_run_metric(
+    async fn insert_run_metrics<'life1>(
+        &self,
+        records: &'life1 [MetricRecord],
+    ) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_run_metrics_insert_query(records.len());
+
+        let mut query_builder = sqlx::query(&query);
+
+        for r in records {
+            query_builder = query_builder
+                .bind(&r.run_uid)
+                .bind(&r.name)
+                .bind(r.value)
+                .bind(r.step)
+                .bind(r.timestamp);
+        }
+
+        query_builder
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_run_metric<'life2>(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &'life2 [String],
     ) -> Result<Vec<MetricRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_metric_query(names);
         let mut query_builder = sqlx::query_as::<sqlx::Sqlite, MetricRecord>(&query).bind(uid);
@@ -779,8 +828,7 @@ impl SqlClient for SqliteClient {
             query_builder = query_builder.bind(binding);
         }
 
-        let records: Vec<MetricRecord> = sqlx::query_as(&query)
-            .bind(uid)
+        let records: Vec<MetricRecord> = query_builder
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -803,29 +851,38 @@ impl SqlClient for SqliteClient {
         Ok(records)
     }
 
-    async fn insert_hardware_metric(&self, record: &HardwareMetricsRecord) -> Result<(), SqlError> {
-        let query = SqliteQueryHelper::get_hardware_metric_insert_query();
+    async fn insert_hardware_metrics<'life1>(
+        &self,
+        record: &'life1 [HardwareMetricsRecord],
+    ) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_hardware_metrics_insert_query(record.len());
 
-        sqlx::query(&query)
-            .bind(&record.run_uid)
-            .bind(record.created_at)
-            .bind(record.cpu_percent_utilization)
-            .bind(&record.cpu_percent_per_core)
-            .bind(record.compute_overall)
-            .bind(record.compute_utilized)
-            .bind(record.load_avg)
-            .bind(record.sys_ram_total)
-            .bind(record.sys_ram_used)
-            .bind(record.sys_ram_available)
-            .bind(record.sys_ram_percent_used)
-            .bind(record.sys_swap_total)
-            .bind(record.sys_swap_used)
-            .bind(record.sys_swap_free)
-            .bind(record.sys_swap_percent)
-            .bind(record.bytes_recv)
-            .bind(record.bytes_sent)
-            .bind(record.gpu_percent_utilization)
-            .bind(&record.gpu_percent_per_core)
+        let mut query_builder = sqlx::query(&query);
+
+        for r in record {
+            query_builder = query_builder
+                .bind(&r.run_uid)
+                .bind(r.created_at)
+                .bind(r.cpu_percent_utilization)
+                .bind(&r.cpu_percent_per_core)
+                .bind(r.compute_overall)
+                .bind(r.compute_utilized)
+                .bind(r.load_avg)
+                .bind(r.sys_ram_total)
+                .bind(r.sys_ram_used)
+                .bind(r.sys_ram_available)
+                .bind(r.sys_ram_percent_used)
+                .bind(r.sys_swap_total)
+                .bind(r.sys_swap_used)
+                .bind(r.sys_swap_free)
+                .bind(r.sys_swap_percent)
+                .bind(r.bytes_recv)
+                .bind(r.bytes_sent)
+                .bind(r.gpu_percent_utilization)
+                .bind(&r.gpu_percent_per_core);
+        }
+
+        query_builder
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -845,13 +902,22 @@ impl SqlClient for SqliteClient {
         Ok(records)
     }
 
-    async fn insert_run_parameter(&self, record: &ParameterRecord) -> Result<(), SqlError> {
-        let query = SqliteQueryHelper::get_run_parameter_insert_query();
+    async fn insert_run_parameters<'life1>(
+        &self,
+        records: &'life1 [ParameterRecord],
+    ) -> Result<(), SqlError> {
+        let query = SqliteQueryHelper::get_run_parameters_insert_query(records.len());
 
-        sqlx::query(&query)
-            .bind(&record.run_uid)
-            .bind(&record.name)
-            .bind(&record.value)
+        let mut query_builder = sqlx::query(&query);
+
+        for record in records {
+            query_builder = query_builder
+                .bind(&record.run_uid)
+                .bind(&record.name)
+                .bind(&record.value);
+        }
+
+        query_builder
             .execute(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
@@ -859,10 +925,10 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
-    async fn get_run_parameter(
+    async fn get_run_parameter<'life2>(
         &self,
         uid: &str,
-        names: Option<&Vec<&str>>,
+        names: &'life2 [String],
     ) -> Result<Vec<ParameterRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_parameter_query(names);
         let mut query_builder = sqlx::query_as::<_, ParameterRecord>(&query).bind(uid);
@@ -939,7 +1005,7 @@ mod tests {
 
     use super::*;
 
-    use opsml_settings::config::SqlType;
+    use opsml_types::SqlType;
     use opsml_utils::utils::get_utc_datetime;
     use std::env;
 
@@ -993,53 +1059,53 @@ mod tests {
         // query all versions
         // get versions (should return 1)
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", None)
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", None)
             .await
             .unwrap();
         assert_eq!(versions.len(), 10);
 
         // check star pattern
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("*"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("*"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 10);
 
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.*"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("1.*"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 4);
 
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("1.1.*"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("1.1.*"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 2);
 
         // check tilde pattern
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("~1"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 4);
 
         // check tilde pattern
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 2);
 
         // check tilde pattern
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1.1"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("~1.1.1"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 1);
 
         let versions = client
-            .get_versions(CardSQLTableNames::Data, "Data1", "repo1", Some("^2.0.0"))
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("^2.0.0"))
             .await
             .unwrap();
         assert_eq!(versions.len(), 2);
@@ -1063,6 +1129,14 @@ mod tests {
         let script = std::fs::read_to_string("tests/populate_sqlite_test.sql").unwrap();
         sqlx::query(&script).execute(&client.pool).await.unwrap();
 
+        // check if uid exists
+        let exists = client
+            .check_uid_exists("fake", &CardSQLTableNames::Data)
+            .await
+            .unwrap();
+
+        assert!(!exists);
+
         // try name and repository
         let card_args = CardQueryArgs {
             name: Some("Data1".to_string()),
@@ -1073,7 +1147,7 @@ mod tests {
         // query all versions
         // get versions (should return 1)
         let results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
@@ -1087,7 +1161,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Model, &card_args)
+            .query_cards(&CardSQLTableNames::Model, &card_args)
             .await
             .unwrap();
 
@@ -1099,7 +1173,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Run, &card_args)
+            .query_cards(&CardSQLTableNames::Run, &card_args)
             .await
             .unwrap();
 
@@ -1115,7 +1189,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
@@ -1127,7 +1201,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .query_cards(&CardSQLTableNames::Audit, &card_args)
             .await
             .unwrap();
 
@@ -1139,11 +1213,22 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
         assert_eq!(results.len(), 1);
+
+        // check if uid exists
+        let exists = client
+            .check_uid_exists(
+                "550e8400-e29b-41d4-a716-446655440000",
+                &CardSQLTableNames::Data,
+            )
+            .await
+            .unwrap();
+
+        assert!(exists);
 
         cleanup();
     }
@@ -1163,7 +1248,7 @@ mod tests {
         let card = Card::Data(data_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Data, &card)
+            .insert_card(&CardSQLTableNames::Data, &card)
             .await
             .unwrap();
 
@@ -1173,7 +1258,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
@@ -1184,7 +1269,7 @@ mod tests {
         let card = Card::Model(model_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Model, &card)
+            .insert_card(&CardSQLTableNames::Model, &card)
             .await
             .unwrap();
 
@@ -1195,7 +1280,7 @@ mod tests {
         };
 
         let results = client
-            .query_cards(CardSQLTableNames::Model, &card_args)
+            .query_cards(&CardSQLTableNames::Model, &card_args)
             .await
             .unwrap();
 
@@ -1206,7 +1291,7 @@ mod tests {
         let card = Card::Run(run_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Run, &card)
+            .insert_card(&CardSQLTableNames::Run, &card)
             .await
             .unwrap();
 
@@ -1218,7 +1303,7 @@ mod tests {
         };
 
         let results = client
-            .query_cards(CardSQLTableNames::Run, &card_args)
+            .query_cards(&CardSQLTableNames::Run, &card_args)
             .await
             .unwrap();
 
@@ -1230,7 +1315,7 @@ mod tests {
         let card = Card::Audit(audit_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Audit, &card)
+            .insert_card(&CardSQLTableNames::Audit, &card)
             .await
             .unwrap();
 
@@ -1242,7 +1327,7 @@ mod tests {
         };
 
         let results = client
-            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .query_cards(&CardSQLTableNames::Audit, &card_args)
             .await
             .unwrap();
 
@@ -1253,7 +1338,7 @@ mod tests {
         let card = Card::Pipeline(pipeline_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Pipeline, &card)
+            .insert_card(&CardSQLTableNames::Pipeline, &card)
             .await
             .unwrap();
 
@@ -1265,7 +1350,7 @@ mod tests {
         };
 
         let results = client
-            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .query_cards(&CardSQLTableNames::Pipeline, &card_args)
             .await
             .unwrap();
 
@@ -1291,7 +1376,7 @@ mod tests {
         let card = Card::Data(data_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Data, &card)
+            .insert_card(&CardSQLTableNames::Data, &card)
             .await
             .unwrap();
 
@@ -1301,7 +1386,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
@@ -1312,13 +1397,13 @@ mod tests {
         let updated_card = Card::Data(data_card.clone());
 
         client
-            .update_card(CardSQLTableNames::Data, &updated_card)
+            .update_card(&CardSQLTableNames::Data, &updated_card)
             .await
             .unwrap();
 
         // check if the card was updated
         let updated_results = client
-            .query_cards(CardSQLTableNames::Data, &card_args)
+            .query_cards(&CardSQLTableNames::Data, &card_args)
             .await
             .unwrap();
 
@@ -1332,7 +1417,7 @@ mod tests {
         let card = Card::Model(model_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Model, &card)
+            .insert_card(&CardSQLTableNames::Model, &card)
             .await
             .unwrap();
 
@@ -1342,7 +1427,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Model, &card_args)
+            .query_cards(&CardSQLTableNames::Model, &card_args)
             .await
             .unwrap();
 
@@ -1353,13 +1438,13 @@ mod tests {
         let updated_card = Card::Model(model_card.clone());
 
         client
-            .update_card(CardSQLTableNames::Model, &updated_card)
+            .update_card(&CardSQLTableNames::Model, &updated_card)
             .await
             .unwrap();
 
         // check if the card was updated
         let updated_results = client
-            .query_cards(CardSQLTableNames::Model, &card_args)
+            .query_cards(&CardSQLTableNames::Model, &card_args)
             .await
             .unwrap();
 
@@ -1373,7 +1458,7 @@ mod tests {
         let card = Card::Run(run_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Run, &card)
+            .insert_card(&CardSQLTableNames::Run, &card)
             .await
             .unwrap();
 
@@ -1383,7 +1468,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Run, &card_args)
+            .query_cards(&CardSQLTableNames::Run, &card_args)
             .await
             .unwrap();
 
@@ -1394,13 +1479,13 @@ mod tests {
         let updated_card = Card::Run(run_card.clone());
 
         client
-            .update_card(CardSQLTableNames::Run, &updated_card)
+            .update_card(&CardSQLTableNames::Run, &updated_card)
             .await
             .unwrap();
 
         // check if the card was updated
         let updated_results = client
-            .query_cards(CardSQLTableNames::Run, &card_args)
+            .query_cards(&CardSQLTableNames::Run, &card_args)
             .await
             .unwrap();
 
@@ -1414,7 +1499,7 @@ mod tests {
         let card = Card::Audit(audit_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Audit, &card)
+            .insert_card(&CardSQLTableNames::Audit, &card)
             .await
             .unwrap();
 
@@ -1424,7 +1509,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .query_cards(&CardSQLTableNames::Audit, &card_args)
             .await
             .unwrap();
 
@@ -1435,13 +1520,13 @@ mod tests {
         let updated_card = Card::Audit(audit_card.clone());
 
         client
-            .update_card(CardSQLTableNames::Audit, &updated_card)
+            .update_card(&CardSQLTableNames::Audit, &updated_card)
             .await
             .unwrap();
 
         // check if the card was updated
         let updated_results = client
-            .query_cards(CardSQLTableNames::Audit, &card_args)
+            .query_cards(&CardSQLTableNames::Audit, &card_args)
             .await
             .unwrap();
 
@@ -1455,7 +1540,7 @@ mod tests {
         let card = Card::Pipeline(pipeline_card.clone());
 
         client
-            .insert_card(CardSQLTableNames::Pipeline, &card)
+            .insert_card(&CardSQLTableNames::Pipeline, &card)
             .await
             .unwrap();
 
@@ -1465,7 +1550,7 @@ mod tests {
             ..Default::default()
         };
         let results = client
-            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .query_cards(&CardSQLTableNames::Pipeline, &card_args)
             .await
             .unwrap();
 
@@ -1476,13 +1561,13 @@ mod tests {
         let updated_card = Card::Pipeline(pipeline_card.clone());
 
         client
-            .update_card(CardSQLTableNames::Pipeline, &updated_card)
+            .update_card(&CardSQLTableNames::Pipeline, &updated_card)
             .await
             .unwrap();
 
         // check if the card was updated
         let updated_results = client
-            .query_cards(CardSQLTableNames::Pipeline, &card_args)
+            .query_cards(&CardSQLTableNames::Pipeline, &card_args)
             .await
             .unwrap();
 
@@ -1512,7 +1597,7 @@ mod tests {
 
         // get unique repository names
         let repos = client
-            .get_unique_repository_names(CardSQLTableNames::Model)
+            .get_unique_repository_names(&CardSQLTableNames::Model)
             .await
             .unwrap();
 
@@ -1539,7 +1624,7 @@ mod tests {
 
         // query stats
         let stats = client
-            .query_stats(CardSQLTableNames::Model, None)
+            .query_stats(&CardSQLTableNames::Model, None)
             .await
             .unwrap();
 
@@ -1549,7 +1634,7 @@ mod tests {
 
         // query stats with search term
         let stats = client
-            .query_stats(CardSQLTableNames::Model, Some("Model1"))
+            .query_stats(&CardSQLTableNames::Model, Some("Model1"))
             .await
             .unwrap();
 
@@ -1576,7 +1661,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, None, CardSQLTableNames::Data)
+            .query_page("name", 0, None, None, &CardSQLTableNames::Data)
             .await
             .unwrap();
 
@@ -1584,7 +1669,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, None, CardSQLTableNames::Model)
+            .query_page("name", 0, None, None, &CardSQLTableNames::Model)
             .await
             .unwrap();
 
@@ -1592,7 +1677,7 @@ mod tests {
 
         // query page
         let results = client
-            .query_page("name", 0, None, Some("repo3"), CardSQLTableNames::Model)
+            .query_page("name", 0, None, Some("repo3"), &CardSQLTableNames::Model)
             .await
             .unwrap();
 
@@ -1627,7 +1712,7 @@ mod tests {
         };
 
         let cards = client
-            .query_cards(CardSQLTableNames::Data, &args)
+            .query_cards(&CardSQLTableNames::Data, &args)
             .await
             .unwrap();
 
@@ -1640,7 +1725,7 @@ mod tests {
 
         // delete the card
         client
-            .delete_card(CardSQLTableNames::Data, &uid)
+            .delete_card(&CardSQLTableNames::Data, &uid)
             .await
             .unwrap();
 
@@ -1651,7 +1736,7 @@ mod tests {
         };
 
         let results = client
-            .query_cards(CardSQLTableNames::Data, &args)
+            .query_cards(&CardSQLTableNames::Data, &args)
             .await
             .unwrap();
 
@@ -1691,7 +1776,7 @@ mod tests {
             ..Default::default()
         };
         let cards = client
-            .query_cards(CardSQLTableNames::Project, &args)
+            .query_cards(&CardSQLTableNames::Project, &args)
             .await
             .unwrap();
 
@@ -1725,23 +1810,41 @@ mod tests {
                 run_uid: uid.clone(),
                 name: name.to_string(),
                 value: 1.0,
-                step: None,
-                timestamp: None,
-                created_at: None,
-                idx: None,
+                ..Default::default()
             };
 
             client.insert_run_metric(&metric).await.unwrap();
         }
 
-        let records = client.get_run_metric(&uid, None).await.unwrap();
-
+        let records = client.get_run_metric(&uid, &Vec::new()).await.unwrap();
         let names = client.get_run_metric_names(&uid).await.unwrap();
 
         assert_eq!(records.len(), 3);
 
         // assert names = "metric1"
         assert_eq!(names.len(), 3);
+
+        // insert vec
+        let records = vec![
+            MetricRecord {
+                run_uid: uid.clone(),
+                name: "vec1".to_string(),
+                value: 1.0,
+                ..Default::default()
+            },
+            MetricRecord {
+                run_uid: uid.clone(),
+                name: "vec2".to_string(),
+                value: 1.0,
+                ..Default::default()
+            },
+        ];
+
+        client.insert_run_metrics(&records).await.unwrap();
+
+        let records = client.get_run_metric(&uid, &Vec::new()).await.unwrap();
+
+        assert_eq!(records.len(), 5);
 
         cleanup();
     }
@@ -1764,6 +1867,7 @@ mod tests {
         sqlx::query(&script).execute(&client.pool).await.unwrap();
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut metrics = vec![];
 
         // create a loop of 10
         for _ in 0..10 {
@@ -1772,10 +1876,10 @@ mod tests {
                 created_at: get_utc_datetime(),
                 ..Default::default()
             };
-
-            client.insert_hardware_metric(&metric).await.unwrap();
+            metrics.push(metric.clone());
         }
 
+        client.insert_hardware_metrics(&metrics).await.unwrap();
         let records = client.get_hardware_metric(&uid).await.unwrap();
 
         assert_eq!(records.len(), 10);
@@ -1801,6 +1905,7 @@ mod tests {
         sqlx::query(&script).execute(&client.pool).await.unwrap();
 
         let uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let mut params = vec![];
 
         // create a loop of 10
         for i in 0..10 {
@@ -1810,15 +1915,16 @@ mod tests {
                 ..Default::default()
             };
 
-            client.insert_run_parameter(&parameter).await.unwrap();
+            params.push(parameter.clone());
         }
 
-        let records = client.get_run_parameter(&uid, None).await.unwrap();
+        client.insert_run_parameters(&params).await.unwrap();
+        let records = client.get_run_parameter(&uid, &Vec::new()).await.unwrap();
 
         assert_eq!(records.len(), 10);
 
         let param_records = client
-            .get_run_parameter(&uid, Some(&vec!["param1"]))
+            .get_run_parameter(&uid, &["param1".to_string()])
             .await
             .unwrap();
 

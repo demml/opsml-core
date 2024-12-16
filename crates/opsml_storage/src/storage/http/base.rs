@@ -2,15 +2,13 @@ use crate::storage::enums::client::{MultiPartUploader, StorageClientEnum};
 use anyhow::{Context, Result as AnyhowResult};
 use bytes::BytesMut;
 use indicatif::{ProgressBar, ProgressStyle};
-use opsml_constants::DOWNLOAD_CHUNK_SIZE;
-use opsml_contracts::{
-    DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
-};
-use opsml_contracts::{FileInfo, StorageSettings};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
-use opsml_settings::config::{ApiSettings, OpsmlStorageSettings, StorageType};
-use opsml_types::types::JwtToken;
+use opsml_settings::config::{ApiSettings, OpsmlStorageSettings};
+use opsml_types::{
+    DeleteFileResponse, FileInfo, JwtToken, ListFileInfoResponse, ListFileResponse,
+    MultiPartSession, PresignedUrl, StorageSettings, StorageType, DOWNLOAD_CHUNK_SIZE,
+};
 use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
 use reqwest::Response;

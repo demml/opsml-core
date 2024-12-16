@@ -1,12 +1,15 @@
 use opsml_error::error::SqlError;
 
 /// this file contains helper logic for generating sql queries across different databases
-use crate::base::{add_version_bounds, CardSQLTableNames};
-use crate::schemas::arguments::CardQueryArgs;
+use crate::base::add_version_bounds;
+use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::utils::is_valid_uuid4;
 pub struct SqliteQueryHelper;
 
 impl SqliteQueryHelper {
+    pub fn get_uid_query(table: &CardSQLTableNames) -> String {
+        format!("SELECT uid FROM {} WHERE uid = ?", table).to_string()
+    }
     pub fn get_user_insert_query() -> String {
         format!(
             "INSERT INTO {} (username, password_hash, permissions, group_permissions) VALUES (?, ?, ?, ?)",
@@ -77,29 +80,57 @@ impl SqliteQueryHelper {
         )
         .to_string()
     }
-    pub fn get_run_metric_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+
+    pub fn get_run_metrics_insert_query(nbr_records: usize) -> String {
+        // values will be a vec of tuples
+        let mut query = format!(
+            "INSERT INTO {} (
+                run_uid, 
+                name, 
+                value,
+                step,
+                timestamp
+            ) VALUES ",
+            CardSQLTableNames::Metrics
+        )
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
+
+        // remove last co
+    }
+    pub fn get_run_metric_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
-            WHERE run_uid = ?1",
+            WHERE run_uid = ?",
             CardSQLTableNames::Metrics
         );
 
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
@@ -292,18 +323,31 @@ impl SqliteQueryHelper {
 
         Ok(query)
     }
-    pub fn get_run_parameter_insert_query() -> String {
-        format!(
+    pub fn get_run_parameters_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 name, 
                 value
-            ) VALUES (?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::Parameters
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?) ");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
     }
-    pub fn get_run_parameter_query(names: Option<&Vec<&str>>) -> (String, Vec<String>) {
+    pub fn get_run_parameter_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -314,24 +358,23 @@ impl SqliteQueryHelper {
         let mut bindings: Vec<String> = Vec::new();
 
         // loop through names and bind them. First name = and and others are or
-        if let Some(names) = names {
-            if !names.is_empty() {
-                query.push_str(" AND (");
-                for (idx, name) in names.iter().enumerate() {
-                    if idx > 0 {
-                        query.push_str(" OR ");
-                    }
-                    query.push_str("name = ?");
-                    bindings.push(name.to_string());
+
+        if !names.is_empty() {
+            query.push_str(" AND (");
+            for (idx, name) in names.iter().enumerate() {
+                if idx > 0 {
+                    query.push_str(" OR ");
                 }
-                query.push(')');
+                query.push_str("name = ?");
+                bindings.push(name.to_string());
             }
+            query.push(')');
         }
 
         (query, bindings)
     }
-    pub fn get_hardware_metric_insert_query() -> String {
-        format!(
+    pub fn get_hardware_metrics_insert_query(nbr_records: usize) -> String {
+        let mut query = format!(
             "INSERT INTO {} (
                 run_uid, 
                 created_at,
@@ -352,10 +395,23 @@ impl SqliteQueryHelper {
                 bytes_sent, 
                 gpu_percent_utilization, 
                 gpu_percent_per_core
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES ",
             CardSQLTableNames::HardwareMetrics
         )
-        .to_string()
+        .to_string();
+
+        for i in 0..nbr_records {
+            query.push_str("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            // add comma if not last record
+            if i < nbr_records - 1 {
+                query.push_str(", ");
+            } else {
+                query.push(';');
+            }
+        }
+
+        query
     }
 
     pub fn get_projectcard_insert_query() -> String {

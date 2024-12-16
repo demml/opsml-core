@@ -1,27 +1,9 @@
+use opsml_types::{SqlType, StorageType};
 use pyo3::prelude::*;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
-
-// TODO: Move this to opsml_types
-#[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum StorageType {
-    Google,
-    AWS,
-    Local,
-    Azure,
-}
-
-// TODO: Move this to opsml_types
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum SqlType {
-    Postgres,
-    Sqlite,
-    MySql,
-}
 
 /// ApiSettings for use with ApiClient
 #[derive(Debug, Clone)]

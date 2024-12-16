@@ -1,7 +1,7 @@
-use opsml_contracts::FileInfo;
-use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings, StorageType};
+use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings};
 use opsml_storage::storage::enums::client::{get_opsml_storage_system, PyStorageClient};
 use opsml_storage::storage::filesystem::PyFileSystemStorage;
+use opsml_types::{FileInfo, StorageType};
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 

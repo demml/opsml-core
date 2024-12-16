@@ -19,8 +19,6 @@ repository = "https://github.com/demml/opsml-core"
 [workspace.dependencies]
 
 opsml-auth = { path = "crates/opsml_auth" }
-opsml-constants = { path = "crates/opsml_constants" }
-opsml-contracts = { path = "crates/opsml_contracts" }
 opsml-error = { path = "crates/opsml_error" }
 opsml-logging = { path = "crates/opsml_logging" }
 opsml-server = { path = "crates/opsml_server" }
@@ -43,7 +41,7 @@ aws-smithy-types = { version = "1.2.9", features = ["rt-tokio", "http-body-0-4-x
 aws-types = "1.*"
 base64 = "0.*"
 bytes = "1.*"
-axum = { version = "0.7.7", features = ["multipart"] }
+axum = { version = "0.7.7", features = ["multipart", "macros"] }
 axum-extra = { version =  "0.*", features = ["cookie"] }
 clap = { version = "4.*", features = ["derive"] }
 chrono = { version = "0.*", features = ["serde"] }
@@ -67,6 +65,7 @@ serde = { version = "1.*", features = ["derive"] }
 serde_json = "1.*"
 sqlx = { version = "0.*", features = [ "runtime-tokio", "tls-native-tls", "postgres", "mysql", "sqlite", "chrono", "json"] }
 tabled = { version = "0.*", features = ["ansi"] }
+tempfile = "3.*"
 thiserror = "2.*"
 time = "0.*"
 

@@ -40,6 +40,20 @@ impl MetricRecord {
     }
 }
 
+impl Default for MetricRecord {
+    fn default() -> Self {
+        MetricRecord {
+            run_uid: Uuid::new_v4().to_string(),
+            name: CommonKwargs::Undefined.as_string().to_string(),
+            value: 0.0,
+            step: None,
+            timestamp: None,
+            created_at: None,
+            idx: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ParameterRecord {
     pub run_uid: String,
@@ -115,7 +129,7 @@ pub struct QueryStats {
     pub nbr_versions: i32,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct CardSummary {
     pub repository: String,
     pub name: String,
@@ -155,7 +169,7 @@ impl DataCardRecord {
         repository: String,
         version: Version,
         contact: String,
-        tags: Option<HashMap<String, String>>,
+        tags: HashMap<String, String>,
         data_type: String,
         runcard_uid: Option<String>,
         pipelinecard_uid: Option<String>,
@@ -179,7 +193,7 @@ impl DataCardRecord {
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
             contact,
-            tags: Json(tags.unwrap_or_default()),
+            tags: Json(tags),
             data_type,
             runcard_uid: runcard_uid
                 .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
@@ -250,7 +264,7 @@ impl ModelCardRecord {
         repository: String,
         version: Version,
         contact: String,
-        tags: Option<HashMap<String, String>>,
+        tags: HashMap<String, String>,
         datacard_uid: Option<String>,
         sample_data_type: String,
         model_type: String,
@@ -277,7 +291,7 @@ impl ModelCardRecord {
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
             contact,
-            tags: Json(tags.unwrap_or_default()),
+            tags: Json(tags),
             datacard_uid: datacard_uid
                 .unwrap_or_else(|| CommonKwargs::Undefined.as_string().to_string()),
             sample_data_type,
@@ -379,7 +393,7 @@ impl RunCardRecord {
         repository: String,
         version: Version,
         contact: String,
-        tags: Option<HashMap<String, String>>,
+        tags: HashMap<String, String>,
         datacard_uids: Option<Vec<String>>,
         modelcard_uids: Option<Vec<String>>,
         pipelinecard_uid: Option<String>,
@@ -404,7 +418,7 @@ impl RunCardRecord {
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
             contact,
-            tags: Json(tags.unwrap_or_default()),
+            tags: Json(tags),
             datacard_uids: Json(datacard_uids.unwrap_or_default()),
             modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
             pipelinecard_uid: pipelinecard_uid
@@ -444,7 +458,7 @@ impl AuditCardRecord {
         repository: String,
         version: Version,
         contact: String,
-        tags: Option<HashMap<String, String>>,
+        tags: HashMap<String, String>,
         approved: bool,
         datacard_uids: Option<Vec<String>>,
         modelcard_uids: Option<Vec<String>>,
@@ -467,7 +481,7 @@ impl AuditCardRecord {
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
             contact,
-            tags: Json(tags.unwrap_or_default()),
+            tags: Json(tags),
             approved,
             datacard_uids: Json(datacard_uids.unwrap_or_default()),
             modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
@@ -528,7 +542,7 @@ impl PipelineCardRecord {
         repository: String,
         version: Version,
         contact: String,
-        tags: Option<HashMap<String, String>>,
+        tags: HashMap<String, String>,
         pipeline_code_uri: String,
         datacard_uids: Option<Vec<String>>,
         modelcard_uids: Option<Vec<String>>,
@@ -551,7 +565,7 @@ impl PipelineCardRecord {
             build_tag: version.build.to_string().parse().ok(),
             version: version.to_string(),
             contact,
-            tags: Json(tags.unwrap_or_default()),
+            tags: Json(tags),
             pipeline_code_uri,
             datacard_uids: Json(datacard_uids.unwrap_or_default()),
             modelcard_uids: Json(modelcard_uids.unwrap_or_default()),
@@ -636,8 +650,8 @@ impl ProjectCardRecord {
 }
 
 // create enum that takes vec of cards
-
-#[derive(Debug)]
+// TODO: There should also be a client side enum that matches this (don't want to install opsml_sql on client)
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CardResults {
     Data(Vec<DataCardRecord>),
     Model(Vec<ModelCardRecord>),
@@ -706,6 +720,19 @@ pub enum Card {
     Audit(AuditCardRecord),
     Pipeline(PipelineCardRecord),
     Project(ProjectCardRecord),
+}
+
+impl Card {
+    pub fn uid(&self) -> String {
+        match self {
+            Card::Data(card) => card.uid.clone(),
+            Card::Model(card) => card.uid.clone(),
+            Card::Run(card) => card.uid.clone(),
+            Card::Audit(card) => card.uid.clone(),
+            Card::Pipeline(card) => card.uid.clone(),
+            Card::Project(card) => card.uid.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
