@@ -3064,6 +3064,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "opsml-registry"
+version = "0.1.0"
+dependencies = [
+ "opsml-error",
+ "opsml-sql",
+ "opsml-storage",
+ "opsml-types",
+]
+
+[[package]]
 name = "opsml-server"
 version = "0.1.0"
 dependencies = [

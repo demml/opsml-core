@@ -1,0 +1,17 @@
+[package]
+name = "opsml-registry"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+
+[lib]
+doctest = false
+
+[dependencies]
+opsml-error = { workspace = true }
+opsml-types = { workspace = true }
+opsml-sql = { workspace = true, optional = true }
+opsml-storage = { workspace = true }
+
+[features]
+server = ["opsml-sql"]
