@@ -1,20 +1,20 @@
 use crate::core::error::internal_server_error;
-use crate::core::files::schema::{DeleteFileQuery, ListFileQuery, MultiPartQuery, PresignedQuery};
 use crate::core::state::AppState;
 use axum::extract::DefaultBodyLimit;
 use axum::extract::Multipart;
 use axum::{
+    body::Body,
     extract::{Query, State},
     http::StatusCode,
-    Json,
-};
-use axum::{
+    response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Extension, Router,
+    Extension, Json, Router,
 };
+
 use opsml_auth::permission::UserPermissions;
 use opsml_types::{
-    DeleteFileResponse, ListFileInfoResponse, ListFileResponse, MultiPartSession, PresignedUrl,
+    DeleteFileQuery, DeleteFileResponse, DownloadFileQuery, ListFileInfoResponse, ListFileQuery,
+    ListFileResponse, MultiPartQuery, MultiPartSession, PresignedQuery, PresignedUrl, StorageType,
     UploadResponse, MAX_FILE_SIZE,
 };
 use tokio::fs::File;
@@ -28,6 +28,7 @@ use serde_json::json;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::Arc;
+use tokio_util::io::ReaderStream;
 use tracing::{error, info};
 
 /// Create a multipart upload session (write)
@@ -298,6 +299,44 @@ pub async fn delete_file(
     }
 }
 
+// for use with local storage only
+pub async fn download_file(
+    State(state): State<Arc<AppState>>,
+    params: Query<DownloadFileQuery>,
+) -> Response<Body> {
+    // check if storage client is local (fails if not)
+    if state.storage_client.storage_type() != StorageType::Local {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Download is only supported for local storage" })),
+        )
+            .into_response();
+    }
+
+    // need to join the bucket and the file name
+
+    let path = Path::new(&params.path);
+    let bucket = state.config.opsml_storage_uri.clone();
+    let rpath = Path::new(&bucket).join(path);
+
+    let file = match File::open(&rpath).await {
+        Ok(file) => file,
+        Err(e) => {
+            error!("Failed to open file: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "failed": "Failed to open file" })),
+            )
+                .into_response();
+        }
+    };
+
+    let stream = ReaderStream::new(file);
+    let body = Body::from_stream(stream);
+
+    (StatusCode::OK, body).into_response()
+}
+
 pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         Router::new()
@@ -309,6 +348,7 @@ pub async fn get_file_router(prefix: &str) -> Result<Router<Arc<AppState>>> {
                 &format!("{}/files/multipart", prefix),
                 post(upload_multipart).layer(DefaultBodyLimit::max(MAX_FILE_SIZE)),
             )
+            .route(&format!("{}/files", prefix), get(download_file))
             .route(
                 &format!("{}/files/presigned", prefix),
                 get(generate_presigned_url),

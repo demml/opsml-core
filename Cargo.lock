@@ -3181,6 +3181,7 @@ dependencies = [
  "reqwest_mock",
  "serde",
  "serde_json",
+ "serde_qs",
  "tempfile",
  "time",
  "tokio 1.41.1",

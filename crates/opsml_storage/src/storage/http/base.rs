@@ -6,8 +6,10 @@ use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings};
 use opsml_types::{
-    DeleteFileResponse, FileInfo, JwtToken, ListFileInfoResponse, ListFileResponse,
-    MultiPartSession, PresignedUrl, StorageSettings, StorageType, DOWNLOAD_CHUNK_SIZE,
+    DeleteFileQuery, DeleteFileResponse, DownloadFileQuery, FileInfo, JwtToken,
+    ListFileInfoResponse, ListFileQuery, ListFileResponse, MultiPartQuery, MultiPartSession,
+    PresignedQuery, PresignedUrl, RequestType, Routes, StorageSettings, StorageType,
+    DOWNLOAD_CHUNK_SIZE,
 };
 use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
@@ -17,51 +19,11 @@ use reqwest::{
     Client,
 };
 use serde_json::Value;
-use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 
 const TIMEOUT_SECS: u64 = 30;
 const REDACTED: &str = "REDACTED";
-
-#[derive(Debug, Clone)]
-pub enum RequestType {
-    Get,
-    Post,
-    Put,
-    Delete,
-}
-
-#[derive(Debug, Clone)]
-pub enum Routes {
-    Multipart,
-    Presigned,
-    List,
-    ListInfo,
-    Files,
-    DeleteFiles,
-    Healthcheck,
-    StorageSettings,
-    AuthApiRefresh,
-    AuthApiLogin,
-}
-
-impl Routes {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Routes::Files => "files",
-            Routes::Multipart => "files/multipart",
-            Routes::Presigned => "files/presigned",
-            Routes::List => "files/list",
-            Routes::ListInfo => "files/list/info",
-            Routes::Healthcheck => "healthcheck",
-            Routes::StorageSettings => "storage/settings",
-            Routes::DeleteFiles => "files/delete",
-            Routes::AuthApiRefresh => "auth/api/refresh",
-            Routes::AuthApiLogin => "auth/api/login",
-        }
-    }
-}
 
 /// Create a new HTTP client that can be shared across different clients
 pub fn build_http_client(settings: &ApiSettings) -> Result<Client, ApiError> {
@@ -181,24 +143,30 @@ impl OpsmlApiClient {
         route: Routes,
         request_type: RequestType,
         body_params: Option<Value>,
-        query_params: HashMap<String, String>,
+        query_string: Option<String>,
         headers: Option<HeaderMap>,
     ) -> Result<Response, ApiError> {
         let headers = headers.unwrap_or_default();
 
         let url = format!("{}/{}", self.base_path, route.as_str());
         let response = match request_type {
-            RequestType::Get => self
-                .client
-                .get(url)
-                .headers(headers)
-                .query(&query_params)
-                .bearer_auth(&self.settings.api_settings.auth_token)
-                .send()
-                .await
-                .map_err(|e| {
-                    ApiError::Error(format!("Failed to send request with error: {}", e))
-                })?,
+            RequestType::Get => {
+                let url = if let Some(query_string) = query_string {
+                    format!("{}?{}", url, query_string)
+                } else {
+                    url
+                };
+
+                self.client
+                    .get(url)
+                    .headers(headers)
+                    .bearer_auth(&self.settings.api_settings.auth_token)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        ApiError::Error(format!("Failed to send request with error: {}", e))
+                    })?
+            }
             RequestType::Post => self
                 .client
                 .post(url)
@@ -221,17 +189,22 @@ impl OpsmlApiClient {
                 .map_err(|e| {
                     ApiError::Error(format!("Failed to send request with error: {}", e))
                 })?,
-            RequestType::Delete => self
-                .client
-                .delete(url)
-                .headers(headers)
-                .query(&query_params)
-                .bearer_auth(self.settings.api_settings.auth_token)
-                .send()
-                .await
-                .map_err(|e| {
-                    ApiError::Error(format!("Failed to send request with error: {}", e))
-                })?,
+            RequestType::Delete => {
+                let url = if let Some(query_string) = query_string {
+                    format!("{}?{}", url, query_string)
+                } else {
+                    url
+                };
+                self.client
+                    .delete(url)
+                    .headers(headers)
+                    .bearer_auth(self.settings.api_settings.auth_token)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        ApiError::Error(format!("Failed to send request with error: {}", e))
+                    })?
+            }
         };
 
         Ok(response)
@@ -242,15 +215,13 @@ impl OpsmlApiClient {
         route: Routes,
         request_type: RequestType,
         body_params: Option<Value>,
-        query_params: Option<HashMap<String, String>>,
+        query_params: Option<String>,
         headers: Option<HeaderMap>,
     ) -> Result<Response, ApiError> {
         // this will attempt to send a request. If the request fails, it will refresh the token and try again. If it fails all 3 times it will return an error
         let mut attempts = 0;
         let max_attempts = 3;
         let mut response: Result<Response, ApiError>;
-
-        let query_params = query_params.unwrap_or_default();
 
         loop {
             attempts += 1;
@@ -303,18 +274,25 @@ impl OpsmlApiClient {
         session_url: &str,
         part_number: i32,
     ) -> Result<String, ApiError> {
-        let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), path.to_string());
-        query_params.insert("session_url".to_string(), session_url.to_string());
-        query_params.insert("part_number".to_string(), part_number.to_string());
-        query_params.insert("for_multi_part".to_string(), "true".to_string());
+        let args = PresignedQuery {
+            path: path.to_string(),
+            session_url: Some(session_url.to_string()),
+            part_number: Some(part_number),
+            for_multi_part: Some(true),
+        };
+        let query_string = serde_qs::to_string(&args).map_err(|e| {
+            ApiError::Error(format!(
+                "Failed to serialize query string with error: {}",
+                e
+            ))
+        })?;
 
         let response = self
             .request_with_retry(
                 Routes::Presigned,
                 RequestType::Get,
                 None,
-                Some(query_params),
+                Some(query_string),
                 None,
             )
             .await
@@ -410,13 +388,23 @@ impl HttpStorageClient {
     }
 
     pub async fn find(&mut self, path: &str) -> Result<Vec<String>, StorageError> {
-        let mut params = HashMap::new();
-        params.insert("path".to_string(), path.to_string());
+        let query = ListFileQuery {
+            path: path.to_string(),
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         // need to clone because self is borrowed
         let response = self
             .api_client
-            .request_with_retry(Routes::List, RequestType::Get, None, Some(params), None)
+            .request_with_retry(
+                Routes::List,
+                RequestType::Get,
+                None,
+                Some(query_string),
+                None,
+            )
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
@@ -433,12 +421,22 @@ impl HttpStorageClient {
     }
 
     pub async fn find_info(&mut self, path: &str) -> Result<Vec<FileInfo>, StorageError> {
-        let mut params = HashMap::new();
-        params.insert("path".to_string(), path.to_string());
+        let query = ListFileQuery {
+            path: path.to_string(),
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         let response = self
             .api_client
-            .request_with_retry(Routes::ListInfo, RequestType::Get, None, Some(params), None)
+            .request_with_retry(
+                Routes::ListInfo,
+                RequestType::Get,
+                None,
+                Some(query_string),
+                None,
+            )
             .await
             .map_err(|e| StorageError::Error(format!("Failed to get files: {}", e)))?;
 
@@ -493,15 +491,19 @@ impl HttpStorageClient {
 
         // download the object
         let mut response = if self.storage_type == StorageType::Local {
-            let mut query_parms = HashMap::new();
-            query_parms.insert("path".to_string(), remote_path.to_string());
+            let query = DownloadFileQuery {
+                path: remote_path.to_string(),
+            };
+
+            let query_string = serde_qs::to_string(&query)
+                .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
             self.api_client
                 .request_with_retry(
                     Routes::Files,
                     RequestType::Get,
                     None,
-                    Some(query_parms),
+                    Some(query_string),
                     None,
                 )
                 .await
@@ -545,9 +547,13 @@ impl HttpStorageClient {
     }
 
     pub async fn delete_object(&mut self, path: &str) -> Result<bool, StorageError> {
-        let mut params = HashMap::new();
-        params.insert("path".to_string(), path.to_string());
-        params.insert("recursive".to_string(), "false".to_string());
+        let query = DeleteFileQuery {
+            path: path.to_string(),
+            recursive: false,
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         let response = self
             .api_client
@@ -555,7 +561,7 @@ impl HttpStorageClient {
                 Routes::DeleteFiles,
                 RequestType::Delete,
                 None,
-                Some(params),
+                Some(query_string),
                 None,
             )
             .await
@@ -574,9 +580,13 @@ impl HttpStorageClient {
     }
 
     pub async fn delete_objects(&mut self, path: &str) -> Result<bool, StorageError> {
-        let mut params = HashMap::new();
-        params.insert("path".to_string(), path.to_string());
-        params.insert("recursive".to_string(), "true".to_string());
+        let query = DeleteFileQuery {
+            path: path.to_string(),
+            recursive: true,
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         let response = self
             .api_client
@@ -584,7 +594,7 @@ impl HttpStorageClient {
                 Routes::DeleteFiles,
                 RequestType::Delete,
                 None,
-                Some(params),
+                Some(query_string),
                 None,
             )
             .await
@@ -602,8 +612,12 @@ impl HttpStorageClient {
     }
 
     pub async fn create_multipart_upload(&mut self, path: &str) -> Result<String, StorageError> {
-        let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), path.to_string());
+        let query = MultiPartQuery {
+            path: path.to_string(),
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         let response = self
             .api_client
@@ -611,7 +625,7 @@ impl HttpStorageClient {
                 Routes::Multipart,
                 RequestType::Get,
                 None,
-                Some(query_params),
+                Some(query_string),
                 None,
             )
             .await
@@ -652,8 +666,13 @@ impl HttpStorageClient {
     }
 
     pub async fn generate_presigned_url(&mut self, path: &str) -> Result<String, StorageError> {
-        let mut query_params = HashMap::new();
-        query_params.insert("path".to_string(), path.to_string());
+        let query = PresignedQuery {
+            path: path.to_string(),
+            ..Default::default()
+        };
+
+        let query_string = serde_qs::to_string(&query)
+            .map_err(|e| StorageError::Error(format!("Failed to serialize query: {}", e)))?;
 
         let response = self
             .api_client
@@ -661,7 +680,7 @@ impl HttpStorageClient {
                 Routes::Presigned,
                 RequestType::Get,
                 None,
-                Some(query_params),
+                Some(query_string),
                 None,
             )
             .await

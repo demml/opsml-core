@@ -7,7 +7,7 @@ use opsml_types::{FileInfo, StorageType};
 use std::path::{Path, PathBuf};
 
 pub struct HttpFSStorageClient {
-    client: HttpStorageClient,
+    pub client: HttpStorageClient,
 }
 
 impl HttpFSStorageClient {
