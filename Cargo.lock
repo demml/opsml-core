@@ -3073,6 +3073,7 @@ dependencies = [
  "opsml-storage",
  "opsml-types",
  "pyo3",
+ "serde_qs",
 ]
 
 [[package]]

@@ -1,4 +1,8 @@
 use crate::core::cards::schema::{QueryPageResponse, RegistryStatsResponse};
+use crate::core::cards::util::{
+    convert_auditcard, convert_datacard, convert_modelcard, convert_pipelinecard,
+    convert_projectcard, convert_runcard,
+};
 use crate::core::state::AppState;
 use anyhow::{Context, Result};
 use axum::{
@@ -14,7 +18,7 @@ use opsml_sql::schemas::schema::{
     ProjectCardRecord, RunCardRecord,
 };
 use opsml_types::{
-    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, ClientCard,
+    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, Cards, ClientCard,
     CreateCardRequest, CreateCardResponse, ListCardRequest, QueryPageRequest, RegistryStatsRequest,
     RepositoryRequest, RepositoryResponse, UidRequest, UidResponse, UpdateCardRequest,
     UpdateCardResponse,
@@ -176,7 +180,7 @@ pub async fn get_next_version(
 pub async fn list_cards(
     State(state): State<Arc<AppState>>,
     params: Query<ListCardRequest>,
-) -> Result<Json<CardResults>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<Cards>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     let card_args = CardQueryArgs {
         name: params.name.clone(),
@@ -201,7 +205,48 @@ pub async fn list_cards(
             )
         })?;
 
-    Ok(Json(cards))
+    // convert to Cards struct
+    match cards {
+        CardResults::Data(data) => {
+            let cards = data
+                .into_iter()
+                .map(|card| convert_datacard(card))
+                .collect();
+            Ok(Json(Cards::Data(cards)))
+        }
+        CardResults::Model(data) => {
+            let cards = data
+                .into_iter()
+                .map(|card| convert_modelcard(card))
+                .collect();
+            Ok(Json(Cards::Model(cards)))
+        }
+        CardResults::Project(data) => {
+            let cards = data
+                .into_iter()
+                .map(|card| convert_projectcard(card))
+                .collect();
+            Ok(Json(Cards::Project(cards)))
+        }
+        CardResults::Run(data) => {
+            let cards = data.into_iter().map(|card| convert_runcard(card)).collect();
+            Ok(Json(Cards::Run(cards)))
+        }
+        CardResults::Pipeline(data) => {
+            let cards = data
+                .into_iter()
+                .map(|card| convert_pipelinecard(card))
+                .collect();
+            Ok(Json(Cards::Pipeline(cards)))
+        }
+        CardResults::Audit(data) => {
+            let cards = data
+                .into_iter()
+                .map(|card| convert_auditcard(card))
+                .collect();
+            Ok(Json(Cards::Audit(cards)))
+        }
+    }
 }
 
 pub async fn create_card(

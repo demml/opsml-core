@@ -31,13 +31,27 @@ impl ClientRegistry {
         CardSQLTableNames::from_registry_type(&self.registry_type).to_string()
     }
 
-    pub async fn list_cards(&self, args: CardQueryArgs) -> Result<Vec<Card>, RegistryError> {
-        self.api_client.request_with_retry(
-            Routes::CardList,
-            RequestType::Get,
-            None,
-            query_params,
-            headers,
-        )
+    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
+        // convert args struct to hasmap
+
+        let query_string = serde_qs::to_string(&args)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize query args {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::CardList,
+                RequestType::Get,
+                None,
+                Some(query_string),
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to list cards {}", e)))?;
+
+        Ok(response
+            .json::<Cards>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?)
     }
 }

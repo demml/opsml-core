@@ -835,13 +835,13 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: CardResults = serde_json::from_slice(&body).unwrap();
+        let card_results: Cards = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
         let card = match card_results {
-            CardResults::Run(cards) => cards[0].clone(),
+            Cards::Run(cards) => cards[0].clone(),
             _ => panic!("Card not found"),
         };
 
@@ -852,16 +852,16 @@ mod tests {
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
                 contact: "test".to_string(),
-                uid: Some(card.uid.clone()),
-                app_env: Some(card.app_env),
+                uid: card.uid.clone(),
+                app_env: card.app_env,
                 created_at: Some(card.created_at.unwrap()),
-                datacard_uids: Some(card.datacard_uids.0),
-                pipelinecard_uid: Some(card.pipelinecard_uid),
-                artifact_uris: Some(card.artifact_uris.0),
-                modelcard_uids: Some(card.modelcard_uids.0),
-                compute_environment: Some(card.compute_environment.0),
+                datacard_uids: card.datacard_uids,
+                pipelinecard_uid: card.pipelinecard_uid,
+                artifact_uris: card.artifact_uris,
+                modelcard_uids: card.modelcard_uids,
+                compute_environment: card.compute_environment,
                 project: card.project,
-                tags: card.tags.0,
+                tags: card.tags,
             }),
         };
 
@@ -882,7 +882,7 @@ mod tests {
         assert!(update_response.updated);
 
         let delete_args = UidRequest {
-            uid: card.uid.clone(),
+            uid: card.uid.clone().unwrap(),
             registry_type: RegistryType::Run,
         };
 

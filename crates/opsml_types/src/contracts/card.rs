@@ -338,6 +338,29 @@ pub enum ClientCard {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum Cards {
+    Data(Vec<DataCardClientRecord>),
+    Model(Vec<ModelCardClientRecord>),
+    Run(Vec<RunCardClientRecord>),
+    Audit(Vec<AuditCardClientRecord>),
+    Pipeline(Vec<PipelineCardClientRecord>),
+    Project(Vec<ProjectCardClientRecord>),
+}
+
+impl Cards {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Data(cards) => cards.len(),
+            Self::Model(cards) => cards.len(),
+            Self::Run(cards) => cards.len(),
+            Self::Audit(cards) => cards.len(),
+            Self::Pipeline(cards) => cards.len(),
+            Self::Project(cards) => cards.len(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateCardRequest {
     pub registry_type: RegistryType,
     pub card: ClientCard,

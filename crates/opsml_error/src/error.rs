@@ -165,4 +165,7 @@ pub enum AuthError {
 pub enum RegistryError {
     #[error("Failed to initialize registry - {0}")]
     NewError(String),
+
+    #[error("{0}")]
+    Error(String),
 }
