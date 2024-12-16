@@ -5,16 +5,11 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub enum GraphStyle {
+    #[default]
     Line,
     Scatter,
-}
-
-impl Default for GraphStyle {
-    fn default() -> Self {
-        GraphStyle::Line
-    }
 }
 
 impl Display for GraphStyle {
@@ -27,16 +22,11 @@ impl Display for GraphStyle {
 }
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
 pub enum GraphType {
+    #[default]
     Single,
     Group,
-}
-
-impl Default for GraphType {
-    fn default() -> Self {
-        GraphType::Single
-    }
 }
 
 impl Display for GraphType {

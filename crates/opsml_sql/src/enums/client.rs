@@ -205,7 +205,10 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_run_metrics(&self, records: &Vec<MetricRecord>) -> Result<(), SqlError> {
+    async fn insert_run_metrics<'life1>(
+        &self,
+        records: &'life1 [MetricRecord],
+    ) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.insert_run_metrics(records).await,
             SqlClientEnum::Sqlite(client) => client.insert_run_metrics(records).await,
@@ -213,10 +216,10 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn get_run_metric(
+    async fn get_run_metric<'life2>(
         &self,
         uid: &str,
-        names: &Vec<String>,
+        names: &'life2 [String],
     ) -> Result<Vec<MetricRecord>, SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.get_run_metric(uid, names).await,
@@ -233,9 +236,9 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_hardware_metrics(
+    async fn insert_hardware_metrics<'life1>(
         &self,
-        record: &Vec<HardwareMetricsRecord>,
+        record: &'life1 [HardwareMetricsRecord],
     ) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.insert_hardware_metrics(record).await,
@@ -252,7 +255,10 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_run_parameters(&self, record: &Vec<ParameterRecord>) -> Result<(), SqlError> {
+    async fn insert_run_parameters<'life1>(
+        &self,
+        record: &'life1 [ParameterRecord],
+    ) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.insert_run_parameters(record).await,
             SqlClientEnum::Sqlite(client) => client.insert_run_parameters(record).await,
@@ -260,10 +266,10 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn get_run_parameter(
+    async fn get_run_parameter<'life2>(
         &self,
         uid: &str,
-        names: &Vec<String>,
+        names: &'life2 [String],
     ) -> Result<Vec<ParameterRecord>, SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.get_run_parameter(uid, names).await,
@@ -1086,7 +1092,7 @@ mod tests {
         assert_eq!(records.len(), 10);
 
         let param_records = client
-            .get_run_parameter(&uid, &vec!["param1".to_string()])
+            .get_run_parameter(&uid, &["param1".to_string()])
             .await
             .unwrap();
 

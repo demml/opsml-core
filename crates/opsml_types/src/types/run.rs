@@ -170,7 +170,7 @@ impl RunGraph {
 impl RunGraph {
     pub fn save_to_json(&self, path: Option<PathBuf>) -> Result<(), TypeError> {
         // check if path is provided
-        let mut path = path.unwrap_or_else(|| PathBuf::new());
+        let mut path = path.unwrap_or_default();
 
         // check if path is a file
         if !path.is_file() {

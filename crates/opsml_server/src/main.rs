@@ -80,7 +80,6 @@ mod tests {
     use axum::response::Response;
     use axum::{
         body::Body,
-        extract::Path,
         http::{header, Request, StatusCode},
     };
     use http_body_util::BodyExt; // for `collect`
@@ -90,7 +89,6 @@ mod tests {
     use opsml_sql::schemas::schema::CardResults;
     use opsml_types::*;
     use std::collections::HashMap;
-    use std::hash::Hash;
     use std::path::PathBuf;
     use std::{env, vec};
     use tower::ServiceExt; // for `call`, `oneshot`, and `ready`
@@ -220,7 +218,7 @@ mod tests {
         }
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_login() {
         let helper = TestHelper::new().await;
 
@@ -262,7 +260,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_card_uid() {
         let helper = TestHelper::new().await;
 
@@ -319,7 +317,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_card_repositories() {
         let helper = TestHelper::new().await;
 
@@ -349,7 +347,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_card_stats_and_query() {
         let helper = TestHelper::new().await;
 
@@ -446,7 +444,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_card_versions() {
         let helper = TestHelper::new().await;
 
@@ -480,7 +478,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_list_cards() {
         let helper = TestHelper::new().await;
 
@@ -543,7 +541,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_datacard_crud() {
         let helper = TestHelper::new().await;
 
@@ -663,7 +661,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_modelcard_crud() {
         let helper = TestHelper::new().await;
 
@@ -786,7 +784,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_runcard_crud() {
         let helper = TestHelper::new().await;
 
@@ -907,7 +905,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_pipelinecard_crud() {
         let helper = TestHelper::new().await;
 
@@ -1026,7 +1024,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_auditcard_crud() {
         let helper = TestHelper::new().await;
 
@@ -1145,7 +1143,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_projectcard_crud() {
         let helper = TestHelper::new().await;
 
@@ -1230,7 +1228,7 @@ mod tests {
         helper.cleanup();
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_opsml_server_run_routes() {
         let helper = TestHelper::new().await;
         let run_uid = "550e8400-e29b-41d4-a716-446655440000".to_string();
@@ -1423,7 +1421,8 @@ mod tests {
 
         helper.cleanup();
     }
-    //#[tokio::test]
+
+    #[tokio::test]
     async fn test_opsml_server_run_graphs() {
         let helper = TestHelper::new().await;
 
@@ -1482,7 +1481,7 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let graphs: Vec<RunGraph> = serde_json::from_slice(&body).unwrap();
 
-        println!("{:?}", graphs);
+        assert_eq!(graphs.len(), 2);
 
         helper.cleanup();
     }

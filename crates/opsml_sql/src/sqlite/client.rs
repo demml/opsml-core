@@ -791,7 +791,10 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
-    async fn insert_run_metrics(&self, records: &Vec<MetricRecord>) -> Result<(), SqlError> {
+    async fn insert_run_metrics<'life1>(
+        &self,
+        records: &'life1 [MetricRecord],
+    ) -> Result<(), SqlError> {
         let query = SqliteQueryHelper::get_run_metrics_insert_query(records.len());
 
         let mut query_builder = sqlx::query(&query);
@@ -813,10 +816,10 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
-    async fn get_run_metric(
+    async fn get_run_metric<'life2>(
         &self,
         uid: &str,
-        names: &Vec<String>,
+        names: &'life2 [String],
     ) -> Result<Vec<MetricRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_metric_query(names);
         let mut query_builder = sqlx::query_as::<sqlx::Sqlite, MetricRecord>(&query).bind(uid);
@@ -848,9 +851,9 @@ impl SqlClient for SqliteClient {
         Ok(records)
     }
 
-    async fn insert_hardware_metrics(
+    async fn insert_hardware_metrics<'life1>(
         &self,
-        record: &Vec<HardwareMetricsRecord>,
+        record: &'life1 [HardwareMetricsRecord],
     ) -> Result<(), SqlError> {
         let query = SqliteQueryHelper::get_hardware_metrics_insert_query(record.len());
 
@@ -899,7 +902,10 @@ impl SqlClient for SqliteClient {
         Ok(records)
     }
 
-    async fn insert_run_parameters(&self, records: &Vec<ParameterRecord>) -> Result<(), SqlError> {
+    async fn insert_run_parameters<'life1>(
+        &self,
+        records: &'life1 [ParameterRecord],
+    ) -> Result<(), SqlError> {
         let query = SqliteQueryHelper::get_run_parameters_insert_query(records.len());
 
         let mut query_builder = sqlx::query(&query);
@@ -919,10 +925,10 @@ impl SqlClient for SqliteClient {
         Ok(())
     }
 
-    async fn get_run_parameter(
+    async fn get_run_parameter<'life2>(
         &self,
         uid: &str,
-        names: &Vec<String>,
+        names: &'life2 [String],
     ) -> Result<Vec<ParameterRecord>, SqlError> {
         let (query, bindings) = SqliteQueryHelper::get_run_parameter_query(names);
         let mut query_builder = sqlx::query_as::<_, ParameterRecord>(&query).bind(uid);
@@ -1918,7 +1924,7 @@ mod tests {
         assert_eq!(records.len(), 10);
 
         let param_records = client
-            .get_run_parameter(&uid, &vec!["param1".to_string()])
+            .get_run_parameter(&uid, &["param1".to_string()])
             .await
             .unwrap();
 

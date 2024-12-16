@@ -142,7 +142,7 @@ pub struct CardVersionResponse {
 /// * `query_terms` - The query terms to search for
 /// * `sort_by_timestamp` - Whether to sort by timestamp
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct CardQueryArgs {
     pub uid: Option<String>,
     pub name: Option<String>,
@@ -152,21 +152,6 @@ pub struct CardQueryArgs {
     pub tags: Option<HashMap<String, String>>,
     pub limit: Option<i32>,
     pub sort_by_timestamp: Option<bool>,
-}
-
-impl Default for CardQueryArgs {
-    fn default() -> Self {
-        Self {
-            uid: None,
-            name: None,
-            repository: None,
-            version: None,
-            max_date: None,
-            tags: None,
-            limit: None,
-            sort_by_timestamp: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -460,7 +445,7 @@ impl GetMetricRequest {
     pub fn new(run_uid: String, names: Option<Vec<String>>) -> Self {
         Self {
             run_uid,
-            names: names.unwrap_or(vec![]),
+            names: names.unwrap_or_default(),
         }
     }
 }
@@ -496,7 +481,7 @@ impl GetParameterRequest {
     pub fn new(run_uid: String, names: Option<Vec<String>>) -> Self {
         Self {
             run_uid,
-            names: names.unwrap_or(vec![]),
+            names: names.unwrap_or_default(),
         }
     }
 }

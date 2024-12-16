@@ -137,7 +137,7 @@ impl PostgresQueryHelper {
 
         query
     }
-    pub fn get_run_metric_query(names: &Vec<String>) -> (String, Vec<String>) {
+    pub fn get_run_metric_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -360,7 +360,7 @@ impl PostgresQueryHelper {
 
         query
     }
-    pub fn get_run_parameter_query(names: &Vec<String>) -> (String, Vec<String>) {
+    pub fn get_run_parameter_query(names: &[String]) -> (String, Vec<String>) {
         let mut query = format!(
             "SELECT *
             FROM {}
@@ -418,7 +418,7 @@ impl PostgresQueryHelper {
             if i < nbr_records - 1 {
                 query.push_str(", ");
             } else {
-                query.push_str(";");
+                query.push(';');
             }
         }
 

@@ -171,25 +171,22 @@ pub async fn insert_hardware_metrics(
         .map(|p| HardwareMetricsRecord {
             run_uid: req.run_uid.clone(),
             created_at,
-            cpu_percent_utilization: p.cpu.cpu_percent_utilization.clone(),
+            cpu_percent_utilization: p.cpu.cpu_percent_utilization,
             cpu_percent_per_core: p.cpu.cpu_percent_per_core.clone().map(SqlxJson),
-            compute_overall: p.cpu.compute_overall.clone(),
-            compute_utilized: p.cpu.compute_utilized.clone(),
-            load_avg: p.cpu.load_avg.clone(),
-            sys_ram_total: p.memory.sys_ram_total.clone(),
-            sys_ram_used: p.memory.sys_ram_used.clone(),
-            sys_ram_available: p.memory.sys_ram_available.clone(),
-            sys_ram_percent_used: p.memory.sys_ram_percent_used.clone(),
-            sys_swap_total: p.memory.sys_swap_total.clone(),
-            sys_swap_used: p.memory.sys_swap_used.clone(),
-            sys_swap_free: p.memory.sys_swap_free.clone(),
-            sys_swap_percent: p.memory.sys_swap_percent.clone(),
-            bytes_recv: p.network.bytes_recv.clone(),
-            bytes_sent: p.network.bytes_sent.clone(),
-            gpu_percent_utilization: p
-                .gpu
-                .as_ref()
-                .map(|gpu| gpu.gpu_percent_utilization.clone()),
+            compute_overall: p.cpu.compute_overall,
+            compute_utilized: p.cpu.compute_utilized,
+            load_avg: p.cpu.load_avg,
+            sys_ram_total: p.memory.sys_ram_total,
+            sys_ram_used: p.memory.sys_ram_used,
+            sys_ram_available: p.memory.sys_ram_available,
+            sys_ram_percent_used: p.memory.sys_ram_percent_used,
+            sys_swap_total: p.memory.sys_swap_total,
+            sys_swap_used: p.memory.sys_swap_used,
+            sys_swap_free: p.memory.sys_swap_free,
+            sys_swap_percent: p.memory.sys_swap_percent,
+            bytes_recv: p.network.bytes_recv,
+            bytes_sent: p.network.bytes_sent,
+            gpu_percent_utilization: p.gpu.as_ref().map(|gpu| gpu.gpu_percent_utilization),
             gpu_percent_per_core: p
                 .gpu
                 .as_ref()
@@ -297,7 +294,7 @@ pub async fn get_run_graphs(
     let (repo, name, version) = match card_result {
         CardResults::Run(card) => {
             // get the card UID
-            let run_card = card.get(0).ok_or_else(|| {
+            let run_card = card.first().ok_or_else(|| {
                 error!("Failed to get run card");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -324,11 +321,11 @@ pub async fn get_run_graphs(
     // format uri to get the run graphs (this is a standardized route for all run graphs)
     let uri = format!(
         "{}/{}/{}/v{}/{}",
-        CardSQLTableNames::Run.to_string(),
+        CardSQLTableNames::Run,
         repo,
         name,
         version,
-        SaveName::Graphs.to_string()
+        SaveName::Graphs
     );
 
     let rpath = Path::new(&uri);
