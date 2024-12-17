@@ -601,28 +601,73 @@ impl Card {
     }
 }
 
-//#[derive(Debug, Serialize, Deserialize)]
-//pub enum Cards {
-//    Data(Vec<DataCardClientRecord>),
-//    Model(Vec<ModelCardClientRecord>),
-//    Run(Vec<RunCardClientRecord>),
-//    Audit(Vec<AuditCardClientRecord>),
-//    Pipeline(Vec<PipelineCardClientRecord>),
-//    Project(Vec<ProjectCardClientRecord>),
-//}
-//
-//impl Cards {
-//    pub fn len(&self) -> usize {
-//        match self {
-//            Self::Data(cards) => cards.len(),
-//            Self::Model(cards) => cards.len(),
-//            Self::Run(cards) => cards.len(),
-//            Self::Audit(cards) => cards.len(),
-//            Self::Pipeline(cards) => cards.len(),
-//            Self::Project(cards) => cards.len(),
-//        }
-//    }
-//}
+#[derive(Debug, Serialize, Deserialize)]
+#[pyclass]
+pub struct CardInfo {
+    #[pyo3(get)]
+    pub name: Option<String>,
+
+    #[pyo3(get)]
+    pub repository: Option<String>,
+
+    #[pyo3(get)]
+    pub contact: Option<String>,
+
+    #[pyo3(get)]
+    pub uid: Option<String>,
+
+    #[pyo3(get)]
+    pub version: Option<String>,
+
+    #[pyo3(get)]
+    pub tags: Option<HashMap<String, String>>,
+}
+
+#[pymethods]
+impl CardInfo {
+    #[new]
+    #[pyo3(signature = (name=None, repository=None, contact=None, uid=None, version=None, tags=None))]
+    pub fn new(
+        name: Option<String>,
+        repository: Option<String>,
+        contact: Option<String>,
+        uid: Option<String>,
+        version: Option<String>,
+        tags: Option<HashMap<String, String>>,
+    ) -> Self {
+        Self {
+            name,
+            repository,
+            contact,
+            uid,
+            version,
+            tags,
+        }
+    }
+    pub fn __str__(&self) -> String {
+        // serialize the struct to a string
+        PyHelperFuncs::__str__(self)
+    }
+
+    pub fn set_env(&mut self) {
+        // if check name, repo and contact. If any is set, set environment variable
+        // if name is set, set OPSML_RUNTIME_NAME
+        // if repository is set, set OPSML_RUNTIME_REPOSITORY
+        // if contact is set, set OPSML_RUNTIME_CONTACT
+
+        if let Some(name) = &self.name {
+            std::env::set_var("OPSML_RUNTIME_NAME", name);
+        }
+
+        if let Some(repo) = &self.repository {
+            std::env::set_var("OPSML_RUNTIME_REPOSITORY", repo);
+        }
+
+        if let Some(contact) = &self.contact {
+            std::env::set_var("OPSML_RUNTIME_CONTACT", contact);
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateCardRequest {
