@@ -1,8 +1,4 @@
 use crate::core::cards::schema::{QueryPageResponse, RegistryStatsResponse};
-use crate::core::cards::util::{
-    convert_auditcard, convert_datacard, convert_modelcard, convert_pipelinecard,
-    convert_projectcard, convert_runcard,
-};
 use crate::core::state::AppState;
 use anyhow::{Context, Result};
 use axum::{
@@ -13,16 +9,8 @@ use axum::{
     Json, Router,
 };
 use opsml_sql::base::SqlClient;
-use opsml_sql::schemas::schema::{
-    AuditCardRecord, Card, CardResults, DataCardRecord, ModelCardRecord, PipelineCardRecord,
-    ProjectCardRecord, RunCardRecord,
-};
-use opsml_types::{
-    CardQueryArgs, CardSQLTableNames, CardVersionRequest, CardVersionResponse, Cards, ClientCard,
-    CreateCardRequest, CreateCardResponse, ListCardRequest, QueryPageRequest, RegistryStatsRequest,
-    RepositoryRequest, RepositoryResponse, UidRequest, UidResponse, UpdateCardRequest,
-    UpdateCardResponse,
-};
+use opsml_sql::schemas::*;
+use opsml_types::*;
 use opsml_utils::semver::{VersionArgs, VersionValidator};
 use semver::Version;
 use sqlx::types::Json as SqlxJson;

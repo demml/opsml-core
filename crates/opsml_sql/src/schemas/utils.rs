@@ -1,4 +1,4 @@
-use opsml_sql::schemas::schema::{
+use crate::schemas::schema::{
     AuditCardRecord, DataCardRecord, ModelCardRecord, PipelineCardRecord, ProjectCardRecord,
     RunCardRecord,
 };

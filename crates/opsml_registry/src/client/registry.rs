@@ -1,5 +1,5 @@
 use opsml_error::error::RegistryError;
-use opsml_settings::config::OpsmlStorageSettings;
+use opsml_settings::config::OpsmlConfig;
 use opsml_storage::*;
 use opsml_types::*;
 
@@ -11,9 +11,10 @@ pub struct ClientRegistry {
 
 impl ClientRegistry {
     pub async fn new(
-        storage_settings: &OpsmlStorageSettings,
+        config: &OpsmlConfig,
         registry_type: RegistryType,
     ) -> Result<Self, RegistryError> {
+        let storage_settings = config.storage_settings();
         let client = build_http_client(&storage_settings.api_settings)
             .map_err(|e| RegistryError::NewError(format!("Failed to create http client {}", e)))?;
 
