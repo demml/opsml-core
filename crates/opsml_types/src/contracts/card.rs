@@ -359,6 +359,246 @@ impl Card {
             Self::Project(card) => PyHelperFuncs::__str__(card),
         }
     }
+
+    #[getter]
+    pub fn uid(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => card.uid.clone(),
+            Self::Model(card) => card.uid.clone(),
+            Self::Run(card) => card.uid.clone(),
+            Self::Audit(card) => card.uid.clone(),
+            Self::Pipeline(card) => card.uid.clone(),
+            Self::Project(card) => card.uid.clone(),
+        }
+    }
+
+    #[getter]
+    pub fn created_at(&self) -> Option<NaiveDateTime> {
+        match self {
+            Self::Data(card) => card.created_at,
+            Self::Model(card) => card.created_at,
+            Self::Run(card) => card.created_at,
+            Self::Audit(card) => card.created_at,
+            Self::Pipeline(card) => card.created_at,
+            Self::Project(card) => card.created_at,
+        }
+    }
+
+    #[getter]
+    pub fn app_env(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => card.app_env.clone(),
+            Self::Model(card) => card.app_env.clone(),
+            Self::Run(card) => card.app_env.clone(),
+            Self::Audit(card) => card.app_env.clone(),
+            Self::Pipeline(card) => card.app_env.clone(),
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn name(&self) -> String {
+        match self {
+            Self::Data(card) => card.name.clone(),
+            Self::Model(card) => card.name.clone(),
+            Self::Run(card) => card.name.clone(),
+            Self::Audit(card) => card.name.clone(),
+            Self::Pipeline(card) => card.name.clone(),
+            Self::Project(card) => card.name.clone(),
+        }
+    }
+
+    #[getter]
+    pub fn repository(&self) -> String {
+        match self {
+            Self::Data(card) => card.repository.clone(),
+            Self::Model(card) => card.repository.clone(),
+            Self::Run(card) => card.repository.clone(),
+            Self::Audit(card) => card.repository.clone(),
+            Self::Pipeline(card) => card.repository.clone(),
+            Self::Project(card) => card.repository.clone(),
+        }
+    }
+
+    #[getter]
+    pub fn version(&self) -> String {
+        match self {
+            Self::Data(card) => card.version.clone(),
+            Self::Model(card) => card.version.clone(),
+            Self::Run(card) => card.version.clone(),
+            Self::Audit(card) => card.version.clone(),
+            Self::Pipeline(card) => card.version.clone(),
+            Self::Project(card) => card.version.clone(),
+        }
+    }
+
+    #[getter]
+    pub fn contact(&self) -> String {
+        match self {
+            Self::Data(card) => card.contact.clone(),
+            Self::Model(card) => card.contact.clone(),
+            Self::Run(card) => card.contact.clone(),
+            Self::Audit(card) => card.contact.clone(),
+            Self::Pipeline(card) => card.contact.clone(),
+            Self::Project(_) => "".to_string(),
+        }
+    }
+
+    #[getter]
+    pub fn tags(&self) -> HashMap<String, String> {
+        match self {
+            Self::Data(card) => card.tags.clone(),
+            Self::Model(card) => card.tags.clone(),
+            Self::Run(card) => card.tags.clone(),
+            Self::Audit(card) => card.tags.clone(),
+            Self::Pipeline(card) => card.tags.clone(),
+            Self::Project(_) => HashMap::new(),
+        }
+    }
+
+    #[getter]
+    pub fn datacard_uids(&self) -> Option<Vec<String>> {
+        match self {
+            Self::Data(card) => {
+                let uid = card.uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Model(card) => {
+                let uid = card.datacard_uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Run(card) => card.datacard_uids.clone(),
+            Self::Audit(card) => card.datacard_uids.clone(),
+            Self::Pipeline(card) => card.datacard_uids.clone(),
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn modelcard_uids(&self) -> Option<Vec<String>> {
+        match self {
+            Self::Data(_) => None,
+            Self::Model(card) => {
+                let uid = card.uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Run(card) => card.modelcard_uids.clone(),
+            Self::Audit(card) => card.modelcard_uids.clone(),
+            Self::Pipeline(card) => card.modelcard_uids.clone(),
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn runcard_uids(&self) -> Option<Vec<String>> {
+        match self {
+            Self::Data(card) => {
+                let uid = card.runcard_uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Model(card) => {
+                let uid = card.runcard_uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Run(card) => {
+                let uid = card.uid.clone();
+                match uid {
+                    Some(uid) => Some(vec![uid]),
+                    None => None,
+                }
+            }
+            Self::Audit(card) => card.runcard_uids.clone(),
+            Self::Pipeline(card) => card.runcard_uids.clone(),
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn pipelinecard_uid(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => card.pipelinecard_uid.clone(),
+            Self::Model(card) => card.pipelinecard_uid.clone(),
+            Self::Run(card) => card.pipelinecard_uid.clone(),
+            Self::Audit(_) => None,
+            Self::Pipeline(card) => card.uid.clone(),
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn auditcard_uid(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => card.auditcard_uid.clone(),
+            Self::Model(card) => card.auditcard_uid.clone(),
+            Self::Run(_) => None,
+            Self::Audit(card) => card.uid.clone(),
+            Self::Pipeline(_) => None,
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn interface_type(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => card.interface_type.clone(),
+            Self::Model(card) => card.interface_type.clone(),
+            Self::Run(_) => None,
+            Self::Audit(_) => None,
+            Self::Pipeline(_) => None,
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn data_type(&self) -> Option<String> {
+        match self {
+            Self::Data(card) => Some(card.data_type.clone()),
+            Self::Model(card) => Some(card.sample_data_type.clone()),
+            Self::Run(_) => None,
+            Self::Audit(_) => None,
+            Self::Pipeline(_) => None,
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn model_type(&self) -> Option<String> {
+        match self {
+            Self::Data(_) => None,
+            Self::Model(card) => Some(card.model_type.clone()),
+            Self::Run(_) => None,
+            Self::Audit(_) => None,
+            Self::Pipeline(_) => None,
+            Self::Project(_) => None,
+        }
+    }
+
+    #[getter]
+    pub fn task_type(&self) -> Option<String> {
+        match self {
+            Self::Data(_) => None,
+            Self::Model(card) => card.task_type.clone(),
+            Self::Run(_) => None,
+            Self::Audit(_) => None,
+            Self::Pipeline(_) => None,
+            Self::Project(_) => None,
+        }
+    }
 }
 
 //#[derive(Debug, Serialize, Deserialize)]
