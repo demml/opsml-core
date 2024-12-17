@@ -3,7 +3,10 @@ use opsml_settings::config::OpsmlConfig;
 use opsml_storage::*;
 use opsml_types::*;
 
+use crate::server::registry;
+
 // TODO: Add trait for client and server registry
+#[derive(Debug)]
 pub struct ClientRegistry {
     registry_type: RegistryType,
     api_client: OpsmlApiClient,
@@ -54,5 +57,129 @@ impl ClientRegistry {
             .json::<Cards>()
             .await
             .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?)
+    }
+
+    pub async fn create_card(&mut self, card: &ClientCard) -> Result<(), RegistryError> {
+        // serialize card to json
+        let body = serde_json::to_value(card)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::CardCreate,
+                RequestType::Post,
+                Some(body),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to create card {}", e)))?;
+
+        let created = response
+            .json::<CreateCardResponse>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?;
+
+        if created.registered {
+            Ok(())
+        } else {
+            Err(RegistryError::Error("Failed to create card".to_string()))
+        }
+    }
+
+    pub async fn update_card(&mut self, card: &ClientCard) -> Result<(), RegistryError> {
+        // serialize card to json
+        let body = serde_json::to_value(card)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::CardUpdate,
+                RequestType::Post,
+                Some(body),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to update card {}", e)))?;
+
+        let updated = response
+            .json::<UpdateCardResponse>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?;
+
+        if updated.updated {
+            Ok(())
+        } else {
+            Err(RegistryError::Error("Failed to update card".to_string()))
+        }
+    }
+
+    pub async fn delete_card(&mut self, uid: &str) -> Result<(), RegistryError> {
+        let uid_request = UidRequest {
+            uid: uid.to_string(),
+            registry_type: self.registry_type.clone(),
+        };
+        let query_string = serde_qs::to_string(&uid_request)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize query args {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::CardDelete,
+                RequestType::Post,
+                None,
+                Some(query_string),
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to delete card {}", e)))?;
+
+        let deleted = response
+            .json::<UidResponse>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?;
+
+        if !deleted.exists {
+            Ok(())
+        } else {
+            Err(RegistryError::Error("Failed to delete card".to_string()))
+        }
+    }
+
+    async fn check_uid_exists(
+        &mut self,
+        uid: &str,
+        registry_type: Option<RegistryType>,
+    ) -> Result<bool, RegistryError> {
+        let registry = registry_type.unwrap_or(self.registry_type.clone());
+
+        let uid_request = UidRequest {
+            uid: uid.to_string(),
+            registry_type: registry,
+        };
+        let query_string = serde_qs::to_string(&uid_request)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize query args {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::Card,
+                RequestType::Get,
+                None,
+                Some(query_string),
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to check uid exists {}", e)))?;
+
+        let exists = response
+            .json::<UidResponse>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?;
+
+        Ok(exists.exists)
     }
 }

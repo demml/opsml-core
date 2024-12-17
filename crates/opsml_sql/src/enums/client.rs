@@ -2,8 +2,8 @@ use crate::base::SqlClient;
 use crate::mysql::client::MySqlClient;
 use crate::postgres::client::PostgresClient;
 use crate::schemas::schema::{
-    Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
-    QueryStats, User,
+    CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord, QueryStats,
+    ServerCard, User,
 };
 use crate::sqlite::client::SqliteClient;
 use anyhow::Context;
@@ -74,7 +74,11 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn insert_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn insert_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.insert_card(table, card).await,
             SqlClientEnum::Sqlite(client) => client.insert_card(table, card).await,
@@ -82,7 +86,11 @@ impl SqlClient for SqlClientEnum {
         }
     }
 
-    async fn update_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn update_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError> {
         match self {
             SqlClientEnum::Postgres(client) => client.update_card(table, card).await,
             SqlClientEnum::Sqlite(client) => client.update_card(table, card).await,
@@ -538,7 +546,7 @@ mod tests {
         let client = get_client().await;
 
         let data_card = DataCardRecord::default();
-        let card = Card::Data(data_card.clone());
+        let card = ServerCard::Data(data_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Data, &card)
@@ -559,7 +567,7 @@ mod tests {
 
         // insert modelcard
         let model_card = ModelCardRecord::default();
-        let card = Card::Model(model_card.clone());
+        let card = ServerCard::Model(model_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Model, &card)
@@ -581,7 +589,7 @@ mod tests {
 
         // insert runcard
         let run_card = RunCardRecord::default();
-        let card = Card::Run(run_card.clone());
+        let card = ServerCard::Run(run_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Run, &card)
@@ -605,7 +613,7 @@ mod tests {
         // insert auditcard
 
         let audit_card = AuditCardRecord::default();
-        let card = Card::Audit(audit_card.clone());
+        let card = ServerCard::Audit(audit_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Audit, &card)
@@ -628,7 +636,7 @@ mod tests {
 
         // check pipeline card
         let pipeline_card = PipelineCardRecord::default();
-        let card = Card::Pipeline(pipeline_card.clone());
+        let card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Pipeline, &card)
@@ -658,7 +666,7 @@ mod tests {
 
         // Test DataCardRecord
         let mut data_card = DataCardRecord::default();
-        let card = Card::Data(data_card.clone());
+        let card = ServerCard::Data(data_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Data, &card)
@@ -679,7 +687,7 @@ mod tests {
 
         // update the card
         data_card.name = "UpdatedDataName".to_string();
-        let updated_card = Card::Data(data_card.clone());
+        let updated_card = ServerCard::Data(data_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Data, &updated_card)
@@ -699,7 +707,7 @@ mod tests {
 
         // Test ModelCardRecord
         let mut model_card = ModelCardRecord::default();
-        let card = Card::Model(model_card.clone());
+        let card = ServerCard::Model(model_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Model, &card)
@@ -720,7 +728,7 @@ mod tests {
 
         // update the card
         model_card.name = "UpdatedModelName".to_string();
-        let updated_card = Card::Model(model_card.clone());
+        let updated_card = ServerCard::Model(model_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Model, &updated_card)
@@ -740,7 +748,7 @@ mod tests {
 
         // Test RunCardRecord
         let mut run_card = RunCardRecord::default();
-        let card = Card::Run(run_card.clone());
+        let card = ServerCard::Run(run_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Run, &card)
@@ -761,7 +769,7 @@ mod tests {
 
         // update the card
         run_card.name = "UpdatedRunName".to_string();
-        let updated_card = Card::Run(run_card.clone());
+        let updated_card = ServerCard::Run(run_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Run, &updated_card)
@@ -781,7 +789,7 @@ mod tests {
 
         // Test AuditCardRecord
         let mut audit_card = AuditCardRecord::default();
-        let card = Card::Audit(audit_card.clone());
+        let card = ServerCard::Audit(audit_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Audit, &card)
@@ -802,7 +810,7 @@ mod tests {
 
         // update the card
         audit_card.name = "UpdatedAuditName".to_string();
-        let updated_card = Card::Audit(audit_card.clone());
+        let updated_card = ServerCard::Audit(audit_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Audit, &updated_card)
@@ -822,7 +830,7 @@ mod tests {
 
         // Test PipelineCardRecord
         let mut pipeline_card = PipelineCardRecord::default();
-        let card = Card::Pipeline(pipeline_card.clone());
+        let card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Pipeline, &card)
@@ -843,7 +851,7 @@ mod tests {
 
         // update the card
         pipeline_card.name = "UpdatedPipelineName".to_string();
-        let updated_card = Card::Pipeline(pipeline_card.clone());
+        let updated_card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Pipeline, &updated_card)

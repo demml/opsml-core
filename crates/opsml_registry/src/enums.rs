@@ -1,6 +1,49 @@
+use opsml_error::error::RegistryError;
+use opsml_settings::config::OpsmlConfig;
+use opsml_types::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug)]
 pub enum OpsmlRegistry {
     ClientRegistry(crate::client::registry::ClientRegistry),
 
     #[cfg(feature = "server")]
     ServerRegistry(crate::server::registry::server_logic::ServerRegistry),
+}
+
+impl OpsmlRegistry {
+    pub async fn new(registry_type: RegistryType) -> Result<Self, RegistryError> {
+        let config = OpsmlConfig::default();
+        let storage_settings = config.storage_settings();
+        match storage_settings.client_mode {
+            true => {
+                let client_registry =
+                    crate::client::registry::ClientRegistry::new(&config, registry_type).await?;
+                Ok(Self::ClientRegistry(client_registry))
+            }
+            #[cfg(feature = "server")]
+            false => {
+                let server_registry = crate::server::registry::server_logic::ServerRegistry::new(
+                    &config,
+                    registry_type,
+                )
+                .await?;
+                Ok(Self::ServerRegistry(server_registry))
+            }
+        }
+    }
+
+    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
+        match self {
+            Self::ClientRegistry(client_registry) => {
+                let cards = client_registry.list_cards(args).await?;
+                Ok(cards)
+            }
+            #[cfg(feature = "server")]
+            Self::ServerRegistry(server_registry) => {
+                let cards = server_registry.list_cards(args).await?;
+                Ok(cards)
+            }
+        }
+    }
 }

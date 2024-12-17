@@ -4,8 +4,8 @@ use crate::schemas::schema::{
 };
 use opsml_types::*;
 
-pub fn convert_datacard(record: DataCardRecord) -> DataCardClientRecord {
-    DataCardClientRecord {
+pub fn convert_datacard(record: DataCardRecord) -> Card {
+    let card = DataCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         app_env: Some(record.app_env),
@@ -19,11 +19,13 @@ pub fn convert_datacard(record: DataCardRecord) -> DataCardClientRecord {
         pipelinecard_uid: Some(record.pipelinecard_uid),
         auditcard_uid: Some(record.auditcard_uid),
         interface_type: Some(record.interface_type),
-    }
+    };
+
+    Card::Data(card)
 }
 
-pub fn convert_modelcard(record: ModelCardRecord) -> ModelCardClientRecord {
-    ModelCardClientRecord {
+pub fn convert_modelcard(record: ModelCardRecord) -> Card {
+    let card = ModelCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         app_env: Some(record.app_env),
@@ -40,11 +42,13 @@ pub fn convert_modelcard(record: ModelCardRecord) -> ModelCardClientRecord {
         auditcard_uid: Some(record.auditcard_uid),
         interface_type: Some(record.interface_type),
         task_type: Some(record.task_type),
-    }
+    };
+
+    Card::Model(card)
 }
 
-pub fn convert_runcard(record: RunCardRecord) -> RunCardClientRecord {
-    RunCardClientRecord {
+pub fn convert_runcard(record: RunCardRecord) -> Card {
+    let card = RunCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         app_env: Some(record.app_env),
@@ -59,11 +63,13 @@ pub fn convert_runcard(record: RunCardRecord) -> RunCardClientRecord {
         project: record.project,
         artifact_uris: Some(record.artifact_uris.0),
         compute_environment: Some(record.compute_environment.0),
-    }
+    };
+
+    Card::Run(card)
 }
 
-pub fn convert_auditcard(record: AuditCardRecord) -> AuditCardClientRecord {
-    AuditCardClientRecord {
+pub fn convert_auditcard(record: AuditCardRecord) -> Card {
+    let card = AuditCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         app_env: Some(record.app_env),
@@ -76,11 +82,13 @@ pub fn convert_auditcard(record: AuditCardRecord) -> AuditCardClientRecord {
         datacard_uids: Some(record.datacard_uids.0),
         modelcard_uids: Some(record.modelcard_uids.0),
         runcard_uids: Some(record.runcard_uids.0),
-    }
+    };
+
+    Card::Audit(card)
 }
 
-pub fn convert_pipelinecard(record: PipelineCardRecord) -> PipelineCardClientRecord {
-    PipelineCardClientRecord {
+pub fn convert_pipelinecard(record: PipelineCardRecord) -> Card {
+    let card = PipelineCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         app_env: Some(record.app_env),
@@ -93,16 +101,20 @@ pub fn convert_pipelinecard(record: PipelineCardRecord) -> PipelineCardClientRec
         datacard_uids: Some(record.datacard_uids.0),
         modelcard_uids: Some(record.modelcard_uids.0),
         runcard_uids: Some(record.runcard_uids.0),
-    }
+    };
+
+    Card::Pipeline(card)
 }
 
-pub fn convert_projectcard(record: ProjectCardRecord) -> ProjectCardClientRecord {
-    ProjectCardClientRecord {
+pub fn convert_projectcard(record: ProjectCardRecord) -> Card {
+    let card = ProjectCardClientRecord {
         uid: Some(record.uid),
         created_at: record.created_at,
         name: record.name,
         repository: record.repository,
         version: record.version,
         project_id: record.project_id,
-    }
+    };
+
+    Card::Project(card)
 }

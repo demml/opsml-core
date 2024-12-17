@@ -168,4 +168,13 @@ pub enum RegistryError {
 
     #[error("{0}")]
     Error(String),
+
+    #[error("Failed to list cards - {0}")]
+    ListCardsError(String),
+}
+
+impl From<RegistryError> for PyErr {
+    fn from(err: RegistryError) -> PyErr {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
+    }
 }

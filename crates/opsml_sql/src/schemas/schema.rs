@@ -713,7 +713,7 @@ impl CardResults {
 }
 
 #[derive(Debug)]
-pub enum Card {
+pub enum ServerCard {
     Data(DataCardRecord),
     Model(ModelCardRecord),
     Run(RunCardRecord),
@@ -722,15 +722,15 @@ pub enum Card {
     Project(ProjectCardRecord),
 }
 
-impl Card {
+impl ServerCard {
     pub fn uid(&self) -> String {
         match self {
-            Card::Data(card) => card.uid.clone(),
-            Card::Model(card) => card.uid.clone(),
-            Card::Run(card) => card.uid.clone(),
-            Card::Audit(card) => card.uid.clone(),
-            Card::Pipeline(card) => card.uid.clone(),
-            Card::Project(card) => card.uid.clone(),
+            ServerCard::Data(card) => card.uid.clone(),
+            ServerCard::Model(card) => card.uid.clone(),
+            ServerCard::Run(card) => card.uid.clone(),
+            ServerCard::Audit(card) => card.uid.clone(),
+            ServerCard::Pipeline(card) => card.uid.clone(),
+            ServerCard::Project(card) => card.uid.clone(),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::schemas::schema::{
-    Card, CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord,
-    QueryStats, User,
+    CardResults, CardSummary, HardwareMetricsRecord, MetricRecord, ParameterRecord, QueryStats,
+    ServerCard, User,
 };
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
@@ -72,8 +72,16 @@ pub trait SqlClient: Sized {
         query_args: &CardQueryArgs,
     ) -> Result<CardResults, SqlError>;
 
-    async fn insert_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
-    async fn update_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError>;
+    async fn insert_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError>;
+    async fn update_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError>;
     async fn get_unique_repository_names(
         &self,
         table: &CardSQLTableNames,

@@ -13,6 +13,7 @@ pub mod server_logic {
     use sqlx::types::Json as SqlxJson;
     use tracing::error;
 
+    #[derive(Debug)]
     pub struct ServerRegistry {
         sql_client: SqlClientEnum,
         pub table_name: CardSQLTableNames,
@@ -20,7 +21,7 @@ pub mod server_logic {
 
     impl ServerRegistry {
         pub async fn new(
-            config: &mut OpsmlConfig,
+            config: &OpsmlConfig,
             registry_type: RegistryType,
         ) -> Result<Self, RegistryError> {
             let sql_client = get_sql_client(&config).await.map_err(|e| {
@@ -34,7 +35,10 @@ pub mod server_logic {
             })
         }
 
-        pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
+        pub async fn list_cards(
+            &mut self,
+            args: CardQueryArgs,
+        ) -> Result<Vec<Card>, RegistryError> {
             let cards = self
                 .sql_client
                 .query_cards(&self.table_name, &args)
@@ -47,7 +51,7 @@ pub mod server_logic {
                         .into_iter()
                         .map(|card| convert_datacard(card))
                         .collect();
-                    Ok(Cards::Data(cards))
+                    Ok(cards)
                 }
                 CardResults::Model(data) => {
                     let cards = data
@@ -362,6 +366,15 @@ pub mod server_logic {
                 .update_card(&self.table_name, &card)
                 .await
                 .map_err(|e| RegistryError::Error(format!("Failed to update card {}", e)))?;
+
+            Ok(())
+        }
+
+        pub async fn delete_card(&self, uid: &str) -> Result<(), RegistryError> {
+            self.sql_client
+                .delete_card(&self.table_name, uid)
+                .await
+                .map_err(|e| RegistryError::Error(format!("Failed to delete card {}", e)))?;
 
             Ok(())
         }

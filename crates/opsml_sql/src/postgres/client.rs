@@ -1,11 +1,10 @@
 use crate::base::SqlClient;
-use crate::schemas::schema::Card;
 
 use crate::postgres::helper::PostgresQueryHelper;
 use crate::schemas::schema::{
     AuditCardRecord, CardResults, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
     ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, QueryStats,
-    Repository, RunCardRecord, User, VersionResult,
+    Repository, RunCardRecord, ServerCard, User, VersionResult,
 };
 
 use async_trait::async_trait;
@@ -258,10 +257,14 @@ impl SqlClient for PostgresClient {
             }
         }
     }
-    async fn insert_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn insert_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError> {
         match table {
             CardSQLTableNames::Data => match card {
-                Card::Data(data) => {
+                ServerCard::Data(data) => {
                     let query = PostgresQueryHelper::get_datacard_insert_query();
                     sqlx::query(&query)
                         .bind(&data.uid)
@@ -293,7 +296,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Model => match card {
-                Card::Model(model) => {
+                ServerCard::Model(model) => {
                     let query = PostgresQueryHelper::get_modelcard_insert_query();
                     sqlx::query(&query)
                         .bind(&model.uid)
@@ -328,7 +331,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Run => match card {
-                Card::Run(run) => {
+                ServerCard::Run(run) => {
                     let query = PostgresQueryHelper::get_runcard_insert_query();
                     sqlx::query(&query)
                         .bind(&run.uid)
@@ -361,7 +364,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Audit => match card {
-                Card::Audit(audit) => {
+                ServerCard::Audit(audit) => {
                     let query = PostgresQueryHelper::get_auditcard_insert_query();
                     sqlx::query(&query)
                         .bind(&audit.uid)
@@ -392,7 +395,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Pipeline => match card {
-                Card::Pipeline(pipeline) => {
+                ServerCard::Pipeline(pipeline) => {
                     let query = PostgresQueryHelper::get_pipelinecard_insert_query();
                     sqlx::query(&query)
                         .bind(&pipeline.uid)
@@ -423,7 +426,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Project => match card {
-                Card::Project(project) => {
+                ServerCard::Project(project) => {
                     let query = PostgresQueryHelper::get_projectcard_insert_query();
                     sqlx::query(&query)
                         .bind(&project.uid)
@@ -456,10 +459,14 @@ impl SqlClient for PostgresClient {
         }
     }
 
-    async fn update_card(&self, table: &CardSQLTableNames, card: &Card) -> Result<(), SqlError> {
+    async fn update_card(
+        &self,
+        table: &CardSQLTableNames,
+        card: &ServerCard,
+    ) -> Result<(), SqlError> {
         match table {
             CardSQLTableNames::Data => match card {
-                Card::Data(data) => {
+                ServerCard::Data(data) => {
                     let query = PostgresQueryHelper::get_datacard_update_query();
                     sqlx::query(&query)
                         .bind(&data.app_env)
@@ -491,7 +498,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Model => match card {
-                Card::Model(model) => {
+                ServerCard::Model(model) => {
                     let query = PostgresQueryHelper::get_modelcard_update_query();
                     sqlx::query(&query)
                         .bind(&model.app_env)
@@ -526,7 +533,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Run => match card {
-                Card::Run(run) => {
+                ServerCard::Run(run) => {
                     let query = PostgresQueryHelper::get_runcard_update_query();
                     sqlx::query(&query)
                         .bind(&run.app_env)
@@ -559,7 +566,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Audit => match card {
-                Card::Audit(audit) => {
+                ServerCard::Audit(audit) => {
                     let query = PostgresQueryHelper::get_auditcard_update_query();
                     sqlx::query(&query)
                         .bind(&audit.app_env)
@@ -590,7 +597,7 @@ impl SqlClient for PostgresClient {
                 }
             },
             CardSQLTableNames::Pipeline => match card {
-                Card::Pipeline(pipeline) => {
+                ServerCard::Pipeline(pipeline) => {
                     let query = PostgresQueryHelper::get_pipelinecard_update_query();
                     sqlx::query(&query)
                         .bind(&pipeline.app_env)
@@ -1225,7 +1232,7 @@ mod tests {
         cleanup(&client.pool).await;
 
         let data_card = DataCardRecord::default();
-        let card = Card::Data(data_card.clone());
+        let card = ServerCard::Data(data_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Data, &card)
@@ -1246,7 +1253,7 @@ mod tests {
 
         // insert modelcard
         let model_card = ModelCardRecord::default();
-        let card = Card::Model(model_card.clone());
+        let card = ServerCard::Model(model_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Model, &card)
@@ -1268,7 +1275,7 @@ mod tests {
 
         // insert runcard
         let run_card = RunCardRecord::default();
-        let card = Card::Run(run_card.clone());
+        let card = ServerCard::Run(run_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Run, &card)
@@ -1292,7 +1299,7 @@ mod tests {
         // insert auditcard
 
         let audit_card = AuditCardRecord::default();
-        let card = Card::Audit(audit_card.clone());
+        let card = ServerCard::Audit(audit_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Audit, &card)
@@ -1315,7 +1322,7 @@ mod tests {
 
         // check pipeline card
         let pipeline_card = PipelineCardRecord::default();
-        let card = Card::Pipeline(pipeline_card.clone());
+        let card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Pipeline, &card)
@@ -1354,7 +1361,7 @@ mod tests {
 
         // Test DataCardRecord
         let mut data_card = DataCardRecord::default();
-        let card = Card::Data(data_card.clone());
+        let card = ServerCard::Data(data_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Data, &card)
@@ -1375,7 +1382,7 @@ mod tests {
 
         // update the card
         data_card.name = "UpdatedDataName".to_string();
-        let updated_card = Card::Data(data_card.clone());
+        let updated_card = ServerCard::Data(data_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Data, &updated_card)
@@ -1395,7 +1402,7 @@ mod tests {
 
         // Test ModelCardRecord
         let mut model_card = ModelCardRecord::default();
-        let card = Card::Model(model_card.clone());
+        let card = ServerCard::Model(model_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Model, &card)
@@ -1416,7 +1423,7 @@ mod tests {
 
         // update the card
         model_card.name = "UpdatedModelName".to_string();
-        let updated_card = Card::Model(model_card.clone());
+        let updated_card = ServerCard::Model(model_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Model, &updated_card)
@@ -1436,7 +1443,7 @@ mod tests {
 
         // Test RunCardRecord
         let mut run_card = RunCardRecord::default();
-        let card = Card::Run(run_card.clone());
+        let card = ServerCard::Run(run_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Run, &card)
@@ -1457,7 +1464,7 @@ mod tests {
 
         // update the card
         run_card.name = "UpdatedRunName".to_string();
-        let updated_card = Card::Run(run_card.clone());
+        let updated_card = ServerCard::Run(run_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Run, &updated_card)
@@ -1477,7 +1484,7 @@ mod tests {
 
         // Test AuditCardRecord
         let mut audit_card = AuditCardRecord::default();
-        let card = Card::Audit(audit_card.clone());
+        let card = ServerCard::Audit(audit_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Audit, &card)
@@ -1498,7 +1505,7 @@ mod tests {
 
         // update the card
         audit_card.name = "UpdatedAuditName".to_string();
-        let updated_card = Card::Audit(audit_card.clone());
+        let updated_card = ServerCard::Audit(audit_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Audit, &updated_card)
@@ -1518,7 +1525,7 @@ mod tests {
 
         // Test PipelineCardRecord
         let mut pipeline_card = PipelineCardRecord::default();
-        let card = Card::Pipeline(pipeline_card.clone());
+        let card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .insert_card(&CardSQLTableNames::Pipeline, &card)
@@ -1539,7 +1546,7 @@ mod tests {
 
         // update the card
         pipeline_card.name = "UpdatedPipelineName".to_string();
-        let updated_card = Card::Pipeline(pipeline_card.clone());
+        let updated_card = ServerCard::Pipeline(pipeline_card.clone());
 
         client
             .update_card(&CardSQLTableNames::Pipeline, &updated_card)
@@ -1745,7 +1752,7 @@ mod tests {
             1,
         );
         client
-            .insert_card(&CardSQLTableNames::Project, &Card::Project(project))
+            .insert_card(&CardSQLTableNames::Project, &ServerCard::Project(project))
             .await
             .unwrap();
 
