@@ -42,9 +42,10 @@ impl CardRegistry {
         self.table_name.clone()
     }
 
-    #[pyo3(signature = (uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
+    #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
+        info: Option<&CardInfo>,
         uid: Option<String>,
         name: Option<String>,
         repository: Option<String>,
@@ -54,6 +55,43 @@ impl CardRegistry {
         limit: Option<i32>,
         sort_by_timestamp: Option<bool>,
     ) -> AnyhowResult<Vec<Card>> {
+        let mut uid = uid;
+        let mut name = name;
+        let mut repository = repository;
+        let mut version = version;
+        let mut tags = tags;
+
+        if let Some(info) = info {
+            name = name.or(info.name.clone());
+            repository = repository.or(info.repository.clone());
+            uid = uid.or(info.uid.clone());
+            version = version.or(info.version.clone());
+            tags = tags.or(info.tags.clone());
+        }
+
+        if name.is_some() {
+            name = Some(name.unwrap().to_lowercase());
+        }
+
+        if repository.is_some() {
+            repository = Some(repository.unwrap().to_lowercase());
+        }
+
+        let limit_check = vec![
+            uid.is_some(),
+            name.is_some(),
+            repository.is_some(),
+            version.is_some(),
+            tags.is_some(),
+        ];
+
+        // check if any value is true. If not, set limit to 25
+        let limit = if limit_check.iter().any(|&x| x) {
+            limit
+        } else {
+            Some(25)
+        };
+
         let query_args = CardQueryArgs {
             uid,
             name,
