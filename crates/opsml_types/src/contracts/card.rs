@@ -1,15 +1,10 @@
-use crate::RegistryType;
-use crate::VersionType;
+use crate::{PyHelperFuncs, RegistryType, VersionType};
 
 use chrono::NaiveDateTime;
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::{prelude::*, types::PyAnyMethods, PyTypeInfo};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 
-use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyString};
-use pyo3::IntoPyObjectExt;
+use pyo3::prelude::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct UidRequest {
@@ -160,51 +155,6 @@ impl Default for DataCardClientRecord {
     }
 }
 
-impl DataCardClientRecord {
-    pub fn to_pydict(&self, py: Python) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-
-        let uid = self.uid.clone().into_py_any(py)?;
-        let created_at = self
-            .created_at
-            .unwrap_or_default()
-            .to_string()
-            .into_py_any(py)?;
-        let app_env = self.app_env.clone().into_py_any(py)?;
-        let name = self.name.clone().into_py_any(py)?;
-        let repository = self.repository.clone().into_py_any(py)?;
-        let version = self.version.clone().into_py_any(py)?;
-        let contact = self.contact.clone().into_py_any(py)?;
-        let tags = PyDict::new(py);
-
-        for (key, value) in self.tags.iter() {
-            tags.set_item(key, value.into_py_any(py)?)?;
-        }
-
-        let data_type = self.data_type.clone().into_py_any(py)?;
-        let runcard_uid = self.runcard_uid.clone().into_py_any(py)?;
-        let pipelinecard_uid = self.pipelinecard_uid.clone().into_py_any(py)?;
-        let auditcard_uid = self.auditcard_uid.clone().into_py_any(py)?;
-        let interface_type = self.interface_type.clone().into_py_any(py)?;
-
-        dict.set_item("uid", uid)?;
-        dict.set_item("created_at", created_at)?;
-        dict.set_item("app_env", app_env)?;
-        dict.set_item("name", name)?;
-        dict.set_item("repository", repository)?;
-        dict.set_item("version", version)?;
-        dict.set_item("contact", contact)?;
-        dict.set_item("tags", tags)?;
-        dict.set_item("data_type", data_type)?;
-        dict.set_item("runcard_uid", runcard_uid)?;
-        dict.set_item("pipelinecard_uid", pipelinecard_uid)?;
-        dict.set_item("auditcard_uid", auditcard_uid)?;
-        dict.set_item("interface_type", interface_type)?;
-
-        Ok(dict.unbind())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[pyclass]
 pub struct ModelCardClientRecord {
@@ -249,57 +199,6 @@ impl Default for ModelCardClientRecord {
     }
 }
 
-impl ModelCardClientRecord {
-    pub fn to_pydict(&self, py: Python) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-
-        let uid = self.uid.clone().into_py_any(py)?;
-        let created_at = self
-            .created_at
-            .unwrap_or_default()
-            .to_string()
-            .into_py_any(py)?;
-        let app_env = self.app_env.clone().into_py_any(py)?;
-        let name = self.name.clone().into_py_any(py)?;
-        let repository = self.repository.clone().into_py_any(py)?;
-        let version = self.version.clone().into_py_any(py)?;
-        let contact = self.contact.clone().into_py_any(py)?;
-        let tags = PyDict::new(py);
-
-        for (key, value) in self.tags.iter() {
-            tags.set_item(key, value.into_py_any(py)?)?;
-        }
-
-        let datacard_uid = self.datacard_uid.clone().into_py_any(py)?;
-        let sample_data_type = self.sample_data_type.clone().into_py_any(py)?;
-        let model_type = self.model_type.clone().into_py_any(py)?;
-        let runcard_uid = self.runcard_uid.clone().into_py_any(py)?;
-        let pipelinecard_uid = self.pipelinecard_uid.clone().into_py_any(py)?;
-        let auditcard_uid = self.auditcard_uid.clone().into_py_any(py)?;
-        let interface_type = self.interface_type.clone().into_py_any(py)?;
-        let task_type = self.task_type.clone().into_py_any(py)?;
-
-        dict.set_item("uid", uid)?;
-        dict.set_item("created_at", created_at)?;
-        dict.set_item("app_env", app_env)?;
-        dict.set_item("name", name)?;
-        dict.set_item("repository", repository)?;
-        dict.set_item("version", version)?;
-        dict.set_item("contact", contact)?;
-        dict.set_item("tags", tags)?;
-        dict.set_item("datacard_uid", datacard_uid)?;
-        dict.set_item("sample_data_type", sample_data_type)?;
-        dict.set_item("model_type", model_type)?;
-        dict.set_item("runcard_uid", runcard_uid)?;
-        dict.set_item("pipelinecard_uid", pipelinecard_uid)?;
-        dict.set_item("auditcard_uid", auditcard_uid)?;
-        dict.set_item("interface_type", interface_type)?;
-        dict.set_item("task_type", task_type)?;
-
-        Ok(dict.unbind())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[pyclass]
 pub struct RunCardClientRecord {
@@ -340,66 +239,6 @@ impl Default for RunCardClientRecord {
     }
 }
 
-impl RunCardClientRecord {
-    pub fn to_pydict(&self, py: Python) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-
-        let uid = self.uid.clone().into_py_any(py)?;
-        let created_at = self
-            .created_at
-            .unwrap_or_default()
-            .to_string()
-            .into_py_any(py)?;
-        let app_env = self.app_env.clone().into_py_any(py)?;
-        let name = self.name.clone().into_py_any(py)?;
-        let repository = self.repository.clone().into_py_any(py)?;
-        let version = self.version.clone().into_py_any(py)?;
-        let contact = self.contact.clone().into_py_any(py)?;
-        let tags = PyDict::new(py);
-
-        for (key, value) in self.tags.iter() {
-            tags.set_item(key, value.into_py_any(py)?)?;
-        }
-
-        let datacard_uids = self.datacard_uids.clone().into_py_any(py)?;
-        let modelcard_uids = self.modelcard_uids.clone().into_py_any(py)?;
-        let pipelinecard_uid = self.pipelinecard_uid.clone().into_py_any(py)?;
-        let project = self.project.clone().into_py_any(py)?;
-        let artifact_uris_dict = PyDict::new(py);
-
-        if let Some(artifact_uris) = &self.artifact_uris {
-            for (key, value) in artifact_uris.iter() {
-                artifact_uris_dict.set_item(key, value.into_py_any(py)?)?;
-            }
-        }
-
-        let compute_environment_dict = PyDict::new(py);
-
-        if let Some(compute_environment) = &self.compute_environment {
-            for (key, value) in compute_environment.iter() {
-                compute_environment_dict.set_item(key, value.into_py_any(py)?)?;
-            }
-        }
-
-        dict.set_item("uid", uid)?;
-        dict.set_item("created_at", created_at)?;
-        dict.set_item("app_env", app_env)?;
-        dict.set_item("name", name)?;
-        dict.set_item("repository", repository)?;
-        dict.set_item("version", version)?;
-        dict.set_item("contact", contact)?;
-        dict.set_item("tags", tags)?;
-        dict.set_item("datacard_uids", datacard_uids)?;
-        dict.set_item("modelcard_uids", modelcard_uids)?;
-        dict.set_item("pipelinecard_uid", pipelinecard_uid)?;
-        dict.set_item("project", project)?;
-        dict.set_item("artifact_uris", artifact_uris_dict)?;
-        dict.set_item("compute_environment", compute_environment_dict)?;
-
-        Ok(dict.unbind())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[pyclass]
 pub struct AuditCardClientRecord {
@@ -433,49 +272,6 @@ impl Default for AuditCardClientRecord {
             modelcard_uids: None,
             runcard_uids: None,
         }
-    }
-}
-
-impl AuditCardClientRecord {
-    pub fn to_pydict(&self, py: Python) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-
-        let uid = self.uid.clone().into_py_any(py)?;
-        let created_at = self
-            .created_at
-            .unwrap_or_default()
-            .to_string()
-            .into_py_any(py)?;
-        let app_env = self.app_env.clone().into_py_any(py)?;
-        let name = self.name.clone().into_py_any(py)?;
-        let repository = self.repository.clone().into_py_any(py)?;
-        let version = self.version.clone().into_py_any(py)?;
-        let contact = self.contact.clone().into_py_any(py)?;
-        let tags = PyDict::new(py);
-
-        for (key, value) in self.tags.iter() {
-            tags.set_item(key, value.into_py_any(py)?)?;
-        }
-
-        let approved = self.approved.clone().into_py_any(py)?;
-        let datacard_uids = self.datacard_uids.clone().into_py_any(py)?;
-        let modelcard_uids = self.modelcard_uids.clone().into_py_any(py)?;
-        let runcard_uids = self.runcard_uids.clone().into_py_any(py)?;
-
-        dict.set_item("uid", uid)?;
-        dict.set_item("created_at", created_at)?;
-        dict.set_item("app_env", app_env)?;
-        dict.set_item("name", name)?;
-        dict.set_item("repository", repository)?;
-        dict.set_item("version", version)?;
-        dict.set_item("contact", contact)?;
-        dict.set_item("tags", tags)?;
-        dict.set_item("approved", approved)?;
-        dict.set_item("datacard_uids", datacard_uids)?;
-        dict.set_item("modelcard_uids", modelcard_uids)?;
-        dict.set_item("runcard_uids", runcard_uids)?;
-
-        Ok(dict.unbind())
     }
 }
 
@@ -549,6 +345,20 @@ pub enum Card {
     Audit(AuditCardClientRecord),
     Pipeline(PipelineCardClientRecord),
     Project(ProjectCardClientRecord),
+}
+
+#[pymethods]
+impl Card {
+    pub fn __str__(&self) -> String {
+        match self {
+            Self::Data(card) => PyHelperFuncs::__str__(card),
+            Self::Model(card) => PyHelperFuncs::__str__(card),
+            Self::Run(card) => PyHelperFuncs::__str__(card),
+            Self::Audit(card) => PyHelperFuncs::__str__(card),
+            Self::Pipeline(card) => PyHelperFuncs::__str__(card),
+            Self::Project(card) => PyHelperFuncs::__str__(card),
+        }
+    }
 }
 
 //#[derive(Debug, Serialize, Deserialize)]

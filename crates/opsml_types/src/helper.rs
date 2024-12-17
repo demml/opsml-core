@@ -1,7 +1,7 @@
 use colored_json::{Color, ColorMode, ColoredFormatter, PrettyFormatter, Styler};
 use opsml_error::error::TypeError;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::{prelude::*, types::PyAnyMethods, PyTypeInfo};
+use pyo3::{prelude::*, types::PyAnyMethods};
 
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyString};
 use pyo3::IntoPyObjectExt;
