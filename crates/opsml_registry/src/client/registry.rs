@@ -3,8 +3,6 @@ use opsml_settings::config::OpsmlConfig;
 use opsml_storage::*;
 use opsml_types::*;
 
-use crate::server::registry;
-
 // TODO: Add trait for client and server registry
 #[derive(Debug)]
 pub struct ClientRegistry {
@@ -35,7 +33,7 @@ impl ClientRegistry {
         CardSQLTableNames::from_registry_type(&self.registry_type).to_string()
     }
 
-    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
+    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Vec<Card>, RegistryError> {
         // convert args struct to hasmap
 
         let query_string = serde_qs::to_string(&args)
@@ -54,12 +52,12 @@ impl ClientRegistry {
             .map_err(|e| RegistryError::Error(format!("Failed to list cards {}", e)))?;
 
         Ok(response
-            .json::<Cards>()
+            .json::<Vec<Card>>()
             .await
             .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?)
     }
 
-    pub async fn create_card(&mut self, card: &ClientCard) -> Result<(), RegistryError> {
+    pub async fn create_card(&mut self, card: &Card) -> Result<(), RegistryError> {
         // serialize card to json
         let body = serde_json::to_value(card)
             .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;
@@ -88,7 +86,7 @@ impl ClientRegistry {
         }
     }
 
-    pub async fn update_card(&mut self, card: &ClientCard) -> Result<(), RegistryError> {
+    pub async fn update_card(&mut self, card: &Card) -> Result<(), RegistryError> {
         // serialize card to json
         let body = serde_json::to_value(card)
             .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;

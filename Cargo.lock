@@ -3099,6 +3099,7 @@ dependencies = [
  "opsml-auth",
  "opsml-error",
  "opsml-logging",
+ "opsml-registry",
  "opsml-settings",
  "opsml-sql",
  "opsml-storage",

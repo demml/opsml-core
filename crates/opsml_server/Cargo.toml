@@ -15,6 +15,7 @@ bytes = { workspace = true }
 futures = { workspace = true }
 opsml-auth = { workspace = true }
 opsml-logging = { workspace = true }
+opsml-registry = { workspace = true, features = ["server"] }
 opsml-settings = { workspace = true }
 opsml-storage = { workspace = true }
 opsml-sql = { workspace = true }

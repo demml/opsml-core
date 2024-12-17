@@ -1,7 +1,6 @@
 use opsml_error::error::RegistryError;
 use opsml_settings::config::OpsmlConfig;
 use opsml_types::*;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub enum OpsmlRegistry {
@@ -33,7 +32,7 @@ impl OpsmlRegistry {
         }
     }
 
-    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
+    pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Vec<Card>, RegistryError> {
         match self {
             Self::ClientRegistry(client_registry) => {
                 let cards = client_registry.list_cards(args).await?;

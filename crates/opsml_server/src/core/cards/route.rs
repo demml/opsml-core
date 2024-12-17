@@ -168,7 +168,7 @@ pub async fn get_next_version(
 pub async fn list_cards(
     State(state): State<Arc<AppState>>,
     params: Query<ListCardRequest>,
-) -> Result<Json<Cards>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<Vec<Card>>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     let card_args = CardQueryArgs {
         name: params.name.clone(),
@@ -200,39 +200,39 @@ pub async fn list_cards(
                 .into_iter()
                 .map(|card| convert_datacard(card))
                 .collect();
-            Ok(Json(Cards::Data(cards)))
+            Ok(Json(cards))
         }
         CardResults::Model(data) => {
             let cards = data
                 .into_iter()
                 .map(|card| convert_modelcard(card))
                 .collect();
-            Ok(Json(Cards::Model(cards)))
+            Ok(Json(cards))
         }
         CardResults::Project(data) => {
             let cards = data
                 .into_iter()
                 .map(|card| convert_projectcard(card))
                 .collect();
-            Ok(Json(Cards::Project(cards)))
+            Ok(Json(cards))
         }
         CardResults::Run(data) => {
             let cards = data.into_iter().map(|card| convert_runcard(card)).collect();
-            Ok(Json(Cards::Run(cards)))
+            Ok(Json(cards))
         }
         CardResults::Pipeline(data) => {
             let cards = data
                 .into_iter()
                 .map(|card| convert_pipelinecard(card))
                 .collect();
-            Ok(Json(Cards::Pipeline(cards)))
+            Ok(Json(cards))
         }
         CardResults::Audit(data) => {
             let cards = data
                 .into_iter()
                 .map(|card| convert_auditcard(card))
                 .collect();
-            Ok(Json(Cards::Audit(cards)))
+            Ok(Json(cards))
         }
     }
 }
@@ -245,7 +245,7 @@ pub async fn create_card(
 
     // match on registry type
     let card = match card_request.card {
-        ClientCard::Data(client_card) => {
+        Card::Data(client_card) => {
             let server_card = DataCardRecord::new(
                 client_card.name,
                 client_card.repository,
@@ -258,9 +258,9 @@ pub async fn create_card(
                 client_card.auditcard_uid,
                 client_card.interface_type,
             );
-            Card::Data(server_card)
+            ServerCard::Data(server_card)
         }
-        ClientCard::Model(client_card) => {
+        Card::Model(client_card) => {
             let server_card = ModelCardRecord::new(
                 client_card.name,
                 client_card.repository,
@@ -276,20 +276,20 @@ pub async fn create_card(
                 client_card.interface_type,
                 client_card.task_type,
             );
-            Card::Model(server_card)
+            ServerCard::Model(server_card)
         }
 
-        ClientCard::Project(client_card) => {
+        Card::Project(client_card) => {
             let server_card = ProjectCardRecord::new(
                 client_card.name,
                 client_card.repository,
                 client_card.version.parse().unwrap(),
                 client_card.project_id,
             );
-            Card::Project(server_card)
+            ServerCard::Project(server_card)
         }
 
-        ClientCard::Run(client_card) => {
+        Card::Run(client_card) => {
             let server_card = RunCardRecord::new(
                 client_card.name,
                 client_card.repository,
@@ -303,10 +303,10 @@ pub async fn create_card(
                 client_card.artifact_uris,
                 client_card.compute_environment,
             );
-            Card::Run(server_card)
+            ServerCard::Run(server_card)
         }
 
-        ClientCard::Pipeline(client_card) => {
+        Card::Pipeline(client_card) => {
             let server_card = PipelineCardRecord::new(
                 client_card.name,
                 client_card.repository,
@@ -318,10 +318,10 @@ pub async fn create_card(
                 client_card.modelcard_uids,
                 client_card.runcard_uids,
             );
-            Card::Pipeline(server_card)
+            ServerCard::Pipeline(server_card)
         }
 
-        ClientCard::Audit(client_card) => {
+        Card::Audit(client_card) => {
             let server_card = AuditCardRecord::new(
                 client_card.name,
                 client_card.repository,
@@ -333,7 +333,7 @@ pub async fn create_card(
                 client_card.modelcard_uids,
                 client_card.runcard_uids,
             );
-            Card::Audit(server_card)
+            ServerCard::Audit(server_card)
         }
     };
 
@@ -365,7 +365,7 @@ pub async fn update_card(
     // Note: We can use unwrap() here because a card being updated has already been created and thus has defaults.
     // match on registry type (all fields should be supplied)
     let card = match card_request.card {
-        ClientCard::Data(client_card) => {
+        Card::Data(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -394,10 +394,10 @@ pub async fn update_card(
                 auditcard_uid: client_card.auditcard_uid.unwrap(),
                 interface_type: client_card.interface_type.unwrap(),
             };
-            Card::Data(server_card)
+            ServerCard::Data(server_card)
         }
 
-        ClientCard::Model(client_card) => {
+        Card::Model(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -429,10 +429,10 @@ pub async fn update_card(
                 interface_type: client_card.interface_type.unwrap(),
                 task_type: client_card.task_type.unwrap(),
             };
-            Card::Model(server_card)
+            ServerCard::Model(server_card)
         }
 
-        ClientCard::Project(client_card) => {
+        Card::Project(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -454,10 +454,10 @@ pub async fn update_card(
                 version: client_card.version,
                 project_id: client_card.project_id,
             };
-            Card::Project(server_card)
+            ServerCard::Project(server_card)
         }
 
-        ClientCard::Run(client_card) => {
+        Card::Run(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -487,10 +487,10 @@ pub async fn update_card(
                 artifact_uris: SqlxJson(client_card.artifact_uris.unwrap()),
                 compute_environment: SqlxJson(client_card.compute_environment.unwrap()),
             };
-            Card::Run(server_card)
+            ServerCard::Run(server_card)
         }
 
-        ClientCard::Pipeline(client_card) => {
+        Card::Pipeline(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -518,10 +518,10 @@ pub async fn update_card(
                 modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
                 runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
             };
-            Card::Pipeline(server_card)
+            ServerCard::Pipeline(server_card)
         }
 
-        ClientCard::Audit(client_card) => {
+        Card::Audit(client_card) => {
             let version = Version::parse(&client_card.version).map_err(|e| {
                 error!("Failed to parse version: {}", e);
                 (
@@ -549,7 +549,7 @@ pub async fn update_card(
                 modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
                 runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
             };
-            Card::Audit(server_card)
+            ServerCard::Audit(server_card)
         }
     };
 

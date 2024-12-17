@@ -505,7 +505,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 10);
 
@@ -533,7 +533,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
@@ -546,7 +546,7 @@ mod tests {
 
         // DataCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Data(DataCardClientRecord {
+            card: Card::Data(DataCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -591,19 +591,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Data(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Data(card) => card,
             _ => panic!("Card not found"),
         };
 
         let card_request = UpdateCardRequest {
             registry_type: RegistryType::Data,
-            card: ClientCard::Data(DataCardClientRecord {
+            card: Card::Data(DataCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
@@ -666,7 +666,7 @@ mod tests {
 
         // ModelCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Model(ModelCardClientRecord {
+            card: Card::Model(ModelCardClientRecord {
                 name: "ModelCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -711,19 +711,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Model(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Model(card) => card,
             _ => panic!("Card not found"),
         };
 
         let card_request = UpdateCardRequest {
             registry_type: RegistryType::Model,
-            card: ClientCard::Model(ModelCardClientRecord {
+            card: Card::Model(ModelCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
@@ -789,7 +789,7 @@ mod tests {
 
         // RunCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Run(RunCardClientRecord {
+            card: Card::Run(RunCardClientRecord {
                 name: "RunCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -834,19 +834,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Run(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Run(card) => card,
             _ => panic!("Card not found"),
         };
 
         let card_request = UpdateCardRequest {
             registry_type: RegistryType::Run,
-            card: ClientCard::Run(RunCardClientRecord {
+            card: Card::Run(RunCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
@@ -910,7 +910,7 @@ mod tests {
 
         // PipelineCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Pipeline(PipelineCardClientRecord {
+            card: Card::Pipeline(PipelineCardClientRecord {
                 name: "PipelineCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -955,19 +955,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Pipeline(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Pipeline(card) => card,
             _ => panic!("Card not found"),
         };
 
         let card_request = UpdateCardRequest {
             registry_type: RegistryType::Pipeline,
-            card: ClientCard::Pipeline(PipelineCardClientRecord {
+            card: Card::Pipeline(PipelineCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
@@ -1029,7 +1029,7 @@ mod tests {
 
         // AuditCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Audit(AuditCardClientRecord {
+            card: Card::Audit(AuditCardClientRecord {
                 name: "AuditCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -1074,19 +1074,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Audit(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Audit(card) => card,
             _ => panic!("Card not found"),
         };
 
         let card_request = UpdateCardRequest {
             registry_type: RegistryType::Audit,
-            card: ClientCard::Audit(AuditCardClientRecord {
+            card: Card::Audit(AuditCardClientRecord {
                 name: "DataCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.1".to_string(),
@@ -1148,7 +1148,7 @@ mod tests {
 
         // ProjectCard
         let card_request = CreateCardRequest {
-            card: ClientCard::Project(ProjectCardClientRecord {
+            card: Card::Project(ProjectCardClientRecord {
                 name: "ProjectCard".to_string(),
                 repository: "repo1".to_string(),
                 version: "1.0.0".to_string(),
@@ -1193,13 +1193,13 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        let card_results: Cards = serde_json::from_slice(&body).unwrap();
+        let card_results: Vec<Card> = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(card_results.len(), 1);
 
         // Update the card (get card from CardResults)
-        let card = match card_results {
-            Cards::Project(cards) => cards[0].clone(),
+        let card = match card_results[0].clone() {
+            Card::Project(card) => card,
             _ => panic!("Card not found"),
         };
 

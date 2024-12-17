@@ -1,10 +1,7 @@
 use crate::enums::OpsmlRegistry;
 use anyhow::{Context, Result as AnyhowResult};
-use opsml_error::error::RegistryError;
 use opsml_types::*;
 use pyo3::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 
 #[pyclass]
@@ -20,7 +17,7 @@ pub struct CardRegistry {
 impl CardRegistry {
     #[new]
     pub fn new(registry_type: RegistryType) -> AnyhowResult<Self> {
-        /// Create a new tokio runtime for the registry (needed for async calls)
+        // Create a new tokio runtime for the registry (needed for async calls)
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         let registry = rt
@@ -43,6 +40,36 @@ impl CardRegistry {
     #[getter]
     pub fn table_name(&self) -> String {
         self.table_name.clone()
+    }
+
+    #[pyo3(signature = (uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
+    pub fn list_cards(
+        &mut self,
+        uid: Option<String>,
+        name: Option<String>,
+        repository: Option<String>,
+        version: Option<String>,
+        max_date: Option<String>,
+        tags: Option<HashMap<String, String>>,
+        limit: Option<i32>,
+        sort_by_timestamp: Option<bool>,
+    ) -> AnyhowResult<Vec<Card>> {
+        let query_args = CardQueryArgs {
+            uid,
+            name,
+            repository,
+            version,
+            max_date,
+            tags,
+            limit,
+            sort_by_timestamp,
+        };
+
+        let cards = self
+            .runtime
+            .block_on(async { self.registry.list_cards(query_args).await })?;
+
+        Ok(cards)
     }
 
     //pub fn list_cards(

@@ -58,39 +58,39 @@ pub mod server_logic {
                         .into_iter()
                         .map(|card| convert_modelcard(card))
                         .collect();
-                    Ok(Cards::Model(cards))
+                    Ok(cards)
                 }
                 CardResults::Project(data) => {
                     let cards = data
                         .into_iter()
                         .map(|card| convert_projectcard(card))
                         .collect();
-                    Ok(Cards::Project(cards))
+                    Ok(cards)
                 }
                 CardResults::Run(data) => {
                     let cards = data.into_iter().map(|card| convert_runcard(card)).collect();
-                    Ok(Cards::Run(cards))
+                    Ok(cards)
                 }
                 CardResults::Pipeline(data) => {
                     let cards = data
                         .into_iter()
                         .map(|card| convert_pipelinecard(card))
                         .collect();
-                    Ok(Cards::Pipeline(cards))
+                    Ok(cards)
                 }
                 CardResults::Audit(data) => {
                     let cards = data
                         .into_iter()
                         .map(|card| convert_auditcard(card))
                         .collect();
-                    Ok(Cards::Audit(cards))
+                    Ok(cards)
                 }
             }
         }
 
-        pub async fn create_card(&self, card: &ClientCard) -> Result<(), RegistryError> {
+        pub async fn create_card(&self, card: &Card) -> Result<(), RegistryError> {
             let card = match card.clone() {
-                ClientCard::Data(client_card) => {
+                Card::Data(client_card) => {
                     let server_card = DataCardRecord::new(
                         client_card.name,
                         client_card.repository,
@@ -103,9 +103,9 @@ pub mod server_logic {
                         client_card.auditcard_uid,
                         client_card.interface_type,
                     );
-                    Card::Data(server_card)
+                    ServerCard::Data(server_card)
                 }
-                ClientCard::Model(client_card) => {
+                Card::Model(client_card) => {
                     let server_card = ModelCardRecord::new(
                         client_card.name,
                         client_card.repository,
@@ -121,20 +121,20 @@ pub mod server_logic {
                         client_card.interface_type,
                         client_card.task_type,
                     );
-                    Card::Model(server_card)
+                    ServerCard::Model(server_card)
                 }
 
-                ClientCard::Project(client_card) => {
+                Card::Project(client_card) => {
                     let server_card = ProjectCardRecord::new(
                         client_card.name,
                         client_card.repository,
                         client_card.version.parse().unwrap(),
                         client_card.project_id,
                     );
-                    Card::Project(server_card)
+                    ServerCard::Project(server_card)
                 }
 
-                ClientCard::Run(client_card) => {
+                Card::Run(client_card) => {
                     let server_card = RunCardRecord::new(
                         client_card.name,
                         client_card.repository,
@@ -148,10 +148,10 @@ pub mod server_logic {
                         client_card.artifact_uris,
                         client_card.compute_environment,
                     );
-                    Card::Run(server_card)
+                    ServerCard::Run(server_card)
                 }
 
-                ClientCard::Pipeline(client_card) => {
+                Card::Pipeline(client_card) => {
                     let server_card = PipelineCardRecord::new(
                         client_card.name,
                         client_card.repository,
@@ -163,10 +163,10 @@ pub mod server_logic {
                         client_card.modelcard_uids,
                         client_card.runcard_uids,
                     );
-                    Card::Pipeline(server_card)
+                    ServerCard::Pipeline(server_card)
                 }
 
-                ClientCard::Audit(client_card) => {
+                Card::Audit(client_card) => {
                     let server_card = AuditCardRecord::new(
                         client_card.name,
                         client_card.repository,
@@ -178,7 +178,7 @@ pub mod server_logic {
                         client_card.modelcard_uids,
                         client_card.runcard_uids,
                     );
-                    Card::Audit(server_card)
+                    ServerCard::Audit(server_card)
                 }
             };
 
@@ -190,9 +190,9 @@ pub mod server_logic {
             Ok(())
         }
 
-        pub async fn update_card(&self, card: &ClientCard) -> Result<(), RegistryError> {
+        pub async fn update_card(&self, card: &Card) -> Result<(), RegistryError> {
             let card = match card.clone() {
-                ClientCard::Data(client_card) => {
+                Card::Data(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -218,10 +218,10 @@ pub mod server_logic {
                         auditcard_uid: client_card.auditcard_uid.unwrap(),
                         interface_type: client_card.interface_type.unwrap(),
                     };
-                    Card::Data(server_card)
+                    ServerCard::Data(server_card)
                 }
 
-                ClientCard::Model(client_card) => {
+                Card::Model(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -250,10 +250,10 @@ pub mod server_logic {
                         interface_type: client_card.interface_type.unwrap(),
                         task_type: client_card.task_type.unwrap(),
                     };
-                    Card::Model(server_card)
+                    ServerCard::Model(server_card)
                 }
 
-                ClientCard::Project(client_card) => {
+                Card::Project(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -272,10 +272,10 @@ pub mod server_logic {
                         version: client_card.version,
                         project_id: client_card.project_id,
                     };
-                    Card::Project(server_card)
+                    ServerCard::Project(server_card)
                 }
 
-                ClientCard::Run(client_card) => {
+                Card::Run(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -302,10 +302,10 @@ pub mod server_logic {
                         artifact_uris: SqlxJson(client_card.artifact_uris.unwrap()),
                         compute_environment: SqlxJson(client_card.compute_environment.unwrap()),
                     };
-                    Card::Run(server_card)
+                    ServerCard::Run(server_card)
                 }
 
-                ClientCard::Pipeline(client_card) => {
+                Card::Pipeline(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -330,10 +330,10 @@ pub mod server_logic {
                         modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
                         runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
                     };
-                    Card::Pipeline(server_card)
+                    ServerCard::Pipeline(server_card)
                 }
 
-                ClientCard::Audit(client_card) => {
+                Card::Audit(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);
                         RegistryError::Error("Failed to parse version".to_string())
@@ -358,7 +358,7 @@ pub mod server_logic {
                         modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
                         runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
                     };
-                    Card::Audit(server_card)
+                    ServerCard::Audit(server_card)
                 }
             };
 
