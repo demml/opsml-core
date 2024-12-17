@@ -9,10 +9,13 @@ pub mod server_logic {
         schemas::*,
     };
     use opsml_types::*;
+    use semver::Version;
+    use sqlx::types::Json as SqlxJson;
+    use tracing::error;
 
     pub struct ServerRegistry {
-        registry_type: RegistryType,
         sql_client: SqlClientEnum,
+        pub table_name: CardSQLTableNames,
     }
 
     impl ServerRegistry {
@@ -23,22 +26,18 @@ pub mod server_logic {
             let sql_client = get_sql_client(&config).await.map_err(|e| {
                 RegistryError::NewError(format!("Failed to create sql client {}", e))
             })?;
+
+            let table_name = CardSQLTableNames::from_registry_type(&registry_type);
             Ok(Self {
-                registry_type,
                 sql_client,
+                table_name,
             })
         }
 
-        pub fn table_name(&self) -> String {
-            CardSQLTableNames::from_registry_type(&self.registry_type).to_string()
-        }
-
         pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Cards, RegistryError> {
-            let table = CardSQLTableNames::from_registry_type(&self.registry_type);
-
             let cards = self
                 .sql_client
-                .query_cards(&table, &args)
+                .query_cards(&self.table_name, &args)
                 .await
                 .map_err(|e| RegistryError::Error(format!("Failed to list cards {}", e)))?;
 
@@ -83,6 +82,288 @@ pub mod server_logic {
                     Ok(Cards::Audit(cards))
                 }
             }
+        }
+
+        pub async fn create_card(&self, card: &ClientCard) -> Result<(), RegistryError> {
+            let card = match card.clone() {
+                ClientCard::Data(client_card) => {
+                    let server_card = DataCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.contact,
+                        client_card.tags,
+                        client_card.data_type,
+                        client_card.runcard_uid,
+                        client_card.pipelinecard_uid,
+                        client_card.auditcard_uid,
+                        client_card.interface_type,
+                    );
+                    Card::Data(server_card)
+                }
+                ClientCard::Model(client_card) => {
+                    let server_card = ModelCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.contact,
+                        client_card.tags,
+                        client_card.datacard_uid,
+                        client_card.sample_data_type,
+                        client_card.model_type,
+                        client_card.runcard_uid,
+                        client_card.pipelinecard_uid,
+                        client_card.auditcard_uid,
+                        client_card.interface_type,
+                        client_card.task_type,
+                    );
+                    Card::Model(server_card)
+                }
+
+                ClientCard::Project(client_card) => {
+                    let server_card = ProjectCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.project_id,
+                    );
+                    Card::Project(server_card)
+                }
+
+                ClientCard::Run(client_card) => {
+                    let server_card = RunCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.contact,
+                        client_card.tags,
+                        client_card.datacard_uids,
+                        client_card.modelcard_uids,
+                        client_card.pipelinecard_uid,
+                        client_card.project,
+                        client_card.artifact_uris,
+                        client_card.compute_environment,
+                    );
+                    Card::Run(server_card)
+                }
+
+                ClientCard::Pipeline(client_card) => {
+                    let server_card = PipelineCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.contact,
+                        client_card.tags,
+                        client_card.pipeline_code_uri,
+                        client_card.datacard_uids,
+                        client_card.modelcard_uids,
+                        client_card.runcard_uids,
+                    );
+                    Card::Pipeline(server_card)
+                }
+
+                ClientCard::Audit(client_card) => {
+                    let server_card = AuditCardRecord::new(
+                        client_card.name,
+                        client_card.repository,
+                        client_card.version.parse().unwrap(),
+                        client_card.contact,
+                        client_card.tags,
+                        client_card.approved,
+                        client_card.datacard_uids,
+                        client_card.modelcard_uids,
+                        client_card.runcard_uids,
+                    );
+                    Card::Audit(server_card)
+                }
+            };
+
+            self.sql_client
+                .insert_card(&self.table_name, &card)
+                .await
+                .map_err(|e| RegistryError::Error(format!("Failed to create card {}", e)))?;
+
+            Ok(())
+        }
+
+        pub async fn update_card(&self, card: &ClientCard) -> Result<(), RegistryError> {
+            let card = match card.clone() {
+                ClientCard::Data(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = DataCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        app_env: client_card.app_env.unwrap(),
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        contact: client_card.contact,
+                        tags: SqlxJson(client_card.tags),
+                        data_type: client_card.data_type,
+                        runcard_uid: client_card.runcard_uid.unwrap(),
+                        pipelinecard_uid: client_card.pipelinecard_uid.unwrap(),
+                        auditcard_uid: client_card.auditcard_uid.unwrap(),
+                        interface_type: client_card.interface_type.unwrap(),
+                    };
+                    Card::Data(server_card)
+                }
+
+                ClientCard::Model(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = ModelCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        app_env: client_card.app_env.unwrap(),
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        contact: client_card.contact,
+                        tags: SqlxJson(client_card.tags),
+                        datacard_uid: client_card.datacard_uid.unwrap(),
+                        sample_data_type: client_card.sample_data_type,
+                        model_type: client_card.model_type,
+                        runcard_uid: client_card.runcard_uid.unwrap(),
+                        pipelinecard_uid: client_card.pipelinecard_uid.unwrap(),
+                        auditcard_uid: client_card.auditcard_uid.unwrap(),
+                        interface_type: client_card.interface_type.unwrap(),
+                        task_type: client_card.task_type.unwrap(),
+                    };
+                    Card::Model(server_card)
+                }
+
+                ClientCard::Project(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = ProjectCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        project_id: client_card.project_id,
+                    };
+                    Card::Project(server_card)
+                }
+
+                ClientCard::Run(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = RunCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        app_env: client_card.app_env.unwrap(),
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        contact: client_card.contact,
+                        tags: SqlxJson(client_card.tags),
+                        datacard_uids: SqlxJson(client_card.datacard_uids.unwrap()),
+                        modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
+                        pipelinecard_uid: client_card.pipelinecard_uid.unwrap(),
+                        project: client_card.project,
+                        artifact_uris: SqlxJson(client_card.artifact_uris.unwrap()),
+                        compute_environment: SqlxJson(client_card.compute_environment.unwrap()),
+                    };
+                    Card::Run(server_card)
+                }
+
+                ClientCard::Pipeline(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = PipelineCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        app_env: client_card.app_env.unwrap(),
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        contact: client_card.contact,
+                        tags: SqlxJson(client_card.tags),
+                        pipeline_code_uri: client_card.pipeline_code_uri,
+                        datacard_uids: SqlxJson(client_card.datacard_uids.unwrap()),
+                        modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
+                        runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
+                    };
+                    Card::Pipeline(server_card)
+                }
+
+                ClientCard::Audit(client_card) => {
+                    let version = Version::parse(&client_card.version).map_err(|e| {
+                        error!("Failed to parse version: {}", e);
+                        RegistryError::Error("Failed to parse version".to_string())
+                    })?;
+
+                    let server_card = AuditCardRecord {
+                        uid: client_card.uid.unwrap(),
+                        created_at: client_card.created_at,
+                        app_env: client_card.app_env.unwrap(),
+                        name: client_card.name,
+                        repository: client_card.repository,
+                        major: version.major as i32,
+                        minor: version.minor as i32,
+                        patch: version.patch as i32,
+                        pre_tag: Some(version.pre.to_string()),
+                        build_tag: Some(version.build.to_string()),
+                        version: client_card.version,
+                        contact: client_card.contact,
+                        tags: SqlxJson(client_card.tags),
+                        approved: client_card.approved,
+                        datacard_uids: SqlxJson(client_card.datacard_uids.unwrap()),
+                        modelcard_uids: SqlxJson(client_card.modelcard_uids.unwrap()),
+                        runcard_uids: SqlxJson(client_card.runcard_uids.unwrap()),
+                    };
+                    Card::Audit(server_card)
+                }
+            };
+
+            self.sql_client
+                .update_card(&self.table_name, &card)
+                .await
+                .map_err(|e| RegistryError::Error(format!("Failed to update card {}", e)))?;
+
+            Ok(())
         }
     }
 }

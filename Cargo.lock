@@ -3073,7 +3073,10 @@ dependencies = [
  "opsml-storage",
  "opsml-types",
  "pyo3",
+ "semver",
  "serde_qs",
+ "sqlx",
+ "tracing",
 ]
 
 [[package]]
