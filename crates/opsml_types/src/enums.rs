@@ -55,6 +55,23 @@ pub enum SqlType {
 }
 
 #[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
+pub enum RegistryMode {
+    #[default]
+    Client,
+    Server,
+}
+
+impl Display for RegistryMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RegistryMode::Client => write!(f, "client"),
+            RegistryMode::Server => write!(f, "server"),
+        }
+    }
+}
+
+#[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum UriNames {
     TrainedModelUri,

@@ -35,6 +35,14 @@ pub mod server_logic {
             })
         }
 
+        pub fn mode(&self) -> RegistryMode {
+            RegistryMode::Server
+        }
+
+        pub fn table_name(&self) -> String {
+            self.table_name.to_string()
+        }
+
         pub async fn list_cards(
             &mut self,
             args: CardQueryArgs,

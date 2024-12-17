@@ -39,3 +39,12 @@ test.utils:
 .PHONY: test.opsml.server
 test.opsml.server:
 	cargo test -p opsml-server test_opsml_server -- --nocapture --test-threads=1
+
+.PHONY: test.opsml.registry.client
+start.server:
+	cargo build -p opsml-server
+	./target/debug/opsml-server
+
+.PHONY: test.opsml.registry.client
+test.opsml.registry.client:
+	cargo test --features server -p opsml-registry test_registry_client -- --nocapture --test-threads=1

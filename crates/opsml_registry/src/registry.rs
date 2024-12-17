@@ -42,6 +42,10 @@ impl CardRegistry {
         self.table_name.clone()
     }
 
+    pub fn mode(&self) -> RegistryMode {
+        self.registry.mode()
+    }
+
     #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
@@ -109,33 +113,100 @@ impl CardRegistry {
 
         Ok(cards)
     }
+}
 
-    //pub fn list_cards(
-    //    &mut self,
-    //    uid: Option<String>,
-    //    name: Option<String>,
-    //    repository: Option<String>,
-    //    version: Option<String>,
-    //    max_date: Option<String>,
-    //    tags: Option<HashMap<String, String>>,
-    //    limit: Option<i32>,
-    //    sort_by_timestamp: Option<bool>,
-    //) -> PyResult<Vec<ClientCard>> {
-    //    let query_args = CardQueryArgs {
-    //        uid,
-    //        name,
-    //        repository,
-    //        version,
-    //        max_date,
-    //        tags,
-    //        limit,
-    //        sort_by_timestamp,
-    //    };
-    //
-    //    let cards = self.runtime.block_on(async {
-    //        let cards = self.registry.list_cards(query_args).await?;
-    //    })?;
-    //
-    //    cards
-    //}
-} //
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opsml_settings::config::OpsmlDatabaseSettings;
+    use opsml_sql::base::SqlClient;
+    use opsml_sql::enums::client::SqlClientEnum;
+
+    use std::env;
+
+    fn cleanup() {
+        // cleanup delete opsml.db and opsml_registries folder from the current directory
+        let current_dir = std::env::current_dir().unwrap();
+        // get 2 parents up
+        let parent_dir = current_dir.parent().unwrap().parent().unwrap();
+        let db_path = parent_dir.join("opsml.db");
+        let registry_path = parent_dir.join("opsml_registries");
+
+        if db_path.exists() {
+            std::fs::remove_file(db_path).unwrap();
+        }
+
+        if registry_path.exists() {
+            std::fs::remove_dir_all(registry_path).unwrap();
+        }
+    }
+
+    fn create_registry_storage() {
+        let current_dir = std::env::current_dir().unwrap();
+        // get 2 parents up
+        let parent_dir = current_dir.parent().unwrap().parent().unwrap();
+        let registry_path = parent_dir.join("opsml_registries");
+
+        // create the registry folder if it does not exist
+        if !registry_path.exists() {
+            std::fs::create_dir(registry_path).unwrap();
+        }
+    }
+
+    fn get_connection_uri() -> String {
+        let current_dir = env::current_dir().expect("Failed to get current directory");
+        let parent_dir = current_dir.parent().unwrap().parent().unwrap();
+        let db_path = parent_dir.join("opsml.db");
+
+        format!(
+            "sqlite://{}",
+            db_path.to_str().expect("Failed to convert path to string")
+        )
+    }
+
+    fn setup() {
+        // create opsml_registries folder
+        create_registry_storage();
+
+        // create opsml.db and populate it with data
+        let config = OpsmlDatabaseSettings {
+            connection_uri: get_connection_uri(),
+            max_connections: 1,
+            sql_type: SqlType::Sqlite,
+        };
+
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let client = SqlClientEnum::new(&config).await.unwrap();
+            let script = std::fs::read_to_string("tests/populate_db.sql").unwrap();
+            client.query(&script).await;
+        });
+
+        env::set_var("OPSML_TRACKING_URI", "http://0.0.0.0:3000");
+    }
+
+    #[test]
+    fn test_registry_client_list_cards() {
+        cleanup();
+
+        //cleanup();
+        setup();
+
+        env::set_var("OPSML_TRACKING_URI", "http://0.0.0.0:3000");
+        let mut registry = CardRegistry::new(RegistryType::Data).unwrap();
+
+        // Test mode
+        assert_eq!(registry.mode(), RegistryMode::Client);
+
+        // Test table name
+        assert_eq!(registry.table_name(), CardSQLTableNames::Data.to_string());
+
+        // Test list cards
+        let cards = registry
+            .list_cards(None, None, None, None, None, None, None, None, None)
+            .unwrap();
+
+        assert_eq!(cards.len(), 10);
+
+        cleanup();
+    }
+}

@@ -32,6 +32,22 @@ impl OpsmlRegistry {
         }
     }
 
+    pub fn mode(&self) -> RegistryMode {
+        match self {
+            Self::ClientRegistry(client_registry) => client_registry.mode(),
+            #[cfg(feature = "server")]
+            Self::ServerRegistry(server_registry) => server_registry.mode(),
+        }
+    }
+
+    pub fn table_name(&self) -> String {
+        match self {
+            Self::ClientRegistry(client_registry) => client_registry.table_name(),
+            #[cfg(feature = "server")]
+            Self::ServerRegistry(server_registry) => server_registry.table_name(),
+        }
+    }
+
     pub async fn list_cards(&mut self, args: CardQueryArgs) -> Result<Vec<Card>, RegistryError> {
         match self {
             Self::ClientRegistry(client_registry) => {
