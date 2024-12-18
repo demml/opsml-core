@@ -2,8 +2,6 @@ use crate::{PyHelperFuncs, RegistryType, VersionType};
 
 use chrono::NaiveDateTime;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyDictMethods};
-use pyo3::PyClass;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -462,17 +460,11 @@ impl Card {
         match self {
             Self::Data(card) => {
                 let uid = card.uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
+                uid.map(|uid| vec![uid])
             }
             Self::Model(card) => {
                 let uid = card.datacard_uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
+                uid.map(|uid| vec![uid])
             }
             Self::Run(card) => card.datacard_uids.clone(),
             Self::Audit(card) => card.datacard_uids.clone(),
@@ -487,10 +479,7 @@ impl Card {
             Self::Data(_) => None,
             Self::Model(card) => {
                 let uid = card.uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
+                uid.map(|uid| vec![uid])
             }
             Self::Run(card) => card.modelcard_uids.clone(),
             Self::Audit(card) => card.modelcard_uids.clone(),

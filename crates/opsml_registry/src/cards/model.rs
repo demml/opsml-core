@@ -20,6 +20,19 @@ struct SerializedCard {
     metadata: ModelCardMetadata,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct InterfaceArgs {
+    task_type: String,
+    model_type: String,
+    data_type: String,
+    modelcard_uid: String,
+    feature_map: HashMap<String, Feature>,
+    sample_data_interface: String,
+    preprocessor_name: String,
+    
+
+}
+
 #[pyclass]
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ModelCardMetadata {

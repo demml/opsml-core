@@ -47,10 +47,8 @@ impl Description {
                 // recursively search for file in current directory
                 for entry in WalkDir::new(current_dir) {
                     let entry = entry.map_err(|_| TypeError::FileEntryError)?;
-                    if entry.file_type().is_file() {
-                        if entry.file_name().to_string_lossy() == path {
-                            return Ok(Some(entry.path().to_str().unwrap().to_string()));
-                        }
+                    if entry.file_type().is_file() && entry.file_name().to_string_lossy() == path {
+                        return Ok(Some(entry.path().to_str().unwrap().to_string()));
                     }
                 }
                 // raise error if file not found

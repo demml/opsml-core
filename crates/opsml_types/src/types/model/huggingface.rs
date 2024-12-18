@@ -33,6 +33,7 @@ struct HuggingFaceOnnxSaveArgs {
 
 #[pyclass]
 #[derive(Debug)]
+#[allow(dead_code)]
 struct HuggingFaceOnnxArgs {
     pub ort_type: HuggingFaceORTModel,
     pub provider: String,
