@@ -44,29 +44,32 @@ pub struct DataCardMetadata {
 #[pyclass]
 #[derive(Debug)]
 pub struct DataCard {
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub interface: PyObject,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub name: String,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub repository: String,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub contact: String,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub version: String,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub uid: String,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub tags: HashMap<String, String>,
 
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub metadata: DataCardMetadata,
+
+    #[pyo3(get)]
+    pub card_type: CardType,
 }
 
 #[pymethods]
@@ -102,6 +105,7 @@ impl DataCard {
             uid: base_args.uid,
             tags: base_args.tags,
             metadata: metadata.unwrap_or_default(),
+            card_type: CardType::Data,
         })
     }
 
@@ -130,6 +134,7 @@ impl DataCard {
             uid: card.uid,
             tags: card.tags,
             metadata: card.metadata,
+            card_type: CardType::Data,
         })
     }
 }

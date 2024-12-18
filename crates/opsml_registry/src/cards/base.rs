@@ -23,12 +23,16 @@ impl BaseArgs {
         info: Option<CardInfo>,
         tags: HashMap<String, String>,
     ) -> Result<Self, CardError> {
-        let name = Self::get_value("NAME", &name, info.as_ref().map(|i| &i.name))?;
-        let repository = Self::get_value(
+        let name = clean_string(&Self::get_value(
+            "NAME",
+            &name,
+            info.as_ref().map(|i| &i.name),
+        )?);
+        let repository = clean_string(&Self::get_value(
             "REPOSITORY",
             &repository,
             info.as_ref().map(|i| &i.repository),
-        )?;
+        )?);
         let contact = Self::get_value("CONTACT", &contact, info.as_ref().map(|i| &i.contact))?;
 
         let version = version.unwrap_or_else(|| enums::CommonKwargs::BaseVersion.to_string());
