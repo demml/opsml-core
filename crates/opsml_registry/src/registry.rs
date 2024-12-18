@@ -1,9 +1,10 @@
 use crate::cards::*;
 use crate::enums::OpsmlRegistry;
-use anyhow::{Context, Result as AnyhowResult};
+use anyhow::{Context, Ok, Result as AnyhowResult};
 use opsml_types::*;
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use tracing::info;
 
 #[pyclass]
 #[derive(Debug)]
@@ -226,8 +227,12 @@ impl PyCardRegistry {
         Ok(cards)
     }
 
-    pub fn register_card(&self, card: &PyAny) -> PyResult<()> {
-        Ok(())
+    pub fn register_card(&self, card: &Bound<'_, PyAny>) -> AnyhowResult<()> {
+        if card.is_instance_of::<ModelCard>() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Card is not an instance of ModelCard"))
+        }
     }
 }
 

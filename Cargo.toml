@@ -59,6 +59,7 @@ password-auth = "1.*"
 pyo3 = { version = "0.23", features = ["extension-module", "anyhow", "serde", "chrono"] }
 rand = "0.8.5"
 rayon = "1.*"
+regex = "1.*"
 reqwest = { version = "0.*", features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots" ], default-features = false }
 reqwest-middleware = "0.*"
 semver = "1.*"

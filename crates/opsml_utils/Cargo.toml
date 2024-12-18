@@ -12,5 +12,6 @@ opsml-error = { workspace = true }
 opsml-types = { workspace = true }
 chrono = { workspace = true }
 colored = { workspace = true}
+regex = { workspace = true }
 semver = { workspace = true }
 uuid = { workspace = true }

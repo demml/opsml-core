@@ -237,6 +237,12 @@ impl CommonKwargs {
     }
 }
 
+impl Display for CommonKwargs {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_string())
+    }
+}
+
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum SaveName {

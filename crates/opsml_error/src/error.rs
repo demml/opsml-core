@@ -178,3 +178,15 @@ impl From<RegistryError> for PyErr {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
     }
 }
+
+#[derive(Error, Debug)]
+pub enum CardError {
+    #[error("{0}")]
+    Error(String),
+}
+
+impl From<CardError> for PyErr {
+    fn from(err: CardError) -> PyErr {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
+    }
+}
