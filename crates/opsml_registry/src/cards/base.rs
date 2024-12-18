@@ -1,5 +1,6 @@
 use opsml_error::error::CardError;
 use opsml_types::*;
+use opsml_utils::{clean_string, validate_name_repository_pattern};
 use std::collections::HashMap;
 use std::env;
 
@@ -22,27 +23,18 @@ impl BaseArgs {
         info: Option<CardInfo>,
         tags: HashMap<String, String>,
     ) -> Result<Self, CardError> {
-        // check if name provided
-        // if not provided, check in info is provided and if name is provided in info
-        // if not provided, check if OPSML_RUNTIME_NAME is set
-        // if not set, return error
+        let name = Self::get_value("NAME", &name, info.as_ref().map(|i| &i.name))?;
+        let repository = Self::get_value(
+            "REPOSITORY",
+            &repository,
+            info.as_ref().map(|i| &i.repository),
+        )?;
+        let contact = Self::get_value("CONTACT", &contact, info.as_ref().map(|i| &i.contact))?;
 
-        let name = name
-            .or_else(|| info.and_then(|i| i.name))
-            .or_else(|| env::var("OPSML_RUNTIME_NAME").ok())
-            .ok_or_else(|| CardError::Error("Name not provided".to_string()))?;
+        let version = version.unwrap_or_else(|| enums::CommonKwargs::BaseVersion.to_string());
+        let uid = uid.unwrap_or_else(|| enums::CommonKwargs::Undefined.to_string());
 
-        let repository = repository
-            .or_else(|| info.and_then(|i| i.repository))
-            .or_else(|| env::var("OPSML_RUNTIME_REPOSITORY").ok())
-            .ok_or_else(|| CardError::Error("Repository not provided".to_string()))?;
-
-        let contact = contact
-            .or_else(|| info.and_then(|i| i.repository))
-            .or_else(|| env::var("OPSML_RUNTIME_CONTACT").ok())
-            .ok_or_else(|| CardError::Error("Contact not provided".to_string()))?;
-        let version = version.unwrap_or(enums::CommonKwargs::BaseVersion.to_string());
-        let uid = uid.unwrap_or(enums::CommonKwargs::Undefined.to_string());
+        validate_name_repository_pattern(&name, &repository)?;
 
         Ok(Self {
             name,
@@ -53,4 +45,30 @@ impl BaseArgs {
             tags,
         })
     }
+
+    fn get_value(
+        key: &str,
+        value: &Option<String>,
+        card_info_value: Option<&Option<String>>,
+    ) -> Result<String, CardError> {
+        let env_key = format!("OPSML_RUNTIME_{}", key.to_uppercase());
+        let env_val = env::var(&env_key).ok();
+
+        value
+            .as_ref()
+            .or_else(|| card_info_value.and_then(|v| v.as_ref()))
+            .or_else(|| env_val.as_ref())
+            .map(|s| s.to_string())
+            .ok_or_else(|| CardError::Error(format!("{} not provided", key)))
+    }
+}
+
+pub trait BaseCard {
+    fn name(&self) -> &str;
+    fn repository(&self) -> &str;
+    fn contact(&self) -> &str;
+    fn version(&self) -> &str;
+    fn uid(&self) -> &str;
+    fn tags(&self) -> &HashMap<String, String>;
+    fn card_type(&self) -> CardType;
 }

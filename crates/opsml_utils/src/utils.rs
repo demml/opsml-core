@@ -4,8 +4,8 @@ use regex::Regex;
 
 use uuid::Uuid;
 
-pub const PUNCTUATION: &str = "!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~";
-pub const NAME_REPOSITORY_PATTERN: &str = r"^[a-z0-9]+(?:[-a-z0-9]+)*/[-a-z0-9]+$";
+const PUNCTUATION: &str = "!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~";
+const NAME_REPOSITORY_PATTERN: &str = r"^[a-z0-9]+(?:[-a-z0-9]+)*/[-a-z0-9]+$";
 
 pub fn clean_string(input: &str) -> String {
     let pattern = format!("[{}]", regex::escape(PUNCTUATION));

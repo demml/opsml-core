@@ -502,6 +502,17 @@ pub enum RegistryType {
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum CardType {
+    Data,
+    Model,
+    Run,
+    Project,
+    Audit,
+    Pipeline,
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CardSQLTableNames {
     Data,
     Model,

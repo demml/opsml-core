@@ -3074,6 +3074,7 @@ dependencies = [
  "opsml-sql",
  "opsml-storage",
  "opsml-types",
+ "opsml-utils",
  "pyo3",
  "semver",
  "serde",
@@ -3222,6 +3223,7 @@ dependencies = [
  "pyo3",
  "serde",
  "serde_json",
+ "walkdir",
 ]
 
 [[package]]

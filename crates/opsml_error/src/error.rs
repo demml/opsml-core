@@ -78,6 +78,12 @@ pub enum TypeError {
 
     #[error("Failed to parse date")]
     DateError,
+
+    #[error("Error reading file entry")]
+    FileEntryError,
+
+    #[error("File not found")]
+    FileNotFoundError,
 }
 
 impl From<TypeError> for PyErr {
@@ -183,6 +189,18 @@ impl From<RegistryError> for PyErr {
 pub enum CardError {
     #[error("{0}")]
     Error(String),
+
+    #[error(transparent)]
+    UtilError(#[from] UtilError),
+
+    #[error(transparent)]
+    TypeError(#[from] TypeError),
+
+    #[error(transparent)]
+    RegistryError(#[from] RegistryError),
+
+    #[error(transparent)]
+    StorageError(#[from] StorageError),
 }
 
 impl From<CardError> for PyErr {

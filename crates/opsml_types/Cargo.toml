@@ -16,4 +16,5 @@ opsml-error = { workspace = true }
 pyo3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+walkdir = { workspace = true }
 

@@ -1,10 +1,11 @@
 use crate::{PyHelperFuncs, RegistryType, VersionType};
 
 use chrono::NaiveDateTime;
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyDictMethods};
+use pyo3::PyClass;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use pyo3::prelude::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct UidRequest {
@@ -666,6 +667,80 @@ impl CardInfo {
         if let Some(contact) = &self.contact {
             std::env::set_var("OPSML_RUNTIME_CONTACT", contact);
         }
+    }
+}
+
+impl CardInfo {
+    pub fn get_value_by_name(&self, name: &str) -> &Option<String> {
+        match name {
+            "name" => &self.name,
+            "repository" => &self.repository,
+            "contact" => &self.contact,
+            "uid" => &self.uid,
+            "version" => &self.version,
+            _ => &None,
+        }
+    }
+}
+
+impl FromPyObject<'_> for CardInfo {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let name = ob.getattr("name").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<String>()?))
+            }
+        })?;
+
+        let repository = ob.getattr("repository").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<String>()?))
+            }
+        })?;
+
+        let contact = ob.getattr("contact").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<String>()?))
+            }
+        })?;
+
+        let version = ob.getattr("version").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<String>()?))
+            }
+        })?;
+
+        let uid = ob.getattr("uid").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<String>()?))
+            }
+        })?;
+
+        let tags = ob.getattr("tags").and_then(|item| {
+            if item.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(item.extract::<HashMap<String, String>>()?))
+            }
+        })?;
+
+        Ok(CardInfo {
+            name,
+            repository,
+            contact,
+            uid,
+            version,
+            tags,
+        })
     }
 }
 
