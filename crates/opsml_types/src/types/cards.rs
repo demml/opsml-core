@@ -1,4 +1,4 @@
-use crate::helper::PyHelperFuncs;
+use crate::{helper::PyHelperFuncs, CommonKwargs};
 use opsml_error::error::TypeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -94,4 +94,91 @@ impl Feature {
     }
 }
 
+#[pyclass]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct OnnxSchema {
+    #[pyo3(get, set)]
+    pub data_type: String,
+
+    #[pyo3(get, set)]
+    pub input_features: HashMap<String, Feature>,
+
+    #[pyo3(get, set)]
+    pub output_features: HashMap<String, Feature>,
+
+    #[pyo3(get, set)]
+    pub onnx_version: String,
+}
+
+#[pymethods]
+impl OnnxSchema {
+    pub fn __str__(&self) -> String {
+        // serialize the struct to a string
+        PyHelperFuncs::__str__(self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data_type == CommonKwargs::Undefined.to_string()
+    }
+}
+
 // new should implement form a pytuple
+#[pyclass]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct DataSchema {
+    #[pyo3(get, set)]
+    pub data_type: String,
+
+    #[pyo3(get, set)]
+    pub input_features: Option<HashMap<String, Feature>>,
+
+    #[pyo3(get, set)]
+    pub output_features: Option<HashMap<String, Feature>>,
+
+    #[pyo3(get, set)]
+    pub onnx_schema: OnnxSchema,
+}
+
+#[pymethods]
+impl DataSchema {
+    pub fn __str__(&self) -> String {
+        // serialize the struct to a string
+        PyHelperFuncs::__str__(self)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SklearnModelInterfaceArgs {
+    task_type: String,
+    model_type: String,
+    data_type: String,
+    modelcard_uid: String,
+    feature_map: HashMap<String, Feature>,
+    sample_data_interface: String,
+    preprocessor_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CatBoostModelInterfaceArgs {
+    task_type: String,
+    model_type: String,
+    data_type: String,
+    modelcard_uid: String,
+    feature_map: HashMap<String, Feature>,
+    sample_data_interface: String,
+    preprocessor_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct HuggingFaceModelInterfaceArgs {
+    task_type: String,
+    model_type: String,
+    data_type: String,
+    modelcard_uid: String,
+    feature_map: HashMap<String, Feature>,
+    sample_data_interface: String,
+    is_pipeline: bool,
+    backend: String,
+    tokenizer_name: String,
+    feature_extractor_name: String,
+}
