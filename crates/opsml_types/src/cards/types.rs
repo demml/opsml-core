@@ -1,6 +1,5 @@
 use crate::shared::helper::PyHelperFuncs;
-use colored_json::Paint;
-use opsml_error::error::{OpsmlError, TypeError};
+use opsml_error::error::TypeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
