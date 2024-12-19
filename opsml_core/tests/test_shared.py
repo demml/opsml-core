@@ -34,3 +34,55 @@ import pytest
 )
 def test_common_kwargs_as_string(variant, expected_string):
     assert variant.as_string() == expected_string
+
+
+@pytest.mark.parametrize(
+    "variant, expected_string",
+    [
+        (SaveName.Card, "card"),
+        (SaveName.Audit, "audit"),
+        (SaveName.PipelineCard, "pipelinecard"),
+        (SaveName.ModelMetadata, "model-metadata"),
+        (SaveName.TrainedModel, "trained-model"),
+        (SaveName.Preprocessor, "preprocessor"),
+        (SaveName.OnnxModel, "onnx-model"),
+        (SaveName.SampleModelData, "sample-model-data"),
+        (SaveName.DataProfile, "data-profile"),
+        (SaveName.Data, "data"),
+        (SaveName.Profile, "profile"),
+        (SaveName.Artifacts, "artifacts"),
+        (SaveName.QuantizedModel, "quantized-model"),
+        (SaveName.Tokenizer, "tokenizer"),
+        (SaveName.FeatureExtractor, "feature_extractor"),
+        (SaveName.Metadata, "metadata"),
+        (SaveName.Graphs, "graphs"),
+        (SaveName.OnnxConfig, "onnx-config"),
+        (SaveName.Dataset, "dataset"),
+        (SaveName.DriftProfile, "drift-profile"),
+    ],
+)
+def test_save_name_as_string(variant, expected_string):
+    assert variant.as_string() == expected_string
+
+
+@pytest.mark.parametrize(
+    "variant, expected_string",
+    [
+        (Suffix.Onnx, ".onnx"),
+        (Suffix.Parquet, ".parquet"),
+        (Suffix.Zarr, ".zarr"),
+        (Suffix.Joblib, ".joblib"),
+        (Suffix.Html, ".html"),
+        (Suffix.Json, ".json"),
+        (Suffix.Ckpt, ".ckpt"),
+        (Suffix.Pt, ".pt"),
+        (Suffix.Text, ".txt"),
+        (Suffix.Catboost, ".cbm"),
+        (Suffix.Jsonl, ".jsonl"),
+        (Suffix.Empty, ""),
+        (Suffix.Dmatrix, ".dmatrix"),
+        (Suffix.Model, ".model"),
+    ],
+)
+def test_suffix_as_string(variant, expected_string):
+    assert variant.as_string() == expected_string
