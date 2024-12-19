@@ -1,6 +1,6 @@
 use crate::Feature;
 use anyhow::{Context, Result as AnyhowResult};
-use opsml_error::error::TypeError;
+use opsml_error::error::OpsmlError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use pyo3::IntoPyObjectExt;
@@ -76,7 +76,7 @@ impl HuggingFaceOnnxArgs {
     fn check_optimum_config(
         py: Python,
         config: Option<&Bound<'_, PyAny>>,
-    ) -> AnyhowResult<Option<PyObject>> {
+    ) -> PyResult<Option<PyObject>> {
         if config.is_none() {
             return Ok(None);
         }
@@ -88,17 +88,17 @@ impl HuggingFaceOnnxArgs {
         let auto_quantization_config_attr = optimum_module.getattr("AutoQuantizationConfig")?;
         let auto_quantization_config = auto_quantization_config_attr
             .downcast::<PyType>()
-            .map_err(|e| TypeError::Error(e.to_string()))?;
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         let ort_config_attr = optimum_module.getattr("ORTConfig")?;
         let ort_config = ort_config_attr
             .downcast::<PyType>()
-            .map_err(|e| TypeError::Error(e.to_string()))?;
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         let quantization_config_attr = optimum_module.getattr("QuantizationConfig")?;
         let quantization_config = quantization_config_attr
             .downcast::<PyType>()
-            .map_err(|e| TypeError::Error(e.to_string()))?;
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         // Assert that config is an instance of one of the specified classes
         let is_valid_config = config.is_instance(auto_quantization_config)?
@@ -106,7 +106,10 @@ impl HuggingFaceOnnxArgs {
             || config.is_instance(quantization_config)?;
 
         if !is_valid_config {
-            return Err(anyhow::anyhow!("config must be a valid optimum config"));
+            return Err(OpsmlError::new_err(
+                "config must be an instance of AutoQuantizationConfig, ORTConfig, or QuantizationConfig".to_string(),
+            )
+            .into());
         }
 
         Ok(Some(config.into_py_any(py).with_context(|| {

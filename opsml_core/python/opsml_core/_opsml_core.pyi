@@ -2,6 +2,10 @@ from pathlib import Path
 from typing import List, Optional, Any
 from enum import Enum
 
+class OpsmlError(Exception):
+    def __init__(self, message: str) -> None: ...
+    def __str__(self) -> str: ...
+
 class StorageType(str, Enum):
     Google = "google"
     AWS = "aws"

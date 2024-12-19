@@ -6,6 +6,7 @@ from ._opsml_core import (  # type: ignore
     ApiSettings,
     HuggingFaceORTModel,
     HuggingFaceOnnxArgs,
+    OpsmlError,
 )
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "PyFileSystemStorage",
     "HuggingFaceORTModel",
     "HuggingFaceOnnxArgs",
+    "OpsmlError",
 ]

@@ -1,5 +1,6 @@
-from opsml_core import HuggingFaceORTModel, HuggingFaceOnnxArgs
+from opsml_core import HuggingFaceORTModel, HuggingFaceOnnxArgs, OpsmlError
 from optimum.onnxruntime.configuration import AutoQuantizationConfig
+import pytest
 
 
 def test_hugging_face_ort_model():
@@ -18,11 +19,22 @@ def test_hugging_face_ort_model():
 
     assert args.quantize is True
 
+    with pytest.raises(OpsmlError) as error:
+        args = HuggingFaceOnnxArgs(
+            ort_type=HuggingFaceORTModel.OrtAudioClassification,
+            provider="CPUExecutionProvider",
+            quantize=True,
+            config="fail",
+        )
+
+    assert (
+        str(error.value)
+        == "config must be an instance of AutoQuantizationConfig, ORTConfig, or QuantizationConfig"
+    )
+
     args = HuggingFaceOnnxArgs(
         ort_type=HuggingFaceORTModel.OrtAudioClassification,
         provider="CPUExecutionProvider",
         quantize=True,
-        config="fail",
+        config=AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False),
     )
-
-    config = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)

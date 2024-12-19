@@ -3038,6 +3038,7 @@ dependencies = [
 name = "opsml-core"
 version = "0.1.0"
 dependencies = [
+ "opsml-error",
  "opsml-settings",
  "opsml-storage",
  "opsml-types",

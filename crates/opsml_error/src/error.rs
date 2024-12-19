@@ -1,3 +1,5 @@
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
 use pyo3::PyErr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -208,3 +210,5 @@ impl From<CardError> for PyErr {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
     }
 }
+
+create_exception!(opsml_error, OpsmlError, PyException);
