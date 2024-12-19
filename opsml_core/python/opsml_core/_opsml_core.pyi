@@ -1,11 +1,42 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any
 from enum import Enum
 
 class StorageType(str, Enum):
     Google = "google"
     AWS = "aws"
     Local = "local"
+
+class HuggingFaceORTModel:
+    OrtAudioClassification: "HuggingFaceORTModel"
+    OrtAudioFrameClassification: "HuggingFaceORTModel"
+    OrtAudioXVector: "HuggingFaceORTModel"
+    OrtCustomTasks: "HuggingFaceORTModel"
+    OrtCtc: "HuggingFaceORTModel"
+    OrtFeatureExtraction: "HuggingFaceORTModel"
+    OrtImageClassification: "HuggingFaceORTModel"
+    OrtMaskedLm: "HuggingFaceORTModel"
+    OrtMultipleChoice: "HuggingFaceORTModel"
+    OrtQuestionAnswering: "HuggingFaceORTModel"
+    OrtSemanticSegmentation: "HuggingFaceORTModel"
+    OrtSequenceClassification: "HuggingFaceORTModel"
+    OrtTokenClassification: "HuggingFaceORTModel"
+    OrtSeq2SeqLm: "HuggingFaceORTModel"
+    OrtSpeechSeq2Seq: "HuggingFaceORTModel"
+    OrtVision2Seq: "HuggingFaceORTModel"
+    OrtPix2Struct: "HuggingFaceORTModel"
+    OrtCausalLm: "HuggingFaceORTModel"
+    OrtOptimizer: "HuggingFaceORTModel"
+    OrtQuantizer: "HuggingFaceORTModel"
+    OrtTrainer: "HuggingFaceORTModel"
+    OrtSeq2SeqTrainer: "HuggingFaceORTModel"
+    OrtTrainingArguments: "HuggingFaceORTModel"
+    OrtSeq2SeqTrainingArguments: "HuggingFaceORTModel"
+    OrtStableDiffusionPipeline: "HuggingFaceORTModel"
+    OrtStableDiffusionImg2ImgPipeline: "HuggingFaceORTModel"
+    OrtStableDiffusionInpaintPipeline: "HuggingFaceORTModel"
+    OrtStableDiffusionXlPipeline: "HuggingFaceORTModel"
+    OrtStableDiffusionXlImg2ImgPipeline: "HuggingFaceORTModel"
 
 class FileInfo:
     @property
@@ -267,4 +298,28 @@ class PyFileSystemStorage:
             The signed URL.
 
 
+        """
+
+class HuggingFaceOnnxArgs:
+    ort_type: HuggingFaceORTModel
+    provider: str
+    quantize: bool
+    config: Optional[Any]
+
+    def __init__(
+        self,
+        ort_type: HuggingFaceORTModel,
+        provider: str,
+        quantize: bool = False,
+        config: Optional[Any] = None,
+    ) -> None:
+        """Optional Args to use with a huggingface model
+
+        Args:
+            ort_type:
+                Optimum onnx class name
+            provider:
+                Onnx runtime provider to use
+            config:
+                Optional optimum config to use
         """

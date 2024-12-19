@@ -244,6 +244,7 @@ impl AWSMulitPartUpload {
             chunk_count -= 1;
         }
 
+        // TODO: add multi progress bar
         let bar = ProgressBar::new(chunk_count);
 
         let msg1 = LogColors::green("Uploading file:");

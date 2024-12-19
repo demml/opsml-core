@@ -11,7 +11,10 @@ version = "0.1.0"
 description = ""
 authors = [{name = "Thorrester", email = "<support@demmlai.com>"}]
 readme = "README.md"
-dependencies = []
+dependencies = [
+    "onnx>=1.17.0",
+    "onnxruntime>=1.20.1",
+]
 
 [dependency-groups]
 dev = [
@@ -25,6 +28,8 @@ dev = [
     "pytest-lazy-fixture >= 0.6.3, < 1.0.0",
     "isort >= 5.13.2, < 6.0.0",
     "pip>=24.3.1",
+    "transformers>=4.46.3",
+    "optimum>=1.23.3",
 ]
 
 [tool.isort]

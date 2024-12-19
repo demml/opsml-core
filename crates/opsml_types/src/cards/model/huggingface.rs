@@ -34,10 +34,17 @@ struct HuggingFaceOnnxSaveArgs {
 #[pyclass]
 #[derive(Debug)]
 #[allow(dead_code)]
-struct HuggingFaceOnnxArgs {
+pub struct HuggingFaceOnnxArgs {
+    #[pyo3(get)]
     pub ort_type: HuggingFaceORTModel,
+
+    #[pyo3(get)]
     pub provider: String,
+
+    #[pyo3(get)]
     pub quantize: bool,
+
+    #[pyo3(get)]
     pub config: Option<PyObject>,
 }
 
@@ -173,6 +180,48 @@ pub enum HuggingFaceTask {
     ZeroShotObjectDetection,
 }
 
+#[pymethods]
+impl HuggingFaceTask {
+    fn __str__(&self) -> String {
+        match self {
+            HuggingFaceTask::AudioClassification => "audio-classification".to_string(),
+            HuggingFaceTask::AutomaticSpeechRecognition => {
+                "automatic-speech-recognition".to_string()
+            }
+            HuggingFaceTask::Conversational => "conversational".to_string(),
+            HuggingFaceTask::DepthEstimation => "depth-estimation".to_string(),
+            HuggingFaceTask::DocumentQuestionAnswering => "document-question-answering".to_string(),
+            HuggingFaceTask::FeatureExtraction => "feature-extraction".to_string(),
+            HuggingFaceTask::FillMask => "fill-mask".to_string(),
+            HuggingFaceTask::ImageClassification => "image-classification".to_string(),
+            HuggingFaceTask::ImageSegmentation => "image-segmentation".to_string(),
+            HuggingFaceTask::ImageToImage => "image-to-image".to_string(),
+            HuggingFaceTask::ImageToText => "image-to-text".to_string(),
+            HuggingFaceTask::MaskGeneration => "mask-generation".to_string(),
+            HuggingFaceTask::ObjectDetection => "object-detection".to_string(),
+            HuggingFaceTask::QuestionAnswering => "question-answering".to_string(),
+            HuggingFaceTask::Summarization => "summarization".to_string(),
+            HuggingFaceTask::TableQuestionAnswering => "table-question-answering".to_string(),
+            HuggingFaceTask::Text2TextGeneration => "text2text-generation".to_string(),
+            HuggingFaceTask::TextClassification => "text-classification".to_string(),
+            HuggingFaceTask::TextGeneration => "text-generation".to_string(),
+            HuggingFaceTask::TextToAudio => "text-to-audio".to_string(),
+            HuggingFaceTask::TokenClassification => "token-classification".to_string(),
+            HuggingFaceTask::Translation => "translation".to_string(),
+            HuggingFaceTask::TranslationXxToYy => "translation_xx_to_yy".to_string(),
+            HuggingFaceTask::VideoClassification => "video-classification".to_string(),
+            HuggingFaceTask::VisualQuestionAnswering => "visual-question-answering".to_string(),
+            HuggingFaceTask::ZeroShotClassification => "zero-shot-classification".to_string(),
+            HuggingFaceTask::ZeroShotImageClassification => {
+                "zero-shot-image-classification".to_string()
+            }
+            HuggingFaceTask::ZeroShotAudioClassification => {
+                "zero-shot-audio-classification".to_string()
+            }
+            HuggingFaceTask::ZeroShotObjectDetection => "zero-shot-object-detection".to_string(),
+        }
+    }
+}
 impl Display for HuggingFaceTask {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
