@@ -132,7 +132,7 @@ pub fn json_to_pyobject_value(py: Python, value: &Value) -> PyResult<PyObject> {
     })
 }
 
-pub fn pyobject_to_json<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> PyResult<Value> {
+pub fn pyobject_to_json(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     if obj.is_instance_of::<PyDict>() {
         let dict = obj.downcast::<PyDict>()?;
         let mut map = serde_json::Map::new();

@@ -69,10 +69,10 @@ impl ClientRegistry {
 
         println!("{:?}", response);
 
-        Ok(response
+        response
             .json::<Vec<Card>>()
             .await
-            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?)
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))
     }
 
     pub async fn create_card(&mut self, card: Card) -> Result<(), RegistryError> {

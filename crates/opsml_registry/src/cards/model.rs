@@ -86,6 +86,7 @@ pub struct ModelCard {
 #[pymethods]
 impl ModelCard {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None))]
     pub fn new(
         py: Python,
@@ -166,7 +167,7 @@ impl ModelCard {
                 .map_err(|e| {
                     CardError::Error(format!(
                         "Error calling model_dump method on interface: {}",
-                        e.to_string()
+                        e
                     ))
                 })?;
 

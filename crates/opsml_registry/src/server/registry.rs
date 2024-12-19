@@ -24,7 +24,7 @@ pub mod server_logic {
             config: &OpsmlConfig,
             registry_type: RegistryType,
         ) -> Result<Self, RegistryError> {
-            let sql_client = get_sql_client(&config).await.map_err(|e| {
+            let sql_client = get_sql_client(config).await.map_err(|e| {
                 RegistryError::NewError(format!("Failed to create sql client {}", e))
             })?;
 
@@ -55,42 +55,27 @@ pub mod server_logic {
 
             match cards {
                 CardResults::Data(data) => {
-                    let cards = data
-                        .into_iter()
-                        .map(|card| convert_datacard(card))
-                        .collect();
+                    let cards = data.into_iter().map(convert_datacard).collect();
                     Ok(cards)
                 }
                 CardResults::Model(data) => {
-                    let cards = data
-                        .into_iter()
-                        .map(|card| convert_modelcard(card))
-                        .collect();
+                    let cards = data.into_iter().map(convert_modelcard).collect();
                     Ok(cards)
                 }
                 CardResults::Project(data) => {
-                    let cards = data
-                        .into_iter()
-                        .map(|card| convert_projectcard(card))
-                        .collect();
+                    let cards = data.into_iter().map(convert_projectcard).collect();
                     Ok(cards)
                 }
                 CardResults::Run(data) => {
-                    let cards = data.into_iter().map(|card| convert_runcard(card)).collect();
+                    let cards = data.into_iter().map(convert_runcard).collect();
                     Ok(cards)
                 }
                 CardResults::Pipeline(data) => {
-                    let cards = data
-                        .into_iter()
-                        .map(|card| convert_pipelinecard(card))
-                        .collect();
+                    let cards = data.into_iter().map(convert_pipelinecard).collect();
                     Ok(cards)
                 }
                 CardResults::Audit(data) => {
-                    let cards = data
-                        .into_iter()
-                        .map(|card| convert_auditcard(card))
-                        .collect();
+                    let cards = data.into_iter().map(convert_auditcard).collect();
                     Ok(cards)
                 }
             }

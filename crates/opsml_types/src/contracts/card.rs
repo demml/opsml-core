@@ -351,7 +351,7 @@ pub enum Card {
 impl Card {
     pub fn __str__(&self) -> String {
         match self {
-            Self::Data(card) => PyHelperFuncs::__str__(&card),
+            Self::Data(card) => PyHelperFuncs::__str__(card),
             Self::Model(card) => PyHelperFuncs::__str__(card),
             Self::Run(card) => PyHelperFuncs::__str__(card),
             Self::Audit(card) => PyHelperFuncs::__str__(card),
@@ -453,8 +453,7 @@ impl Card {
             Self::Audit(card) => &card.tags,
             Self::Pipeline(card) => &card.tags,
             Self::Project(_) => {
-                static EMPTY_MAP: LazyLock<HashMap<String, String>> =
-                    LazyLock::new(|| HashMap::new());
+                static EMPTY_MAP: LazyLock<HashMap<String, String>> = LazyLock::new(HashMap::new);
                 &EMPTY_MAP
             }
         }

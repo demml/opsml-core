@@ -9,7 +9,7 @@ const NAME_REPOSITORY_PATTERN: &str = r"^[a-z0-9]+(?:[-a-z0-9]+)*/[-a-z0-9]+$";
 
 pub fn clean_string(input: &str) -> String {
     let pattern = format!("[{}]", regex::escape(PUNCTUATION));
-    let re = Regex::new(&format!(r"{}", pattern)).unwrap();
+    let re = Regex::new(&pattern.to_string()).unwrap();
     re.replace_all(&input.trim().to_lowercase(), "")
         .to_string()
         .replace("_", "-")

@@ -47,6 +47,7 @@ impl CardRegistry {
         self.registry.mode()
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
@@ -67,11 +68,11 @@ impl CardRegistry {
         let mut tags = tags;
 
         if let Some(info) = info {
-            name = name.or_else(|| info.name);
-            repository = repository.or_else(|| info.repository);
-            uid = uid.or_else(|| info.uid);
-            version = version.or_else(|| info.version);
-            tags = tags.or_else(|| info.tags);
+            name = name.or(info.name);
+            repository = repository.or(info.repository);
+            uid = uid.or(info.uid);
+            version = version.or(info.version);
+            tags = tags.or(info.tags);
         }
 
         if name.is_some() {
@@ -82,7 +83,7 @@ impl CardRegistry {
             repository = Some(repository.unwrap().to_lowercase());
         }
 
-        let limit_check = vec![
+        let limit_check = [
             uid.is_some(),
             name.is_some(),
             repository.is_some(),
@@ -158,6 +159,7 @@ impl PyCardRegistry {
         self.registry.mode()
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
@@ -178,11 +180,11 @@ impl PyCardRegistry {
         let mut tags = tags;
 
         if let Some(info) = info {
-            name = name.or_else(|| info.name);
-            repository = repository.or_else(|| info.repository);
-            uid = uid.or_else(|| info.uid);
-            version = version.or_else(|| info.version);
-            tags = tags.or_else(|| info.tags);
+            name = name.or(info.name);
+            repository = repository.or(info.repository);
+            uid = uid.or(info.uid);
+            version = version.or(info.version);
+            tags = tags.or(info.tags);
         }
 
         if name.is_some() {
@@ -193,7 +195,7 @@ impl PyCardRegistry {
             repository = Some(repository.unwrap().to_lowercase());
         }
 
-        let limit_check = vec![
+        let limit_check = [
             uid.is_some(),
             name.is_some(),
             repository.is_some(),
