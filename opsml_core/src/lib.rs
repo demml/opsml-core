@@ -7,8 +7,8 @@ use opsml_types::cards::model::{
     XGBoostModelInterfaceArgs,
 };
 use opsml_types::cards::{
-    DataSchema, Description, Feature, HuggingFaceORTModel, HuggingFaceOnnxArgs, OnnxSchema,
-    TorchOnnxArgs, TorchSaveArgs, VersionType,
+    DataSchema, Description, Feature, HuggingFaceORTModel, HuggingFaceOnnxArgs,
+    HuggingFaceOnnxSaveArgs, OnnxSchema, TorchOnnxArgs, TorchSaveArgs, VersionType,
 };
 use opsml_types::shared::{CommonKwargs, SaveName, Suffix};
 
@@ -30,6 +30,7 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
     _m.add_class::<HuggingFaceORTModel>()?;
+    _m.add_class::<HuggingFaceOnnxSaveArgs>()?;
     _m.add_class::<TorchOnnxArgs>()?;
     _m.add_class::<TorchSaveArgs>()?;
     _m.add_class::<Feature>()?;

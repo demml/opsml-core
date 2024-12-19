@@ -637,17 +637,6 @@ class VowpalWabbitInterfaceArgs(ModelInterfaceArgs):
 class XGBoostModelInterfaceArgs(SklearnModelInterfaceArgs): ...
 
 class ModelInterfaceArgsEnum:
-    Huggingface: HuggingFaceModelInterfaceArgs
-    Lightgbm: LightGBMModelInterfaceArgs
-    Lightning: LightningInterfaceArgs
-    Sklearn: SklearnModelInterfaceArgs
-    Tensorflow: TensorFlowInterfaceArgs
-    Torch: TorchInterfaceArgs
-    Vowpal: VowpalWabbitInterfaceArgs
-    Xgboost: XGBoostModelInterfaceArgs
-    CatBoost: CatBoostModelInterfaceArgs
-    Base: ModelInterfaceArgs
-
     def __init__(
         self,
         interface_args: Union[
@@ -668,4 +657,11 @@ class ModelInterfaceArgsEnum:
         Args:
             interface_args:
                 The interface args to use
+        """
+
+    def type_name(self) -> str:
+        """Return the type name of the model interface args.
+
+        Returns:
+            The type name of the model interface args.
         """

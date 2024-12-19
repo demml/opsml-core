@@ -625,4 +625,19 @@ impl ModelInterfaceArgsEnum {
             Err(OpsmlError::new_err("Invalid ModelInterfaceArgs type"))
         }
     }
+
+    pub fn type_name(&self) -> &str {
+        match self {
+            ModelInterfaceArgsEnum::Huggingface(_) => "HuggingFace",
+            ModelInterfaceArgsEnum::Lightgbm(_) => "Lightgbm",
+            ModelInterfaceArgsEnum::Lightning(_) => "Lightning",
+            ModelInterfaceArgsEnum::Sklearn(_) => "Sklearn",
+            ModelInterfaceArgsEnum::Tensorflow(_) => "TensorFlow",
+            ModelInterfaceArgsEnum::Torch(_) => "Torch",
+            ModelInterfaceArgsEnum::Vowpal(_) => "Vowpal",
+            ModelInterfaceArgsEnum::Xgboost(_) => "Xgboost",
+            ModelInterfaceArgsEnum::CatBoost(_) => "CatBoost",
+            ModelInterfaceArgsEnum::Base(_) => "Base",
+        }
+    }
 }
