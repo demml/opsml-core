@@ -313,7 +313,7 @@ pub enum Suffix {
     Text,
     Catboost,
     Jsonl,
-    None,
+    Empty,
     Dmatrix,
     Model,
 }
@@ -334,7 +334,7 @@ impl Suffix {
             ".txt" => Some(Suffix::Text),
             ".cbm" => Some(Suffix::Catboost),
             ".jsonl" => Some(Suffix::Jsonl),
-            "" => Some(Suffix::None),
+            "" => Some(Suffix::Empty),
             ".dmatrix" => Some(Suffix::Dmatrix),
             ".model" => Some(Suffix::Model),
             _ => None,
@@ -354,7 +354,7 @@ impl Suffix {
             Suffix::Text => ".txt",
             Suffix::Catboost => ".cbm",
             Suffix::Jsonl => ".jsonl",
-            Suffix::None => "",
+            Suffix::Empty => "",
             Suffix::Dmatrix => ".dmatrix",
             Suffix::Model => ".model",
         }
