@@ -6,6 +6,7 @@ from opsml_core import (
     Feature,
     OnnxSchema,
     DataSchema,
+    Description,
 )
 from optimum.onnxruntime.configuration import AutoQuantizationConfig  # type: ignore
 import pytest
@@ -170,3 +171,15 @@ def test_data_schema_default_values():
     assert schema.input_features is None
     assert schema.output_features is None
     assert schema.onnx_schema is None
+
+
+def test_description_creation():
+    summary = "This is a summary."
+    sample_code = "print('Hello, world!')"
+    notes = "These are some notes."
+
+    description = Description(summary, sample_code, notes)
+
+    assert description.summary == summary
+    assert description.sample_code == sample_code
+    assert description.notes == notes

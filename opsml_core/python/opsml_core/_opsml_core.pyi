@@ -339,3 +339,32 @@ class DataSchema:
         Returns:
             String representation of the DataSchema.
         """
+
+class Description:
+    summary: Optional[str]
+    sample_code: Optional[str]
+    notes: Optional[str]
+
+    def __init__(
+        self,
+        summary: Optional[str] = None,
+        sample_code: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> None:
+        """Define a description to be used in a card
+
+        Args:
+            summary:
+                A summary string or path to a markdown file with a summary.
+                You can also define a summary on the ui for the card.
+            sample_code:
+                Sample code string or path to a markdown file with sample code.
+            notes:
+                Any additional notes
+        """
+    def __str__(self) -> str:
+        """Return a string representation of the Description.
+
+        Returns:
+            String representation of the Description.
+        """

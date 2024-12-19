@@ -1,5 +1,6 @@
 use crate::shared::helper::PyHelperFuncs;
-use opsml_error::error::TypeError;
+use colored_json::Paint;
+use opsml_error::error::{OpsmlError, TypeError};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -110,8 +111,8 @@ impl FromStr for VersionType {
     }
 }
 
-#[pyclass]
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[pyclass(eq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct Description {
     #[pyo3(get, set)]
     pub summary: Option<String>,
@@ -131,10 +132,35 @@ impl Description {
         summary: Option<String>,
         sample_code: Option<String>,
         notes: Option<String>,
-    ) -> Result<Self, TypeError> {
+    ) -> PyResult<Self> {
+        // check if summary is some and if it is a file path. If .md file, read the file. IF not, return string
+        let extracted_summary = match summary {
+            Some(summary) => {
+                if summary.ends_with(".md") {
+                    let filepath = Description::find_filepath(&summary)?;
+                    Some(filepath)
+                } else {
+                    Some(summary)
+                }
+            }
+            None => None,
+        };
+
+        let extracted_sample_code = match sample_code {
+            Some(sample_code) => {
+                if sample_code.ends_with(".md") {
+                    let filepath = Description::find_filepath(&sample_code)?;
+                    Some(filepath)
+                } else {
+                    Some(sample_code)
+                }
+            }
+            None => None,
+        };
+
         Ok(Description {
-            summary: Description::find_filepath(summary)?,
-            sample_code,
+            summary: extracted_summary,
+            sample_code: extracted_sample_code,
             notes,
         })
     }
@@ -145,22 +171,28 @@ impl Description {
 }
 
 impl Description {
-    pub fn find_filepath(filepath: Option<String>) -> Result<Option<String>, TypeError> {
-        match filepath {
-            Some(path) => {
-                let current_dir = std::env::current_dir().map_err(|_| TypeError::FileEntryError)?;
-                // recursively search for file in current directory
-                for entry in WalkDir::new(current_dir) {
-                    let entry = entry.map_err(|_| TypeError::FileEntryError)?;
-                    if entry.file_type().is_file() && entry.file_name().to_string_lossy() == path {
-                        return Ok(Some(entry.path().to_str().unwrap().to_string()));
-                    }
-                }
-                // raise error if file not found
-                Err(TypeError::FileNotFoundError)
+    pub fn find_filepath(filepath: &str) -> Result<String, TypeError> {
+        // get file name of path
+        let path = std::path::Path::new(&filepath)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        let current_dir = std::env::current_dir().map_err(|_| TypeError::FileEntryError)?;
+        // recursively search for file in current directory
+        for entry in WalkDir::new(current_dir) {
+            let entry = entry.map_err(|_| TypeError::FileEntryError)?;
+            if entry.file_type().is_file() && entry.file_name().to_string_lossy() == path {
+                // open the file and read it to a string
+                let file = std::fs::read_to_string(entry.path())
+                    .map_err(|e| TypeError::Error(e.to_string()))?;
+
+                return Ok(file);
             }
-            None => Ok(None),
         }
+        // raise error if file not found
+        Err(TypeError::FileNotFoundError)
     }
 }
 

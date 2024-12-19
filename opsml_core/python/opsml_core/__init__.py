@@ -11,6 +11,7 @@ from ._opsml_core import (  # type: ignore
     Feature,
     OnnxSchema,
     DataSchema,
+    Description,
 )
 
 __all__ = [
@@ -24,4 +25,7 @@ __all__ = [
     "TorchOnnxArgs",
     "TorchSaveArgs",
     "Feature",
+    "OnnxSchema",
+    "DataSchema",
+    "Description",
 ]
