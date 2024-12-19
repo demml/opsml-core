@@ -350,7 +350,7 @@ pub enum Card {
 impl Card {
     pub fn __str__(&self) -> String {
         match self {
-            Self::Data(card) => PyHelperFuncs::__str__(card),
+            Self::Data(card) => PyHelperFuncs::__str__(&card),
             Self::Model(card) => PyHelperFuncs::__str__(card),
             Self::Run(card) => PyHelperFuncs::__str__(card),
             Self::Audit(card) => PyHelperFuncs::__str__(card),
@@ -360,14 +360,14 @@ impl Card {
     }
 
     #[getter]
-    pub fn uid(&self) -> Option<String> {
+    pub fn uid(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => card.uid.clone(),
-            Self::Model(card) => card.uid.clone(),
-            Self::Run(card) => card.uid.clone(),
-            Self::Audit(card) => card.uid.clone(),
-            Self::Pipeline(card) => card.uid.clone(),
-            Self::Project(card) => card.uid.clone(),
+            Self::Data(card) => card.uid.as_deref(),
+            Self::Model(card) => card.uid.as_deref(),
+            Self::Run(card) => card.uid.as_deref(),
+            Self::Audit(card) => card.uid.as_deref(),
+            Self::Pipeline(card) => card.uid.as_deref(),
+            Self::Project(card) => card.uid.as_deref(),
         }
     }
 
@@ -474,79 +474,73 @@ impl Card {
     }
 
     #[getter]
-    pub fn modelcard_uids(&self) -> Option<Vec<String>> {
+    pub fn modelcard_uids(&self) -> Option<Vec<&str>> {
         match self {
             Self::Data(_) => None,
-            Self::Model(card) => {
-                let uid = card.uid.clone();
-                uid.map(|uid| vec![uid])
-            }
-            Self::Run(card) => card.modelcard_uids.clone(),
-            Self::Audit(card) => card.modelcard_uids.clone(),
-            Self::Pipeline(card) => card.modelcard_uids.clone(),
+            Self::Model(card) => card.uid.as_deref().map(|uid| vec![uid]),
+            Self::Run(card) => card
+                .modelcard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
+            Self::Audit(card) => card
+                .modelcard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
+            Self::Pipeline(card) => card
+                .modelcard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
             Self::Project(_) => None,
         }
     }
 
     #[getter]
-    pub fn runcard_uids(&self) -> Option<Vec<String>> {
+    pub fn runcard_uids(&self) -> Option<Vec<&str>> {
         match self {
-            Self::Data(card) => {
-                let uid = card.runcard_uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
-            }
-            Self::Model(card) => {
-                let uid = card.runcard_uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
-            }
-            Self::Run(card) => {
-                let uid = card.uid.clone();
-                match uid {
-                    Some(uid) => Some(vec![uid]),
-                    None => None,
-                }
-            }
-            Self::Audit(card) => card.runcard_uids.clone(),
-            Self::Pipeline(card) => card.runcard_uids.clone(),
+            Self::Data(card) => card.runcard_uid.as_deref().map(|uid| vec![uid]),
+            Self::Model(card) => card.runcard_uid.as_deref().map(|uid| vec![uid]),
+            Self::Run(card) => card.uid.as_deref().map(|uid| vec![uid]),
+            Self::Audit(card) => card
+                .runcard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
+            Self::Pipeline(card) => card
+                .runcard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
             Self::Project(_) => None,
         }
     }
 
     #[getter]
-    pub fn pipelinecard_uid(&self) -> Option<String> {
+    pub fn pipelinecard_uid(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => card.pipelinecard_uid.clone(),
-            Self::Model(card) => card.pipelinecard_uid.clone(),
-            Self::Run(card) => card.pipelinecard_uid.clone(),
+            Self::Data(card) => card.pipelinecard_uid.as_deref(),
+            Self::Model(card) => card.pipelinecard_uid.as_deref(),
+            Self::Run(card) => card.pipelinecard_uid.as_deref(),
             Self::Audit(_) => None,
-            Self::Pipeline(card) => card.uid.clone(),
+            Self::Pipeline(card) => card.uid.as_deref(),
             Self::Project(_) => None,
         }
     }
 
     #[getter]
-    pub fn auditcard_uid(&self) -> Option<String> {
+    pub fn auditcard_uid(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => card.auditcard_uid.clone(),
-            Self::Model(card) => card.auditcard_uid.clone(),
+            Self::Data(card) => card.auditcard_uid.as_deref(),
+            Self::Model(card) => card.auditcard_uid.as_deref(),
             Self::Run(_) => None,
-            Self::Audit(card) => card.uid.clone(),
+            Self::Audit(card) => card.uid.as_deref(),
             Self::Pipeline(_) => None,
             Self::Project(_) => None,
         }
     }
 
     #[getter]
-    pub fn interface_type(&self) -> Option<String> {
+    pub fn interface_type(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => card.interface_type.clone(),
-            Self::Model(card) => card.interface_type.clone(),
+            Self::Data(card) => card.interface_type.as_deref(),
+            Self::Model(card) => card.interface_type.as_deref(),
             Self::Run(_) => None,
             Self::Audit(_) => None,
             Self::Pipeline(_) => None,
@@ -555,10 +549,10 @@ impl Card {
     }
 
     #[getter]
-    pub fn data_type(&self) -> Option<String> {
+    pub fn data_type(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => Some(card.data_type.clone()),
-            Self::Model(card) => Some(card.sample_data_type.clone()),
+            Self::Data(card) => Some(card.data_type.as_str()),
+            Self::Model(card) => Some(card.sample_data_type.as_str()),
             Self::Run(_) => None,
             Self::Audit(_) => None,
             Self::Pipeline(_) => None,
@@ -567,10 +561,10 @@ impl Card {
     }
 
     #[getter]
-    pub fn model_type(&self) -> Option<String> {
+    pub fn model_type(&self) -> Option<&str> {
         match self {
             Self::Data(_) => None,
-            Self::Model(card) => Some(card.model_type.clone()),
+            Self::Model(card) => Some(card.model_type.as_str()),
             Self::Run(_) => None,
             Self::Audit(_) => None,
             Self::Pipeline(_) => None,
@@ -579,10 +573,10 @@ impl Card {
     }
 
     #[getter]
-    pub fn task_type(&self) -> Option<String> {
+    pub fn task_type(&self) -> Option<&str> {
         match self {
             Self::Data(_) => None,
-            Self::Model(card) => card.task_type.clone(),
+            Self::Model(card) => card.task_type.as_deref(),
             Self::Run(_) => None,
             Self::Audit(_) => None,
             Self::Pipeline(_) => None,
