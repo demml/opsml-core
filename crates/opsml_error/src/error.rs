@@ -90,7 +90,7 @@ pub enum TypeError {
 
 impl From<TypeError> for PyErr {
     fn from(err: TypeError) -> PyErr {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
     }
 }
 

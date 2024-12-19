@@ -198,5 +198,5 @@ def test_description_creation_markdown():
 
     summary = "assets/no_readme.md"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         description = Description(summary)
