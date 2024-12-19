@@ -25,7 +25,7 @@ pub async fn auth_api_middleware(
     next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<AuthError>)> {
     // if auth is disabled, just return
-    if !state.config.opsml_auth {
+    if !state.config.auth_settings.enabled {
         req.extensions_mut().insert(UserPermissions {
             username: "".to_string(),
             permissions: vec![],

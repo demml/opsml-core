@@ -47,7 +47,7 @@ pub async fn create_multipart_upload(
     Query(params): Query<MultiPartQuery>,
 ) -> Result<Json<MultiPartSession>, (StatusCode, Json<serde_json::Value>)> {
     // If auth is enabled, check permissions or other auth-related logic
-    if state.config.opsml_auth {
+    if state.config.auth_settings.enabled {
         let repository_id = Path::new(&params.path).iter().next().ok_or_else(|| {
             (
                 StatusCode::BAD_REQUEST,
@@ -101,7 +101,7 @@ pub async fn generate_presigned_url(
     Query(params): Query<PresignedQuery>,
 ) -> Result<Json<PresignedUrl>, (StatusCode, Json<serde_json::Value>)> {
     // check for read access
-    if state.config.opsml_auth {
+    if state.config.auth_settings.enabled {
         // check if user has permission to write to the repo
         if !perms.has_read_permission() {
             return Err((
@@ -249,7 +249,7 @@ pub async fn delete_file(
     Query(params): Query<DeleteFileQuery>,
 ) -> Result<Json<DeleteFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     // check for delete access
-    if state.config.opsml_auth {
+    if state.config.auth_settings.enabled {
         // check if user has permission to write to the repo
         let repository_id = Path::new(&params.path).iter().next().ok_or_else(|| {
             (

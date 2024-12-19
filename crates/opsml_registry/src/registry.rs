@@ -240,7 +240,7 @@ impl PyCardRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opsml_settings::config::OpsmlDatabaseSettings;
+    use opsml_settings::config::DatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
 
@@ -291,7 +291,7 @@ mod tests {
         create_registry_storage();
 
         // create opsml.db and populate it with data
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,

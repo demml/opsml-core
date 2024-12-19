@@ -14,15 +14,15 @@ mod core;
 async fn create_app() -> Result<Router> {
     // setup components (config, logging, storage client)
     let (config, storage_client, sql_client) = setup_components().await?;
-    let auth_enabled = config.opsml_auth;
+    let auth_enabled = config.auth_settings.enabled;
 
     // Create shared state for the application (storage client, auth manager, config)
     let app_state = Arc::new(AppState {
         storage_client: Arc::new(storage_client),
         sql_client: Arc::new(sql_client),
         auth_manager: Arc::new(AuthManager::new(
-            &config.opsml_jwt_secret,
-            &config.opsml_refresh_secret,
+            &config.auth_settings.jwt_secret,
+            &config.auth_settings.refresh_secret,
         )),
         config: Arc::new(config),
     });
@@ -83,7 +83,7 @@ mod tests {
         http::{header, Request, StatusCode},
     };
     use http_body_util::BodyExt; // for `collect`
-    use opsml_settings::config::OpsmlDatabaseSettings;
+    use opsml_settings::config::DatabaseSettings;
     use opsml_sql::base::SqlClient;
     use opsml_sql::enums::client::SqlClientEnum;
     use opsml_types::*;
@@ -120,7 +120,7 @@ mod tests {
     }
 
     async fn setup() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
