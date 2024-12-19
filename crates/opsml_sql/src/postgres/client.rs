@@ -10,7 +10,7 @@ use crate::schemas::schema::{
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
-use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_settings::config::DatabaseSettings;
 use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
@@ -59,7 +59,7 @@ pub struct PostgresClient {
 
 #[async_trait]
 impl SqlClient for PostgresClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
+    async fn new(settings: &DatabaseSettings) -> Result<Self, SqlError> {
         let pool = PgPoolOptions::new()
             .max_connections(settings.max_connections)
             .connect(&settings.connection_uri)
@@ -1012,7 +1012,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1025,7 +1025,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_versions() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1099,7 +1099,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_query_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1220,7 +1220,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_insert_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1348,7 +1348,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_update_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1569,7 +1569,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_unique_repos() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1595,7 +1595,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_query_stats() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1655,7 +1655,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_delete_card() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1731,7 +1731,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_project_id() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1784,7 +1784,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_run_metrics() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1847,7 +1847,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_hardware_metric() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1884,7 +1884,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_parameter() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,
@@ -1928,7 +1928,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_user() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "postgres://admin:admin@localhost:5432/testdb".to_string()),
             max_connections: 1,

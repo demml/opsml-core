@@ -10,7 +10,7 @@ use anyhow::Context;
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
-use opsml_settings::config::{OpsmlConfig, OpsmlDatabaseSettings};
+use opsml_settings::config::{DatabaseSettings, OpsmlConfig};
 use opsml_types::{CardQueryArgs, CardSQLTableNames, SqlType};
 
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ impl SqlClientEnum {
 
 #[async_trait]
 impl SqlClient for SqlClientEnum {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
+    async fn new(settings: &DatabaseSettings) -> Result<Self, SqlError> {
         match settings.sql_type {
             SqlType::Postgres => {
                 let client = PostgresClient::new(settings).await?;
@@ -312,13 +312,15 @@ impl SqlClient for SqlClientEnum {
 }
 
 pub async fn get_sql_client(config: &OpsmlConfig) -> AnyhowResult<SqlClientEnum> {
-    let settings = &config.database_settings();
-    SqlClientEnum::new(settings).await.with_context(|| {
-        format!(
-            "Failed to create sql client for sql type: {:?}",
-            settings.sql_type
-        )
-    })
+    let settings = &config.database_settings;
+    SqlClientEnum::new(&config.database_settings)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create sql client for sql type: {:?}",
+                settings.sql_type
+            )
+        })
 }
 
 #[cfg(test)]
@@ -352,7 +354,7 @@ mod tests {
     pub async fn get_client() -> SqlClientEnum {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,

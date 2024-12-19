@@ -30,7 +30,7 @@ pub fn build_http_client(settings: &ApiSettings) -> Result<Client, ApiError> {
     let mut headers = HeaderMap::new();
     headers.insert(
         "X-Prod-Token",
-        HeaderValue::from_str(&settings.prod_token)
+        HeaderValue::from_str(settings.prod_token.as_deref().unwrap_or(""))
             .map_err(|e| ApiError::Error(format!("Failed to create header with error: {}", e)))?,
     );
 

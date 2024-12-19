@@ -9,7 +9,7 @@ use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
-use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_settings::config::DatabaseSettings;
 use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
@@ -58,7 +58,7 @@ pub struct MySqlClient {
 
 #[async_trait]
 impl SqlClient for MySqlClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
+    async fn new(settings: &DatabaseSettings) -> Result<Self, SqlError> {
         let pool = MySqlPoolOptions::new()
             .max_connections(settings.max_connections)
             .connect(&settings.connection_uri)
@@ -1049,7 +1049,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1061,7 +1061,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_versions() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1135,7 +1135,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_query_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1256,7 +1256,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_insert_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1384,7 +1384,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_update_cards() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1605,7 +1605,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_unique_repos() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1633,7 +1633,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_query_stats() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1669,7 +1669,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_query_page() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1710,7 +1710,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_delete_card() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1786,7 +1786,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_project_id() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1839,7 +1839,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_run_metrics() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1901,7 +1901,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_hardware_metric() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1938,7 +1938,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_parameter() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,
@@ -1982,7 +1982,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mysql_user() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: env::var("OPSML_TRACKING_URI")
                 .unwrap_or_else(|_| "mysql://admin:admin@localhost:3306/testdb".to_string()),
             max_connections: 1,

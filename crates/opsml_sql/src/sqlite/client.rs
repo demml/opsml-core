@@ -10,7 +10,7 @@ use crate::sqlite::helper::SqliteQueryHelper;
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
-use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_settings::config::DatabaseSettings;
 use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionValidator;
 use semver::Version;
@@ -59,7 +59,7 @@ pub struct SqliteClient {
 
 #[async_trait]
 impl SqlClient for SqliteClient {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError> {
+    async fn new(settings: &DatabaseSettings) -> Result<Self, SqlError> {
         // if the connection uri is not in memory, create the file
         if !settings.connection_uri.contains(":memory:") {
             // strip "sqlite://" from the connection uri
@@ -1037,7 +1037,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlite() {
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: "sqlite::memory:".to_string(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1052,7 +1052,7 @@ mod tests {
     async fn test_sqlite_versions() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1125,7 +1125,7 @@ mod tests {
     async fn test_sqlite_query_cards() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1245,7 +1245,7 @@ mod tests {
     async fn test_sqlite_insert_cards() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1371,7 +1371,7 @@ mod tests {
     async fn test_sqlite_update_cards() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1591,7 +1591,7 @@ mod tests {
     async fn test_sqlite_unique_repos() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1618,7 +1618,7 @@ mod tests {
     async fn test_sqlite_query_stats() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1655,7 +1655,7 @@ mod tests {
     async fn test_sqlite_query_page() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1698,7 +1698,7 @@ mod tests {
     async fn test_sqlite_delete_card() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1755,7 +1755,7 @@ mod tests {
     async fn test_sqlite_project_id() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1797,7 +1797,7 @@ mod tests {
     async fn test_sqlite_run_metric() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1861,7 +1861,7 @@ mod tests {
     async fn test_sqlite_hardware_metric() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1899,7 +1899,7 @@ mod tests {
     async fn test_sqlite_parameter() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,
@@ -1945,7 +1945,7 @@ mod tests {
     async fn test_sqlite_user() {
         cleanup();
 
-        let config = OpsmlDatabaseSettings {
+        let config = DatabaseSettings {
             connection_uri: get_connection_uri(),
             max_connections: 1,
             sql_type: SqlType::Sqlite,

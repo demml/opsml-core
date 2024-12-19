@@ -4,7 +4,7 @@ use crate::schemas::schema::{
 };
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
-use opsml_settings::config::OpsmlDatabaseSettings;
+use opsml_settings::config::DatabaseSettings;
 use opsml_types::{CardQueryArgs, CardSQLTableNames};
 use opsml_utils::semver::VersionParser;
 
@@ -56,7 +56,7 @@ pub fn add_version_bounds(builder: &mut String, version: &str) -> Result<(), Sql
 
 #[async_trait]
 pub trait SqlClient: Sized {
-    async fn new(settings: &OpsmlDatabaseSettings) -> Result<Self, SqlError>;
+    async fn new(settings: &DatabaseSettings) -> Result<Self, SqlError>;
     async fn run_migrations(&self) -> Result<(), SqlError>;
     async fn get_versions(
         &self,

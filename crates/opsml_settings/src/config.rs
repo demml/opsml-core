@@ -217,10 +217,6 @@ impl OpsmlConfig {
         }
     }
 
-    pub fn auth_settings(&self) -> &AuthSettings {
-        &self.auth_settings
-    }
-
     fn get_storage_type(&self) -> StorageType {
         let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
         if storage_uri_lower.starts_with("gs://") {
@@ -407,8 +403,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let auth_settings = opsml_config.auth_settings();
-        assert!(auth_settings.enabled);
+        assert!(opsml_config.auth_settings.enabled);
 
         let opsml_config = OpsmlConfig {
             auth_settings: AuthSettings {
