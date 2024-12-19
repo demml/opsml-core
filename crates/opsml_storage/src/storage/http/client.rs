@@ -48,9 +48,8 @@ impl HttpFSStorageClient {
             // Iterate over each object and get it
             let mut tasks = Vec::new();
 
-            for obj in objects {
-                let file_info = obj.clone();
-                let name = file_info.name.clone();
+            for file_info in objects {
+                let name = file_info.name;
                 let file_path = PathBuf::from(name);
                 let relative_path = file_path.relative_path(rpath)?;
                 let local_path = lpath.join(relative_path);
@@ -126,6 +125,7 @@ impl HttpFSStorageClient {
             for file in files {
                 let stripped_lpath_clone = lpath_clone.clone();
                 let stripped_rpath_clone = rpath_clone.clone();
+
                 let stripped_file_path = file.clone();
                 let mut cloned_client = self.client.clone();
 

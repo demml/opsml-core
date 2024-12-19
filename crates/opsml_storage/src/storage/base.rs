@@ -103,8 +103,6 @@ pub trait FileSystem<T: StorageClient> {
         let stripped_lpath = lpath.strip_path(self.client().bucket().await);
 
         if recursive {
-            let stripped_lpath_clone = stripped_lpath.clone();
-
             // list all objects in the path
             let objects = self.client().find(stripped_rpath.to_str().unwrap()).await?;
 
@@ -113,7 +111,7 @@ pub trait FileSystem<T: StorageClient> {
                 let file_path = Path::new(obj.as_str());
                 let stripped_path = file_path.strip_path(self.client().bucket().await);
                 let relative_path = file_path.relative_path(&stripped_rpath)?;
-                let local_path = stripped_lpath_clone.join(relative_path);
+                let local_path = stripped_lpath.join(relative_path);
 
                 self.client()
                     .get_object(

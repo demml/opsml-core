@@ -11,8 +11,8 @@ use tracing::error;
 pub async fn debug_info(State(data): State<Arc<AppState>>) -> DebugInfo {
     DebugInfo::new(
         data.storage_client.name().to_string(),
-        data.config.opsml_storage_uri.clone(),
-        data.config.opsml_tracking_uri.clone(),
+        data.config.opsml_storage_uri.to_owned(),
+        data.config.opsml_tracking_uri.to_owned(),
     )
 }
 

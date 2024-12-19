@@ -518,8 +518,6 @@ impl FileSystem for AzureFSStorageClient {
         let stripped_lpath = lpath.strip_path(self.client.bucket().await);
 
         if recursive {
-            let stripped_lpath_clone = stripped_lpath.clone();
-
             // list all objects in the path
             let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
 
@@ -528,7 +526,7 @@ impl FileSystem for AzureFSStorageClient {
                 let file_path = Path::new(obj.as_str());
                 let stripped_path = file_path.strip_path(self.client.bucket().await);
                 let relative_path = file_path.relative_path(&stripped_rpath)?;
-                let local_path = stripped_lpath_clone.join(relative_path);
+                let local_path = stripped_lpath.join(relative_path);
 
                 self.client
                     .get_object(
@@ -620,12 +618,10 @@ impl FileSystem for AzureFSStorageClient {
             let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
 
             for file in files {
-                let stripped_lpath_clone = stripped_lpath.clone();
-                let stripped_rpath_clone = stripped_rpath.clone();
                 let stripped_file_path = file.strip_path(self.client.bucket().await);
 
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
+                let relative_path = file.relative_path(&stripped_lpath)?;
+                let remote_path = stripped_rpath.join(relative_path);
 
                 let mut uploader = self
                     .create_multipart_uploader(&stripped_file_path, &remote_path, None, None)

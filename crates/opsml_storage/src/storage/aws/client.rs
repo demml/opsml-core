@@ -481,11 +481,11 @@ impl StorageClient for AWSStorageClient {
             .unwrap_or_else(Vec::new)
             .iter()
             .map(|o| {
-                let object_type = match o.storage_class.clone() {
+                let object_type = match o.storage_class.to_owned() {
                     Some(storage_class) => storage_class.to_string(),
                     None => "".to_string(),
                 };
-                let key = o.key.as_ref().unwrap_or(&String::new()).clone();
+                let key = o.key.as_ref().unwrap_or(&String::new()).to_owned();
                 let file = Path::new(&key);
 
                 let size = o.size.unwrap_or_default();
@@ -727,8 +727,6 @@ impl FileSystem for S3FStorageClient {
         let stripped_lpath = lpath.strip_path(self.client.bucket().await);
 
         if recursive {
-            let stripped_lpath_clone = stripped_lpath.clone();
-
             // list all objects in the path
             let objects = self.client.find(stripped_rpath.to_str().unwrap()).await?;
 
@@ -737,7 +735,7 @@ impl FileSystem for S3FStorageClient {
                 let file_path = Path::new(obj.as_str());
                 let stripped_path = file_path.strip_path(self.client.bucket().await);
                 let relative_path = file_path.relative_path(&stripped_rpath)?;
-                let local_path = stripped_lpath_clone.join(relative_path);
+                let local_path = stripped_lpath.join(relative_path);
 
                 self.client
                     .get_object(
@@ -828,12 +826,10 @@ impl FileSystem for S3FStorageClient {
             let files: Vec<PathBuf> = get_files(&stripped_lpath)?;
 
             for file in files {
-                let stripped_lpath_clone = stripped_lpath.clone();
-                let stripped_rpath_clone = stripped_rpath.clone();
                 let stripped_file_path = file.strip_path(self.client.bucket().await);
 
-                let relative_path = file.relative_path(&stripped_lpath_clone)?;
-                let remote_path = stripped_rpath_clone.join(relative_path);
+                let relative_path = file.relative_path(&stripped_lpath)?;
+                let remote_path = stripped_rpath.join(relative_path);
 
                 let mut uploader = self
                     .client

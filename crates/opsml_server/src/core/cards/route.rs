@@ -21,7 +21,7 @@ use tracing::error;
 /// Route for checking if a card UID exists
 pub async fn check_card_uid(
     State(state): State<Arc<AppState>>,
-    params: Query<UidRequest>,
+    Query(params): Query<UidRequest>,
 ) -> Result<Json<UidResponse>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     let exists = state
@@ -65,7 +65,7 @@ pub async fn get_card_repositories(
 /// query stats page
 pub async fn get_registry_stats(
     State(state): State<Arc<AppState>>,
-    params: Query<RegistryStatsRequest>,
+    Query(params): Query<RegistryStatsRequest>,
 ) -> Result<Json<RegistryStatsResponse>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     let stats = state
@@ -86,10 +86,10 @@ pub async fn get_registry_stats(
 // query page
 pub async fn get_page(
     State(state): State<Arc<AppState>>,
-    params: Query<QueryPageRequest>,
+    Query(params): Query<QueryPageRequest>,
 ) -> Result<Json<QueryPageResponse>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
-    let sort_by = &params.sort_by.clone().unwrap_or("updated_at".to_string());
+    let sort_by = params.sort_by.as_deref().unwrap_or("updated_at");
     let page = params.page.unwrap_or(0);
     let summaries = state
         .sql_client
@@ -114,12 +114,9 @@ pub async fn get_page(
 
 pub async fn get_next_version(
     State(state): State<Arc<AppState>>,
-    params: Query<CardVersionRequest>,
+    Query(params): Query<CardVersionRequest>,
 ) -> Result<Json<CardVersionResponse>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
-    let version_type = params.version_type.clone();
-    let pre_tag = params.pre_tag.clone();
-    let build_tag = params.build_tag.clone();
 
     let versions = state
         .sql_client
@@ -147,9 +144,9 @@ pub async fn get_next_version(
 
     let args = VersionArgs {
         version: version.to_string(),
-        version_type,
-        pre: pre_tag,
-        build: build_tag,
+        version_type: params.version_type,
+        pre: params.pre_tag,
+        build: params.build_tag,
     };
 
     let bumped_version = VersionValidator::bump_version(&args).map_err(|e| {
@@ -167,16 +164,16 @@ pub async fn get_next_version(
 
 pub async fn list_cards(
     State(state): State<Arc<AppState>>,
-    params: Query<ListCardRequest>,
+    Query(params): Query<ListCardRequest>,
 ) -> Result<Json<Vec<Card>>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     let card_args = CardQueryArgs {
-        name: params.name.clone(),
-        repository: params.repository.clone(),
-        version: params.version.clone(),
-        uid: params.uid.clone(),
-        max_date: params.max_date.clone(),
-        tags: params.tags.clone(),
+        name: params.name,
+        repository: params.repository,
+        version: params.version,
+        uid: params.uid,
+        max_date: params.max_date,
+        tags: params.tags,
         limit: params.limit,
         sort_by_timestamp: params.sort_by_timestamp,
     };
@@ -351,7 +348,7 @@ pub async fn create_card(
 
     Ok(Json(CreateCardResponse {
         registered: true,
-        uid: card.uid(),
+        uid: card.uid().to_string(),
     }))
 }
 
@@ -570,7 +567,7 @@ pub async fn update_card(
 
 pub async fn delete_card(
     State(state): State<Arc<AppState>>,
-    params: Query<UidRequest>,
+    Query(params): Query<UidRequest>,
 ) -> Result<Json<UidResponse>, (StatusCode, Json<serde_json::Value>)> {
     let table = CardSQLTableNames::from_registry_type(&params.registry_type);
     state

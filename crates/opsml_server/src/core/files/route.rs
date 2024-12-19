@@ -44,7 +44,7 @@ use tracing::{error, info};
 pub async fn create_multipart_upload(
     State(state): State<Arc<AppState>>,
     Extension(perms): Extension<UserPermissions>,
-    params: Query<MultiPartQuery>,
+    Query(params): Query<MultiPartQuery>,
 ) -> Result<Json<MultiPartSession>, (StatusCode, Json<serde_json::Value>)> {
     // If auth is enabled, check permissions or other auth-related logic
     if state.config.opsml_auth {
@@ -98,7 +98,7 @@ pub async fn create_multipart_upload(
 pub async fn generate_presigned_url(
     State(state): State<Arc<AppState>>,
     Extension(perms): Extension<UserPermissions>,
-    params: Query<PresignedQuery>,
+    Query(params): Query<PresignedQuery>,
 ) -> Result<Json<PresignedUrl>, (StatusCode, Json<serde_json::Value>)> {
     // check for read access
     if state.config.opsml_auth {
@@ -177,7 +177,7 @@ pub async fn upload_multipart(
     while let Some(field) = multipart.next_field().await.unwrap() {
         let file_name = field.file_name().unwrap().to_string();
         let data = field.bytes().await.unwrap();
-        let bucket = state.config.opsml_storage_uri.clone();
+        let bucket = state.config.opsml_storage_uri.to_owned();
 
         // join the bucket and the file name
         let rpath = Path::new(&bucket).join(&file_name);
@@ -196,7 +196,7 @@ pub async fn upload_multipart(
 
 pub async fn list_files(
     State(state): State<Arc<AppState>>,
-    params: Query<ListFileQuery>,
+    Query(params): Query<ListFileQuery>,
 ) -> Result<Json<ListFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
     info!("Listing files for: {}", path.display());
@@ -220,7 +220,7 @@ pub async fn list_files(
 
 pub async fn list_file_info(
     State(state): State<Arc<AppState>>,
-    params: Query<ListFileQuery>,
+    Query(params): Query<ListFileQuery>,
 ) -> Result<Json<ListFileInfoResponse>, (StatusCode, Json<serde_json::Value>)> {
     let path = Path::new(&params.path);
 
@@ -246,7 +246,7 @@ pub async fn list_file_info(
 pub async fn delete_file(
     State(state): State<Arc<AppState>>,
     Extension(perms): Extension<UserPermissions>,
-    params: Query<DeleteFileQuery>,
+    Query(params): Query<DeleteFileQuery>,
 ) -> Result<Json<DeleteFileResponse>, (StatusCode, Json<serde_json::Value>)> {
     // check for delete access
     if state.config.opsml_auth {
@@ -302,7 +302,7 @@ pub async fn delete_file(
 // for use with local storage only
 pub async fn download_file(
     State(state): State<Arc<AppState>>,
-    params: Query<DownloadFileQuery>,
+    Query(params): Query<DownloadFileQuery>,
 ) -> Response<Body> {
     // check if storage client is local (fails if not)
     if state.storage_client.storage_type() != StorageType::Local {

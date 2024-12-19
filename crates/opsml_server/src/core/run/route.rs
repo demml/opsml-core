@@ -274,7 +274,7 @@ pub async fn get_run_graphs(
 ) -> Result<Json<Vec<RunGraph>>, (StatusCode, Json<serde_json::Value>)> {
     // get the run card
     let args = CardQueryArgs {
-        uid: Some(req.run_uid.clone()),
+        uid: Some(req.run_uid.to_owned()),
         ..Default::default()
     };
 
@@ -303,9 +303,9 @@ pub async fn get_run_graphs(
             })?;
 
             (
-                run_card.repository.clone(),
-                run_card.name.clone(),
-                run_card.version.clone(),
+                run_card.repository.to_owned(),
+                run_card.name.to_owned(),
+                run_card.version.to_owned(),
             )
         }
 

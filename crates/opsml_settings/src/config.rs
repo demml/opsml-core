@@ -175,15 +175,12 @@ impl OpsmlConfig {
     pub fn storage_root(&self) -> String {
         if !self.client_mode {
             let storage_uri_lower = self.opsml_storage_uri.to_lowercase();
-            if storage_uri_lower.starts_with("gs://") {
-                // strip the gs:// prefix
-                storage_uri_lower.strip_prefix("gs://").unwrap().to_string()
-            } else if storage_uri_lower.starts_with("s3://") {
-                // strip the s3:// prefix
-                storage_uri_lower.strip_prefix("s3://").unwrap().to_string()
-            } else if storage_uri_lower.starts_with("az://") {
-                // strip the az:// prefix
-                storage_uri_lower.strip_prefix("az://").unwrap().to_string()
+            if let Some(stripped) = storage_uri_lower.strip_prefix("gs://") {
+                stripped.to_string()
+            } else if let Some(stripped) = storage_uri_lower.strip_prefix("s3://") {
+                stripped.to_string()
+            } else if let Some(stripped) = storage_uri_lower.strip_prefix("az://") {
+                stripped.to_string()
             } else {
                 storage_uri_lower
             }

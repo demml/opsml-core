@@ -716,14 +716,14 @@ pub enum ServerCard {
 }
 
 impl ServerCard {
-    pub fn uid(&self) -> String {
+    pub fn uid(&self) -> &str {
         match self {
-            ServerCard::Data(card) => card.uid.clone(),
-            ServerCard::Model(card) => card.uid.clone(),
-            ServerCard::Run(card) => card.uid.clone(),
-            ServerCard::Audit(card) => card.uid.clone(),
-            ServerCard::Pipeline(card) => card.uid.clone(),
-            ServerCard::Project(card) => card.uid.clone(),
+            ServerCard::Data(card) => card.uid.as_str(),
+            ServerCard::Model(card) => card.uid.as_str(),
+            ServerCard::Run(card) => card.uid.as_str(),
+            ServerCard::Audit(card) => card.uid.as_str(),
+            ServerCard::Pipeline(card) => card.uid.as_str(),
+            ServerCard::Project(card) => card.uid.as_str(),
         }
     }
 }

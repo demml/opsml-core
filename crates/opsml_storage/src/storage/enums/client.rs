@@ -26,7 +26,7 @@ pub enum MultiPartUploader {
 impl MultiPartUploader {
     pub fn session_url(&self) -> String {
         match self {
-            MultiPartUploader::Google(uploader) => uploader.upload_client.url().to_string().clone(),
+            MultiPartUploader::Google(uploader) => uploader.upload_client.url().to_string(),
             MultiPartUploader::AWS(uploader) => uploader.upload_id.clone(),
             MultiPartUploader::Local(uploader) => {
                 uploader.rpath.clone().to_str().unwrap().to_string()

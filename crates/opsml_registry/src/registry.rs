@@ -39,8 +39,8 @@ impl CardRegistry {
     }
 
     #[getter]
-    pub fn table_name(&self) -> String {
-        self.table_name.clone()
+    pub fn table_name(&self) -> &str {
+        self.table_name.as_str()
     }
 
     pub fn mode(&self) -> RegistryMode {
@@ -50,7 +50,7 @@ impl CardRegistry {
     #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
-        info: Option<&CardInfo>,
+        info: Option<CardInfo>,
         uid: Option<String>,
         name: Option<String>,
         repository: Option<String>,
@@ -67,11 +67,11 @@ impl CardRegistry {
         let mut tags = tags;
 
         if let Some(info) = info {
-            name = name.or(info.name.clone());
-            repository = repository.or(info.repository.clone());
-            uid = uid.or(info.uid.clone());
-            version = version.or(info.version.clone());
-            tags = tags.or(info.tags.clone());
+            name = name.or_else(|| info.name);
+            repository = repository.or_else(|| info.repository);
+            uid = uid.or_else(|| info.uid);
+            version = version.or_else(|| info.version);
+            tags = tags.or_else(|| info.tags);
         }
 
         if name.is_some() {
@@ -150,8 +150,8 @@ impl PyCardRegistry {
     }
 
     #[getter]
-    pub fn table_name(&self) -> String {
-        self.table_name.clone()
+    pub fn table_name(&self) -> &str {
+        &self.table_name
     }
 
     pub fn mode(&self) -> RegistryMode {
@@ -161,7 +161,7 @@ impl PyCardRegistry {
     #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
-        info: Option<&CardInfo>,
+        info: Option<CardInfo>,
         uid: Option<String>,
         name: Option<String>,
         repository: Option<String>,
@@ -178,11 +178,11 @@ impl PyCardRegistry {
         let mut tags = tags;
 
         if let Some(info) = info {
-            name = name.or(info.name.clone());
-            repository = repository.or(info.repository.clone());
-            uid = uid.or(info.uid.clone());
-            version = version.or(info.version.clone());
-            tags = tags.or(info.tags.clone());
+            name = name.or_else(|| info.name);
+            repository = repository.or_else(|| info.repository);
+            uid = uid.or_else(|| info.uid);
+            version = version.or_else(|| info.version);
+            tags = tags.or_else(|| info.tags);
         }
 
         if name.is_some() {

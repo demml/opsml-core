@@ -77,11 +77,9 @@ impl VersionValidator {
     }
 
     pub fn sort_semver_versions(
-        versions: Vec<Version>,
+        mut versions: Vec<Version>,
         reverse: bool,
     ) -> Result<Vec<String>, VersionError> {
-        let mut versions = versions.clone();
-
         versions.sort();
 
         if reverse {
