@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[pyclass]
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[allow(dead_code)]
 pub struct TorchOnnxArgs {
     #[pyo3(get)]

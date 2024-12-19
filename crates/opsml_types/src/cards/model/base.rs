@@ -1,4 +1,5 @@
 use crate::cards::model::HuggingFaceORTModel;
+use crate::cards::model::TorchOnnxArgs;
 use crate::shared::CommonKwargs;
 use crate::Feature;
 use anyhow::{Context, Result as AnyhowResult};
@@ -304,13 +305,15 @@ pub struct LightningInterfaceArgs {
     #[pyo3(get)]
     pub preprocessor_name: String,
     #[pyo3(get)]
+    pub onnx_args: Option<TorchOnnxArgs>,
+    #[pyo3(get)]
     pub metadata: HashMap<String, String>,
 }
 
 #[pymethods]
 impl LightningInterfaceArgs {
     #[new]
-    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, onnx_args=None, metadata=None))]
     fn new(
         task_type: String,
         model_type: String,
@@ -319,6 +322,7 @@ impl LightningInterfaceArgs {
         feature_map: HashMap<String, Feature>,
         sample_data_interface_type: String,
         preprocessor_name: String,
+        onnx_args: Option<TorchOnnxArgs>,
         metadata: Option<HashMap<String, String>>,
     ) -> Self {
         LightningInterfaceArgs {
@@ -329,6 +333,7 @@ impl LightningInterfaceArgs {
             feature_map,
             sample_data_interface_type,
             preprocessor_name,
+            onnx_args,
             metadata: metadata.unwrap_or_default(),
         }
     }
