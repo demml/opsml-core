@@ -27,13 +27,13 @@ pub struct ModelInterfaceArgs {
     #[pyo3(get)]
     pub sample_data_interface_type: String,
     #[pyo3(get)]
-    pub kwargs: HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
 }
 
 #[pymethods]
 impl ModelInterfaceArgs {
     #[new]
-    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, kwargs=None))]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, metadata=None))]
     fn new(
         task_type: String,
         model_type: String,
@@ -41,7 +41,7 @@ impl ModelInterfaceArgs {
         modelcard_uid: String,
         feature_map: HashMap<String, Feature>,
         sample_data_interface_type: String,
-        kwargs: Option<HashMap<String, String>>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Self {
         ModelInterfaceArgs {
             task_type,
@@ -50,7 +50,7 @@ impl ModelInterfaceArgs {
             modelcard_uid,
             feature_map,
             sample_data_interface_type,
-            kwargs: kwargs.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
         }
     }
 }
@@ -73,13 +73,13 @@ pub struct SklearnModelInterfaceArgs {
     #[pyo3(get)]
     pub preprocessor_name: String,
     #[pyo3(get)]
-    pub kwargs: HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
 }
 
 #[pymethods]
 impl SklearnModelInterfaceArgs {
     #[new]
-    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, kwargs=None))]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     fn new(
         task_type: String,
         model_type: String,
@@ -88,7 +88,7 @@ impl SklearnModelInterfaceArgs {
         feature_map: HashMap<String, Feature>,
         sample_data_interface_type: String,
         preprocessor_name: String,
-        kwargs: Option<HashMap<String, String>>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Self {
         SklearnModelInterfaceArgs {
             task_type,
@@ -98,7 +98,7 @@ impl SklearnModelInterfaceArgs {
             feature_map,
             sample_data_interface_type,
             preprocessor_name,
-            kwargs: kwargs.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
         }
     }
 }
@@ -121,13 +121,13 @@ pub struct CatBoostModelInterfaceArgs {
     #[pyo3(get)]
     pub preprocessor_name: String,
     #[pyo3(get)]
-    pub kwargs: HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
 }
 
 #[pymethods]
 impl CatBoostModelInterfaceArgs {
     #[new]
-    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, kwargs=None))]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     fn new(
         task_type: String,
         model_type: String,
@@ -136,7 +136,7 @@ impl CatBoostModelInterfaceArgs {
         feature_map: HashMap<String, Feature>,
         sample_data_interface_type: String,
         preprocessor_name: String,
-        kwargs: Option<HashMap<String, String>>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Self {
         CatBoostModelInterfaceArgs {
             task_type,
@@ -146,7 +146,7 @@ impl CatBoostModelInterfaceArgs {
             feature_map,
             sample_data_interface_type,
             preprocessor_name,
-            kwargs: kwargs.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
         }
     }
 }
@@ -198,13 +198,13 @@ struct HuggingFaceModelInterfaceArgs {
     #[pyo3(get)]
     pub feature_extractor_name: String,
     #[pyo3(get)]
-    pub kwargs: HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
 }
 
 #[pymethods]
 impl HuggingFaceModelInterfaceArgs {
     #[new]
-    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, is_pipeline, backend, onnx_args, tokenizer_name, feature_extractor_name, kwargs=None))]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, is_pipeline, backend, onnx_args, tokenizer_name, feature_extractor_name, metadata=None))]
     fn new(
         task_type: String,
         model_type: String,
@@ -218,7 +218,7 @@ impl HuggingFaceModelInterfaceArgs {
         onnx_args: HuggingFaceOnnxSaveArgs,
         tokenizer_name: String,
         feature_extractor_name: String,
-        kwargs: Option<HashMap<String, String>>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Self {
         HuggingFaceModelInterfaceArgs {
             task_type,
@@ -233,7 +233,103 @@ impl HuggingFaceModelInterfaceArgs {
             onnx_args,
             tokenizer_name,
             feature_extractor_name,
-            kwargs: kwargs.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LightGBMModelInterfaceArgs {
+    #[pyo3(get)]
+    pub task_type: String,
+    #[pyo3(get)]
+    pub model_type: String,
+    #[pyo3(get)]
+    pub data_type: String,
+    #[pyo3(get)]
+    pub modelcard_uid: String,
+    #[pyo3(get)]
+    pub feature_map: HashMap<String, Feature>,
+    #[pyo3(get)]
+    pub sample_data_interface_type: String,
+    #[pyo3(get)]
+    pub preprocessor_name: String,
+    #[pyo3(get)]
+    pub metadata: HashMap<String, String>,
+}
+
+#[pymethods]
+impl LightGBMModelInterfaceArgs {
+    #[new]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
+    fn new(
+        task_type: String,
+        model_type: String,
+        data_type: String,
+        modelcard_uid: String,
+        feature_map: HashMap<String, Feature>,
+        sample_data_interface_type: String,
+        preprocessor_name: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Self {
+        LightGBMModelInterfaceArgs {
+            task_type,
+            model_type,
+            data_type,
+            modelcard_uid,
+            feature_map,
+            sample_data_interface_type,
+            preprocessor_name,
+            metadata: metadata.unwrap_or_default(),
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LightningInterfaceArgs {
+    #[pyo3(get)]
+    pub task_type: String,
+    #[pyo3(get)]
+    pub model_type: String,
+    #[pyo3(get)]
+    pub data_type: String,
+    #[pyo3(get)]
+    pub modelcard_uid: String,
+    #[pyo3(get)]
+    pub feature_map: HashMap<String, Feature>,
+    #[pyo3(get)]
+    pub sample_data_interface_type: String,
+    #[pyo3(get)]
+    pub preprocessor_name: String,
+    #[pyo3(get)]
+    pub metadata: HashMap<String, String>,
+}
+
+#[pymethods]
+impl LightningInterfaceArgs {
+    #[new]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
+    fn new(
+        task_type: String,
+        model_type: String,
+        data_type: String,
+        modelcard_uid: String,
+        feature_map: HashMap<String, Feature>,
+        sample_data_interface_type: String,
+        preprocessor_name: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Self {
+        LightningInterfaceArgs {
+            task_type,
+            model_type,
+            data_type,
+            modelcard_uid,
+            feature_map,
+            sample_data_interface_type,
+            preprocessor_name,
+            metadata: metadata.unwrap_or_default(),
         }
     }
 }

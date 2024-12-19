@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from enum import Enum
 
 class OpsmlError(Exception):
@@ -326,4 +326,40 @@ class HuggingFaceOnnxArgs:
                 Onnx runtime provider to use
             config:
                 Optional optimum config to use
+        """
+
+class TorchOnnxArgs:
+    input_names: list[str]
+    output_names: list[str]
+    dynamic_axes: Optional[Dict[str, Dict[int, str]]]
+    do_constant_folding: bool
+    export_params: bool
+    verbose: bool
+
+    def __init__(
+        self,
+        input_names: list[str],
+        output_names: list[str],
+        dynamic_axes: Optional[Dict[str, Dict[int, str]]] = None,
+        do_constant_folding: bool = True,
+        export_params: bool = True,
+        verbose: bool = True,
+    ) -> None:
+        """Optional arguments to pass to torch when converting to onnx
+
+        Args:
+            input_names:
+                Optional list containing input names for model inputs.
+            output_names:
+                Optional list containing output names for model outputs.
+            dynamic_axes:
+                Optional PyTorch attribute that defines dynamic axes
+            constant_folding:
+                Whether to use constant folding optimization. Default is True
+        """
+    def model_dump(self) -> dict[str, Any]:
+        """Dump onnx args to dictionary
+
+        Returns:
+            Dictionary containing model information
         """

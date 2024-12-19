@@ -1,4 +1,3 @@
-use anyhow::{Context, Result as AnyhowResult};
 use opsml_error::error::OpsmlError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
@@ -34,7 +33,7 @@ impl HuggingFaceOnnxArgs {
         provider: Option<String>,
         quantize: Option<bool>,
         config: Option<&Bound<'_, PyAny>>,
-    ) -> AnyhowResult<Self> {
+    ) -> PyResult<Self> {
         // check if ort_type is valid (does it match any of the HuggingFaceORTModel enum variants?)
 
         let config = HuggingFaceOnnxArgs::check_optimum_config(py, config)?;
@@ -88,9 +87,11 @@ impl HuggingFaceOnnxArgs {
             .into());
         }
 
-        Ok(Some(config.into_py_any(py).with_context(|| {
-            "Error converting interface to PyObject"
-        })?))
+        Ok(Some(
+            config
+                .into_py_any(py)
+                .map_err(|e| OpsmlError::new_err(e.to_string()))?,
+        ))
     }
 }
 

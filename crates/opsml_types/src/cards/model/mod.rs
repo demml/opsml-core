@@ -9,6 +9,7 @@ pub mod vowpal;
 pub mod xgboost;
 
 pub use huggingface::*;
+pub use torch::*;
 pub mod interface;
 //pub use lightgbm::*;
 //pub use lightning::*;
