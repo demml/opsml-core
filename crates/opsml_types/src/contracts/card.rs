@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 #[derive(Serialize, Deserialize)]
 pub struct UidRequest {
@@ -384,91 +385,98 @@ impl Card {
     }
 
     #[getter]
-    pub fn app_env(&self) -> Option<String> {
+    pub fn app_env(&self) -> Option<&str> {
         match self {
-            Self::Data(card) => card.app_env.clone(),
-            Self::Model(card) => card.app_env.clone(),
-            Self::Run(card) => card.app_env.clone(),
-            Self::Audit(card) => card.app_env.clone(),
-            Self::Pipeline(card) => card.app_env.clone(),
+            Self::Data(card) => card.app_env.as_deref(),
+            Self::Model(card) => card.app_env.as_deref(),
+            Self::Run(card) => card.app_env.as_deref(),
+            Self::Audit(card) => card.app_env.as_deref(),
+            Self::Pipeline(card) => card.app_env.as_deref(),
             Self::Project(_) => None,
         }
     }
 
     #[getter]
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &str {
         match self {
-            Self::Data(card) => card.name.clone(),
-            Self::Model(card) => card.name.clone(),
-            Self::Run(card) => card.name.clone(),
-            Self::Audit(card) => card.name.clone(),
-            Self::Pipeline(card) => card.name.clone(),
-            Self::Project(card) => card.name.clone(),
+            Self::Data(card) => card.name.as_ref(),
+            Self::Model(card) => card.name.as_ref(),
+            Self::Run(card) => card.name.as_ref(),
+            Self::Audit(card) => card.name.as_ref(),
+            Self::Pipeline(card) => card.name.as_ref(),
+            Self::Project(card) => card.name.as_ref(),
         }
     }
 
     #[getter]
-    pub fn repository(&self) -> String {
+    pub fn repository(&self) -> &str {
         match self {
-            Self::Data(card) => card.repository.clone(),
-            Self::Model(card) => card.repository.clone(),
-            Self::Run(card) => card.repository.clone(),
-            Self::Audit(card) => card.repository.clone(),
-            Self::Pipeline(card) => card.repository.clone(),
-            Self::Project(card) => card.repository.clone(),
+            Self::Data(card) => card.repository.as_ref(),
+            Self::Model(card) => card.repository.as_ref(),
+            Self::Run(card) => card.repository.as_ref(),
+            Self::Audit(card) => card.repository.as_ref(),
+            Self::Pipeline(card) => card.repository.as_ref(),
+            Self::Project(card) => card.repository.as_ref(),
         }
     }
 
     #[getter]
-    pub fn version(&self) -> String {
+    pub fn version(&self) -> &str {
         match self {
-            Self::Data(card) => card.version.clone(),
-            Self::Model(card) => card.version.clone(),
-            Self::Run(card) => card.version.clone(),
-            Self::Audit(card) => card.version.clone(),
-            Self::Pipeline(card) => card.version.clone(),
-            Self::Project(card) => card.version.clone(),
+            Self::Data(card) => card.version.as_ref(),
+            Self::Model(card) => card.version.as_ref(),
+            Self::Run(card) => card.version.as_ref(),
+            Self::Audit(card) => card.version.as_ref(),
+            Self::Pipeline(card) => card.version.as_ref(),
+            Self::Project(card) => card.version.as_ref(),
         }
     }
 
     #[getter]
-    pub fn contact(&self) -> String {
+    pub fn contact(&self) -> &str {
         match self {
-            Self::Data(card) => card.contact.clone(),
-            Self::Model(card) => card.contact.clone(),
-            Self::Run(card) => card.contact.clone(),
-            Self::Audit(card) => card.contact.clone(),
-            Self::Pipeline(card) => card.contact.clone(),
-            Self::Project(_) => "".to_string(),
+            Self::Data(card) => card.contact.as_ref(),
+            Self::Model(card) => card.contact.as_ref(),
+            Self::Run(card) => card.contact.as_ref(),
+            Self::Audit(card) => card.contact.as_ref(),
+            Self::Pipeline(card) => card.contact.as_ref(),
+            Self::Project(_) => "",
         }
     }
 
     #[getter]
-    pub fn tags(&self) -> HashMap<String, String> {
+    pub fn tags(&self) -> &HashMap<String, String> {
         match self {
-            Self::Data(card) => card.tags.clone(),
-            Self::Model(card) => card.tags.clone(),
-            Self::Run(card) => card.tags.clone(),
-            Self::Audit(card) => card.tags.clone(),
-            Self::Pipeline(card) => card.tags.clone(),
-            Self::Project(_) => HashMap::new(),
-        }
-    }
-
-    #[getter]
-    pub fn datacard_uids(&self) -> Option<Vec<String>> {
-        match self {
-            Self::Data(card) => {
-                let uid = card.uid.clone();
-                uid.map(|uid| vec![uid])
+            Self::Data(card) => &card.tags,
+            Self::Model(card) => &card.tags,
+            Self::Run(card) => &card.tags,
+            Self::Audit(card) => &card.tags,
+            Self::Pipeline(card) => &card.tags,
+            Self::Project(_) => {
+                static EMPTY_MAP: LazyLock<HashMap<String, String>> =
+                    LazyLock::new(|| HashMap::new());
+                &EMPTY_MAP
             }
-            Self::Model(card) => {
-                let uid = card.datacard_uid.clone();
-                uid.map(|uid| vec![uid])
-            }
-            Self::Run(card) => card.datacard_uids.clone(),
-            Self::Audit(card) => card.datacard_uids.clone(),
-            Self::Pipeline(card) => card.datacard_uids.clone(),
+        }
+    }
+
+    #[getter]
+    pub fn datacard_uids(&self) -> Option<Vec<&str>> {
+        match self {
+            Self::Data(card) => card.uid.as_deref().map(|uid| vec![uid]),
+            Self::Model(card) => card.datacard_uid.as_deref().map(|uid| vec![uid]),
+            Self::Run(card) => card
+                .datacard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
+            Self::Audit(card) => card
+                .datacard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
+            Self::Pipeline(card) => card
+                .datacard_uids
+                .as_ref()
+                .map(|uids| uids.iter().map(String::as_str).collect()),
             Self::Project(_) => None,
         }
     }
