@@ -629,13 +629,13 @@ impl ModelInterfaceArgsEnum {
     pub fn type_name(&self) -> &str {
         match self {
             ModelInterfaceArgsEnum::Huggingface(_) => "HuggingFace",
-            ModelInterfaceArgsEnum::Lightgbm(_) => "Lightgbm",
+            ModelInterfaceArgsEnum::Lightgbm(_) => "LightGBM",
             ModelInterfaceArgsEnum::Lightning(_) => "Lightning",
             ModelInterfaceArgsEnum::Sklearn(_) => "Sklearn",
             ModelInterfaceArgsEnum::Tensorflow(_) => "TensorFlow",
             ModelInterfaceArgsEnum::Torch(_) => "Torch",
             ModelInterfaceArgsEnum::Vowpal(_) => "Vowpal",
-            ModelInterfaceArgsEnum::Xgboost(_) => "Xgboost",
+            ModelInterfaceArgsEnum::Xgboost(_) => "XgBoost",
             ModelInterfaceArgsEnum::CatBoost(_) => "CatBoost",
             ModelInterfaceArgsEnum::Base(_) => "Base",
         }

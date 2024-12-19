@@ -23,6 +23,12 @@ from opsml_core import (
 )
 
 
+def create_common_args():
+    feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
+    metadata = {"key1": "value1"}
+    return feature_map, metadata
+
+
 def test_model_interface_args_creation():
     feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
     metadata = {"key1": "value1"}
@@ -101,3 +107,65 @@ def test_model_interface_args_enum_creation():
 
     assert isinstance(enum_args, ModelInterfaceArgsEnum)
     assert enum_args.type_name() == "HuggingFace"
+
+
+def test_model_interface_args_enum_lightgbm():
+    feature_map, metadata = create_common_args()
+
+    args = LightGBMModelInterfaceArgs(
+        task_type="classification",
+        model_type="lightgbm",
+        data_type="tabular",
+        modelcard_uid="1234",
+        feature_map=feature_map,
+        sample_data_interface_type="csv",
+        preprocessor_name="StandardScaler",
+        metadata=metadata,
+    )
+
+    enum_args = ModelInterfaceArgsEnum(args)
+    assert isinstance(enum_args, ModelInterfaceArgsEnum)
+    assert enum_args.type_name() == "LightGBM"
+
+
+def test_model_interface_args_enum_lightning():
+    feature_map, metadata = create_common_args()
+    onnx_args = TorchOnnxArgs(
+        input_names=["input"],
+        output_names=["output"],
+    )
+
+    args = LightningInterfaceArgs(
+        task_type="classification",
+        model_type="lightning",
+        data_type="tabular",
+        modelcard_uid="1234",
+        feature_map=feature_map,
+        sample_data_interface_type="csv",
+        preprocessor_name="StandardScaler",
+        onnx_args=onnx_args,
+        metadata=metadata,
+    )
+
+    enum_args = ModelInterfaceArgsEnum(args)
+    assert isinstance(enum_args, ModelInterfaceArgsEnum)
+    assert enum_args.type_name() == "Lightning"
+
+
+def test_model_interface_args_enum_sklearn():
+    feature_map, metadata = create_common_args()
+
+    args = SklearnModelInterfaceArgs(
+        task_type="classification",
+        model_type="sklearn",
+        data_type="tabular",
+        modelcard_uid="1234",
+        feature_map=feature_map,
+        sample_data_interface_type="csv",
+        preprocessor_name="StandardScaler",
+        metadata=metadata,
+    )
+
+    enum_args = ModelInterfaceArgsEnum(args)
+    assert isinstance(enum_args, ModelInterfaceArgsEnum)
+    assert enum_args.type_name() == "Sklearn"
