@@ -132,7 +132,7 @@ impl Description {
         summary: Option<String>,
         sample_code: Option<String>,
         notes: Option<String>,
-    ) -> PyResult<Self> {
+    ) -> Result<Self, TypeError> {
         // check if summary is some and if it is a file path. If .md file, read the file. IF not, return string
         let extracted_summary = match summary {
             Some(summary) => {

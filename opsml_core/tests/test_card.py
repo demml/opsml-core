@@ -195,3 +195,8 @@ def test_description_creation_markdown():
     assert description.summary != summary
     assert description.sample_code == sample_code
     assert description.notes == notes
+
+    summary = "assets/no_readme.md"
+
+    with pytest.raises(ValueError):
+        description = Description(summary)
