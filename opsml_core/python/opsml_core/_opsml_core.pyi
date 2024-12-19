@@ -2,10 +2,153 @@ from pathlib import Path
 from typing import List, Optional, Any, Dict
 from enum import Enum
 
+# shared
+class CommonKwargs:
+    IsPipeline: "CommonKwargs"
+    ModelType: "CommonKwargs"
+    ModelClass: "CommonKwargs"
+    ModelArch: "CommonKwargs"
+    PreprocessorName: "CommonKwargs"
+    Preprocessor: "CommonKwargs"
+    TaskType: "CommonKwargs"
+    Model: "CommonKwargs"
+    Undefined: "CommonKwargs"
+    Backend: "CommonKwargs"
+    Pytorch: "CommonKwargs"
+    Tensorflow: "CommonKwargs"
+    SampleData: "CommonKwargs"
+    Onnx: "CommonKwargs"
+    LoadType: "CommonKwargs"
+    DataType: "CommonKwargs"
+    Tokenizer: "CommonKwargs"
+    TokenizerName: "CommonKwargs"
+    FeatureExtractor: "CommonKwargs"
+    FeatureExtractorName: "CommonKwargs"
+    Image: "CommonKwargs"
+    Text: "CommonKwargs"
+    VowpalArgs: "CommonKwargs"
+    BaseVersion: "CommonKwargs"
+    SampleDataInterfaceType: "CommonKwargs"
+
+    @staticmethod
+    def from_string(s: str) -> Optional["CommonKwargs"]:
+        """Return the CommonKwargs enum from a string.
+
+        Args:
+            s:
+                The string representation of the CommonKwargs.
+
+        Returns:
+            The CommonKwargs enum.
+        """
+    def as_string(self) -> str:
+        """Return the string representation of the CommonKwargs.
+
+        Returns:
+            String representation of the CommonKwargs.
+        """
+
+class SaveName:
+    Card: "SaveName"
+    Audit: "SaveName"
+    PipelineCard: "SaveName"
+    ModelMetadata: "SaveName"
+    TrainedModel: "SaveName"
+    Preprocessor: "SaveName"
+    OnnxModel: "SaveName"
+    SampleModelData: "SaveName"
+    DataProfile: "SaveName"
+    Data: "SaveName"
+    Profile: "SaveName"
+    Artifacts: "SaveName"
+    QuantizedModel: "SaveName"
+    Tokenizer: "SaveName"
+    FeatureExtractor: "SaveName"
+    Metadata: "SaveName"
+    Graphs: "SaveName"
+    OnnxConfig: "SaveName"
+    Dataset: "SaveName"
+    DriftProfile: "SaveName"
+
+    @staticmethod
+    def from_string(s: str) -> Optional["SaveName"]:
+        """Return the SaveName enum from a string.
+
+        Args:
+            s:
+                The string representation of the SaveName.
+
+        Returns:
+            The SaveName enum.
+        """
+
+    def as_string(self) -> str:
+        """Return the string representation of the SaveName.
+
+        Returns:
+            String representation of the SaveName.
+        """
+
+class Suffix:
+    Onnx: "Suffix"
+    Parquet: "Suffix"
+    Zarr: "Suffix"
+    Joblib: "Suffix"
+    Html: "Suffix"
+    Json: "Suffix"
+    Ckpt: "Suffix"
+    Pt: "Suffix"
+    Text: "Suffix"
+    Catboost: "Suffix"
+    Jsonl: "Suffix"
+    Empty: "Suffix"
+    Dmatrix: "Suffix"
+    Model: "Suffix"
+
+    @staticmethod
+    def from_string(s: str) -> Optional["Suffix"]:
+        """Return the Suffix enum from a string.
+
+        Args:
+            s:
+                The string representation of the Suffix.
+
+        Returns:
+            The Suffix enum.
+        """
+
+    def as_string(self) -> str:
+        """Return the string representation of the Suffix.
+
+        Returns:
+            String representation of the Suffix.
+        """
+
+# Errors
 class OpsmlError(Exception):
     def __init__(self, message: str) -> None: ...
     def __str__(self) -> str: ...
 
+# Config
+class OpsmlConfig:
+    def __init__(self, client_mode: Optional[bool] = None) -> None:
+        """Initialize the OpsmlConfig.
+
+        Args:
+            client_mode:
+                Whether to use the client. By default, OpsML will determine whether
+                to run in client mode based on the provided OPSML_TRACKING_URI. This attribute
+                will override that behavior. Default is None.
+        """
+
+    def __str__(self):
+        """Return a string representation of the OpsmlConfig.
+
+        Returns:
+            String representation of the OpsmlConfig.
+        """
+
+# Cards
 class HuggingFaceORTModel:
     OrtAudioClassification: "HuggingFaceORTModel"
     OrtAudioFrameClassification: "HuggingFaceORTModel"
@@ -36,100 +179,6 @@ class HuggingFaceORTModel:
     OrtStableDiffusionInpaintPipeline: "HuggingFaceORTModel"
     OrtStableDiffusionXlPipeline: "HuggingFaceORTModel"
     OrtStableDiffusionXlImg2ImgPipeline: "HuggingFaceORTModel"
-
-class OpsmlConfig:
-    def __init__(self, client_mode: Optional[bool] = None) -> None:
-        """Initialize the OpsmlConfig.
-
-        Args:
-            client_mode:
-                Whether to use the client. By default, OpsML will determine whether
-                to run in client mode based on the provided OPSML_TRACKING_URI. This attribute
-                will override that behavior. Default is None.
-        """
-
-    @property
-    def app_name(self) -> str:
-        """The name of the application."""
-
-    @property
-    def app_env(self) -> str:
-        """The environment of the application."""
-
-    @property
-    def app_version(self) -> str:
-        """The version of the application."""
-
-    @property
-    def opsml_storage_uri(self) -> str:
-        """The storage URI for Opsml."""
-
-    @property
-    def opsml_tracking_uri(self) -> str:
-        """The tracking URI for Opsml."""
-
-    @property
-    def opsml_prod_token(self) -> str:
-        """The production token for Opsml."""
-
-    @property
-    def opsml_proxy_root(self) -> str:
-        """The proxy root for Opsml."""
-
-    @property
-    def opsml_registry_path(self) -> str:
-        """The registry path for Opsml."""
-
-    @property
-    def opsml_testing(self) -> bool:
-        """Indicates if Opsml is in testing mode."""
-
-    @property
-    def download_chunk_size(self) -> int:
-        """The download chunk size."""
-
-    @property
-    def upload_chunk_size(self) -> int:
-        """The upload chunk size."""
-
-    @property
-    def opsml_jwt_secret(self) -> str:
-        """The JWT secret for Opsml."""
-
-    @property
-    def opsml_jwt_algorithm(self) -> str:
-        """The JWT algorithm for Opsml."""
-
-    @property
-    def opsml_username(self) -> Optional[str]:
-        """The username for Opsml."""
-
-    @property
-    def opsml_password(self) -> Optional[str]:
-        """The password for Opsml."""
-
-    @property
-    def scouter_server_uri(self) -> Optional[str]:
-        """The server URI for Scouter."""
-
-    @property
-    def scouter_username(self) -> Optional[str]:
-        """The username for Scouter."""
-
-    @property
-    def scouter_password(self) -> Optional[str]:
-        """The password for Scouter."""
-
-    @property
-    def scouter_auth(self) -> bool:
-        """Indicates if Scouter authentication is enabled."""
-
-    @property
-    def opsml_auth(self) -> bool:
-        """Indicates if Opsml authentication is enabled."""
-
-    def storage_settings(self) -> OpsmlStorageSettings:
-        """Get the storage settings."""
 
 class HuggingFaceOnnxArgs:
     ort_type: HuggingFaceORTModel

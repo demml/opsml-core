@@ -20,11 +20,11 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add("OpsmlError", _m.py().get_type::<OpsmlError>())?;
 
     // config
-    _m.add_class::<OpsmlConfig>()?; // TODO: pyi
+    _m.add_class::<OpsmlConfig>()?;
 
     // shared
-    _m.add_class::<CommonKwargs>()?; // TODO: pyi
-    _m.add_class::<SaveName>()?; // TODO: pyi
+    _m.add_class::<CommonKwargs>()?;
+    _m.add_class::<SaveName>()?;
     _m.add_class::<Suffix>()?; // TODO: pyi
 
     // cards (types that are used across cards)
