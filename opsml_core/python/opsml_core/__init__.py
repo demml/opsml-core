@@ -8,6 +8,9 @@ from ._opsml_core import (  # type: ignore
     HuggingFaceOnnxArgs,
     TorchOnnxArgs,
     TorchSaveArgs,
+    Feature,
+    OnnxSchema,
+    DataSchema,
 )
 
 __all__ = [
@@ -20,4 +23,5 @@ __all__ = [
     "HuggingFaceOnnxArgs",
     "TorchOnnxArgs",
     "TorchSaveArgs",
+    "Feature",
 ]

@@ -250,3 +250,92 @@ class TorchSaveArgs:
             as_state_dict:
                 Whether to save the model as a state dict. Default is False
         """
+
+class Feature:
+    feature_type: str
+    shape: List[int]
+    extra_args: Dict[str, str]
+
+    def __init__(
+        self,
+        feature_type: str,
+        shape: List[int],
+        extra_args: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """Define a feature
+
+        Args:
+            feature_type:
+                The type of the feature
+            shape:
+                The shape of the feature
+            extra_args:
+                Extra arguments to pass to the feature
+        """
+
+    def __str__(self) -> str:
+        """Return a string representation of the Feature.
+
+        Returns:
+            String representation of the Feature.
+        """
+
+class OnnxSchema:
+    input_features: dict[str, Feature]
+    output_features: dict[str, Feature]
+    onnx_version: str
+
+    def __init__(
+        self,
+        input_features: dict[str, Feature],
+        output_features: dict[str, Feature],
+        onnx_version: str,
+    ) -> None:
+        """Define an onnx schema
+
+        Args:
+            input_features:
+                The input features of the onnx schema
+            output_features:
+                The output features of the onnx schema
+            onnx_version:
+                The onnx version of the schema
+        """
+    def __str__(self) -> str:
+        """Return a string representation of the OnnxSchema.
+
+        Returns:
+            String representation of the OnnxSchema.
+        """
+
+class DataSchema:
+    data_type: str
+    input_features: Optional[dict[str, Feature]]
+    output_features: Optional[dict[str, Feature]]
+    onnx_schema: Optional[OnnxSchema]
+
+    def __init__(
+        self,
+        data_type: str,
+        input_features: Optional[dict[str, Feature]] = None,
+        output_features: Optional[dict[str, Feature]] = None,
+        onnx_schema: Optional[OnnxSchema] = None,
+    ) -> None:
+        """Define a data schema
+
+        Args:
+            data_type:
+                The type of the data schema
+            input_features:
+                The input features of the data schema
+            output_features:
+                The output features of the data schema
+            onnx_schema:
+                The onnx schema of the data schema
+        """
+    def __str__(self) -> str:
+        """Return a string representation of the DataSchema.
+
+        Returns:
+            String representation of the DataSchema.
+        """

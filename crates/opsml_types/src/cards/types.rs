@@ -164,8 +164,8 @@ impl Description {
     }
 }
 
-#[pyclass]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[pyclass(eq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Feature {
     #[pyo3(get, set)]
     feature_type: String,
@@ -197,8 +197,8 @@ impl Feature {
     }
 }
 
-#[pyclass]
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[pyclass(eq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct OnnxSchema {
     #[pyo3(get, set)]
     pub input_features: HashMap<String, Feature>,
@@ -231,8 +231,8 @@ impl OnnxSchema {
     }
 }
 
-#[pyclass]
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[pyclass(eq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub struct DataSchema {
     #[pyo3(get, set)]
     pub data_type: String,

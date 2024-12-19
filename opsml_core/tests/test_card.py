@@ -3,6 +3,9 @@ from opsml_core import (
     HuggingFaceOnnxArgs,
     OpsmlError,
     TorchOnnxArgs,
+    Feature,
+    OnnxSchema,
+    DataSchema,
 )
 from optimum.onnxruntime.configuration import AutoQuantizationConfig  # type: ignore
 import pytest
@@ -107,3 +110,63 @@ def test_torch_onnx_args():
         "export_params": True,
         "verbose": True,
     }
+
+
+def test_feature_creation():
+    feature_type = "example_type"
+    shape = [1, 2, 3]
+    extra_args = {"arg1": "value1", "arg2": "value2"}
+
+    feature = Feature(feature_type, shape, extra_args)
+
+    assert feature.feature_type == feature_type
+    assert feature.shape == shape
+    assert feature.extra_args == extra_args
+
+
+def test_feature_default_extra_args():
+    feature_type = "example_type"
+    shape = [1, 2, 3]
+
+    feature = Feature(feature_type, shape)
+
+    assert feature.feature_type == feature_type
+    assert feature.shape == shape
+    assert feature.extra_args == {}
+
+
+def test_onnx_schema_creation():
+    input_features = {"input1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
+    output_features = {"output1": Feature("type2", [4, 5, 6], {"arg2": "value2"})}
+    onnx_version = "1.0"
+
+    schema = OnnxSchema(input_features, output_features, onnx_version)
+
+    assert schema.input_features == input_features
+    assert schema.output_features == output_features
+    assert schema.onnx_version == onnx_version
+
+
+def test_data_schema_creation():
+    data_type = "example_type"
+    input_features = {"input1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
+    output_features = {"output1": Feature("type2", [4, 5, 6], {"arg2": "value2"})}
+    onnx_schema = OnnxSchema(input_features, output_features, "1.0")
+
+    schema = DataSchema(data_type, input_features, output_features, onnx_schema)
+
+    assert schema.data_type == data_type
+    assert schema.input_features == input_features
+    assert schema.output_features == output_features
+    assert schema.onnx_schema == onnx_schema
+
+
+def test_data_schema_default_values():
+    data_type = "example_type"
+
+    schema = DataSchema(data_type)
+
+    assert schema.data_type == data_type
+    assert schema.input_features is None
+    assert schema.output_features is None
+    assert schema.onnx_schema is None
