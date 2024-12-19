@@ -1,27 +1,55 @@
 use opsml_error::error::OpsmlError;
-use opsml_settings::config::{ApiSettings, OpsmlConfig, OpsmlStorageSettings};
-use opsml_storage::storage::enums::client::{get_opsml_storage_system, PyStorageClient};
-use opsml_storage::storage::filesystem::PyFileSystemStorage;
-use opsml_types::{
-    FileInfo, HuggingFaceORTModel, HuggingFaceOnnxArgs, StorageType, TorchOnnxArgs, TorchSaveArgs,
+use opsml_settings::config::OpsmlConfig;
+use opsml_types::cards::model::{
+    CatBoostModelInterfaceArgs, HuggingFaceModelInterfaceArgs, LightGBMModelInterfaceArgs,
+    LightningInterfaceArgs, ModelInterfaceArgs, ModelInterfaceArgsEnum, SklearnModelInterfaceArgs,
+    TensorFlowInterfaceArgs, TorchInterfaceArgs, VowpalWabbitInterfaceArgs,
+    XGBoostModelInterfaceArgs,
 };
+use opsml_types::cards::{
+    DataSchema, Description, Feature, HuggingFaceORTModel, HuggingFaceOnnxArgs, OnnxSchema,
+    TorchOnnxArgs, TorchSaveArgs, VersionType,
+};
+use opsml_types::shared::{CommonKwargs, SaveName, Suffix};
+
 use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
 
 #[pymodule]
 fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // errors
     _m.add("OpsmlError", _m.py().get_type::<OpsmlError>())?;
-    _m.add_class::<PyFileSystemStorage>()?;
-    _m.add_class::<FileInfo>()?;
-    _m.add_class::<OpsmlStorageSettings>()?;
-    _m.add_class::<StorageType>()?;
+
+    // config
     _m.add_class::<OpsmlConfig>()?;
-    _m.add_class::<PyStorageClient>()?;
-    _m.add_class::<ApiSettings>()?;
+
+    // shared
+    _m.add_class::<CommonKwargs>()?;
+    _m.add_class::<SaveName>()?;
+    _m.add_class::<Suffix>()?;
+
+    // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
     _m.add_class::<HuggingFaceORTModel>()?;
     _m.add_class::<TorchOnnxArgs>()?;
     _m.add_class::<TorchSaveArgs>()?;
-    _m.add_function(wrap_pyfunction!(get_opsml_storage_system, _m)?)?;
+    _m.add_class::<Feature>()?;
+    _m.add_class::<Description>()?;
+    _m.add_class::<VersionType>()?;
+    _m.add_class::<DataSchema>()?;
+    _m.add_class::<OnnxSchema>()?;
+
+    // Model Interface args
+    _m.add_class::<ModelInterfaceArgs>()?;
+    _m.add_class::<CatBoostModelInterfaceArgs>()?;
+    _m.add_class::<HuggingFaceModelInterfaceArgs>()?;
+    _m.add_class::<LightGBMModelInterfaceArgs>()?;
+    _m.add_class::<LightningInterfaceArgs>()?;
+    _m.add_class::<SklearnModelInterfaceArgs>()?;
+    _m.add_class::<TensorFlowInterfaceArgs>()?;
+    _m.add_class::<TorchInterfaceArgs>()?;
+    _m.add_class::<VowpalWabbitInterfaceArgs>()?;
+    _m.add_class::<XGBoostModelInterfaceArgs>()?;
+    _m.add_class::<ModelInterfaceArgsEnum>()?;
+
     Ok(())
 }

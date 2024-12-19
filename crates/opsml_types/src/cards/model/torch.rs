@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::IntoPyObjectExt;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, default};
+use std::collections::HashMap;
 
 #[pyclass]
 #[derive(Debug, Deserialize, Serialize, Clone)]
