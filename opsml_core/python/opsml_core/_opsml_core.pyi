@@ -363,3 +363,14 @@ class TorchOnnxArgs:
         Returns:
             Dictionary containing model information
         """
+
+class TorchSaveArgs:
+    as_state_dict: bool
+
+    def __init__(self, as_state_dict: bool = False) -> None:
+        """Optional arguments to pass to torch when saving a model
+
+        Args:
+            as_state_dict:
+                Whether to save the model as a state dict. Default is False
+        """

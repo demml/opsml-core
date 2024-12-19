@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::IntoPyObjectExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
 #[pyclass]
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -32,7 +32,7 @@ pub struct TorchOnnxArgs {
 impl TorchOnnxArgs {
     #[new]
     #[pyo3(signature = (input_names, output_names, dynamic_axes=None, do_constant_folding=true, export_params=true, verbose=true))]
-    fn new(
+    pub fn new(
         input_names: Vec<String>,
         output_names: Vec<String>,
         dynamic_axes: Option<HashMap<String, HashMap<usize, String>>>,
@@ -65,5 +65,24 @@ impl TorchOnnxArgs {
         dict.set_item("verbose", self.verbose)
             .map_err(|_| OpsmlError::new_err("Failed to set verbose"))?;
         dict.into_py_any(py)
+    }
+}
+
+#[pyclass]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[allow(dead_code)]
+pub struct TorchSaveArgs {
+    #[pyo3(get)]
+    pub as_state_dict: bool,
+}
+
+#[pymethods]
+impl TorchSaveArgs {
+    #[new]
+    #[pyo3(signature = (as_state_dict=false))]
+    pub fn new(as_state_dict: Option<bool>) -> Self {
+        TorchSaveArgs {
+            as_state_dict: as_state_dict.unwrap_or(false),
+        }
     }
 }
