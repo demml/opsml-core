@@ -441,3 +441,51 @@ impl TensorFlowInterfaceArgs {
         }
     }
 }
+
+#[pyclass]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VowpalWabbitInterfaceArgs {
+    #[pyo3(get)]
+    pub task_type: String,
+    #[pyo3(get)]
+    pub model_type: String,
+    #[pyo3(get)]
+    pub data_type: String,
+    #[pyo3(get)]
+    pub modelcard_uid: String,
+    #[pyo3(get)]
+    pub feature_map: HashMap<String, Feature>,
+    #[pyo3(get)]
+    pub arguments: String,
+    #[pyo3(get)]
+    pub sample_data_interface_type: String,
+    #[pyo3(get)]
+    pub metadata: HashMap<String, String>,
+}
+
+#[pymethods]
+impl VowpalWabbitInterfaceArgs {
+    #[new]
+    #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, arguments, sample_data_interface_type, metadata=None))]
+    fn new(
+        task_type: String,
+        model_type: String,
+        data_type: String,
+        modelcard_uid: String,
+        feature_map: HashMap<String, Feature>,
+        arguments: String,
+        sample_data_interface_type: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Self {
+        VowpalWabbitInterfaceArgs {
+            task_type,
+            model_type,
+            data_type,
+            modelcard_uid,
+            feature_map,
+            arguments,
+            sample_data_interface_type,
+            metadata: metadata.unwrap_or_default(),
+        }
+    }
+}
