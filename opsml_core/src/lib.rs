@@ -25,7 +25,7 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // shared
     _m.add_class::<CommonKwargs>()?;
     _m.add_class::<SaveName>()?;
-    _m.add_class::<Suffix>()?; // TODO: pyi
+    _m.add_class::<Suffix>()?;
 
     // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
