@@ -4,7 +4,6 @@ use anyhow::{Context, Ok, Result as AnyhowResult};
 use opsml_types::*;
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use tracing::info;
 
 #[pyclass]
 #[derive(Debug)]

@@ -4,7 +4,7 @@ use crate::postgres::helper::PostgresQueryHelper;
 use crate::schemas::schema::{
     AuditCardRecord, CardResults, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
     ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, QueryStats,
-    Repository, RunCardRecord, ServerCard, User, VersionResult,
+    RunCardRecord, ServerCard, User, VersionResult,
 };
 
 use async_trait::async_trait;
@@ -650,12 +650,12 @@ impl SqlClient for PostgresClient {
         table: &CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError> {
         let query = format!("SELECT DISTINCT repository FROM {}", table);
-        let repos: Vec<Repository> = sqlx::query_as(&query)
+        let repos: Vec<String> = sqlx::query_scalar(&query)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-        Ok(repos.iter().map(|r| r.repository.clone()).collect())
+        Ok(repos)
     }
 
     async fn query_stats(

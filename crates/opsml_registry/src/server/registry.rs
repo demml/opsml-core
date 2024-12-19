@@ -96,8 +96,8 @@ pub mod server_logic {
             }
         }
 
-        pub async fn create_card(&self, card: &Card) -> Result<(), RegistryError> {
-            let card = match card.clone() {
+        pub async fn create_card(&self, card: Card) -> Result<(), RegistryError> {
+            let card = match card {
                 Card::Data(client_card) => {
                     let server_card = DataCardRecord::new(
                         client_card.name,
@@ -198,8 +198,8 @@ pub mod server_logic {
             Ok(())
         }
 
-        pub async fn update_card(&self, card: &Card) -> Result<(), RegistryError> {
-            let card = match card.clone() {
+        pub async fn update_card(&self, card: Card) -> Result<(), RegistryError> {
+            let card = match card {
                 Card::Data(client_card) => {
                     let version = Version::parse(&client_card.version).map_err(|e| {
                         error!("Failed to parse version: {}", e);

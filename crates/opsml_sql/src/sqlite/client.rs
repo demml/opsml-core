@@ -3,8 +3,8 @@ use crate::base::SqlClient;
 use crate::schemas::schema::ProjectCardRecord;
 use crate::schemas::schema::{
     AuditCardRecord, CardResults, CardSummary, DataCardRecord, HardwareMetricsRecord, MetricRecord,
-    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, Repository, RunCardRecord,
-    ServerCard, User, VersionResult,
+    ModelCardRecord, ParameterRecord, PipelineCardRecord, QueryStats, RunCardRecord, ServerCard,
+    User, VersionResult,
 };
 use crate::sqlite::helper::SqliteQueryHelper;
 use async_trait::async_trait;
@@ -684,12 +684,12 @@ impl SqlClient for SqliteClient {
         table: &CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError> {
         let query = format!("SELECT DISTINCT repository FROM {}", table);
-        let repos: Vec<Repository> = sqlx::query_as(&query)
+        let repos: Vec<String> = sqlx::query_scalar(&query)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-        Ok(repos.iter().map(|r| r.repository.clone()).collect())
+        Ok(repos)
     }
 
     /// Query stats for a table

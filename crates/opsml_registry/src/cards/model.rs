@@ -5,7 +5,6 @@ use opsml_types::*;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySet};
 use pyo3::{IntoPyObjectExt, PyObject};
-use semver::Op;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,8 +28,6 @@ struct InterfaceArgs {
     feature_map: HashMap<String, Feature>,
     sample_data_interface: String,
     preprocessor_name: String,
-    
-
 }
 
 #[pyclass]
@@ -189,11 +186,6 @@ impl ModelCard {
                         .map_err(|e| CardError::Error(e.to_string()))?;
                 }
             }
-
-            // convert dumped interface to a string (json)
-            let json = dumped_interface
-                .to_string()
-                .map_err(|e| CardError::Error(e.to_string()))?;
 
             println!("{:?}", result); // Print the result for debugging
 

@@ -5,7 +5,7 @@ use crate::schemas::schema::{
     ModelCardRecord, ParameterRecord, PipelineCardRecord, ProjectCardRecord, QueryStats,
     RunCardRecord, ServerCard, User,
 };
-use crate::schemas::schema::{CardResults, Repository, VersionResult};
+use crate::schemas::schema::{CardResults, VersionResult};
 use async_trait::async_trait;
 use opsml_error::error::SqlError;
 use opsml_logging::logging::setup_logging;
@@ -672,13 +672,12 @@ impl SqlClient for MySqlClient {
         table: &CardSQLTableNames,
     ) -> Result<Vec<String>, SqlError> {
         let query = format!("SELECT DISTINCT repository FROM {}", table);
-
-        let repos: Vec<Repository> = sqlx::query_as(&query)
+        let repos: Vec<String> = sqlx::query_scalar(&query)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| SqlError::QueryError(format!("{}", e)))?;
 
-        Ok(repos.iter().map(|r| r.repository.clone()).collect())
+        Ok(repos)
     }
 
     async fn query_stats(

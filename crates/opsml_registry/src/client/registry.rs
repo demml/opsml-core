@@ -75,7 +75,7 @@ impl ClientRegistry {
             .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?)
     }
 
-    pub async fn create_card(&mut self, card: &Card) -> Result<(), RegistryError> {
+    pub async fn create_card(&mut self, card: Card) -> Result<(), RegistryError> {
         // serialize card to json
         let body = serde_json::to_value(card)
             .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;
@@ -104,7 +104,7 @@ impl ClientRegistry {
         }
     }
 
-    pub async fn update_card(&mut self, card: &Card) -> Result<(), RegistryError> {
+    pub async fn update_card(&mut self, card: Card) -> Result<(), RegistryError> {
         // serialize card to json
         let body = serde_json::to_value(card)
             .map_err(|e| RegistryError::Error(format!("Failed to serialize card {}", e)))?;
