@@ -3,8 +3,9 @@
 use crate::storage::filesystem::FileSystem;
 use crate::storage::http::base::OpsmlApiClient;
 use crate::storage::local::client::{LocalFSStorageClient, LocalMultiPartUpload};
+use anyhow::{Context, Result as AnyhowResult};
 use opsml_error::error::StorageError;
-use opsml_settings::config::OpsmlStorageSettings;
+use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings};
 use opsml_types::{FileInfo, StorageType};
 use std::path::Path;
 
@@ -358,19 +359,19 @@ impl StorageClientEnum {
 //    }
 //}
 //
-//pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
-//    // check storage_uri for prefix
-//    let storage_settings = config.storage_settings();
-//
-//    StorageClientEnum::new(&storage_settings)
-//        .await
-//        .with_context(|| {
-//            format!(
-//                "Failed to create storage client for storage type: {:?}",
-//                storage_settings.storage_type
-//            )
-//        })
-//}
+pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
+    // check storage_uri for prefix
+    let storage_settings = config.storage_settings();
+
+    StorageClientEnum::new(&storage_settings)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create storage client for storage type: {:?}",
+                storage_settings.storage_type
+            )
+        })
+}
 //
 //#[pyfunction]
 //pub fn get_opsml_storage_system(config: &OpsmlConfig) -> AnyhowResult<PyStorageClient> {
