@@ -1,6 +1,7 @@
 use opsml_types::{SqlType, StorageType};
 use pyo3::prelude::*;
 use rand::Rng;
+use serde::Serialize;
 use std::default::Default;
 use std::env;
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ pub struct ApiSettings {
     pub username: String,
     pub password: String,
     pub auth_token: String,
-    pub prod_token: String,
+    pub prod_token: Option<String>,
 }
 
 /// StorageSettings for used with all storage clients
@@ -30,46 +31,65 @@ pub struct OpsmlStorageSettings {
 }
 
 /// DatabaseSettings for used with all database clients
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 #[pyclass]
-pub struct OpsmlDatabaseSettings {
+pub struct DatabaseSettings {
     pub connection_uri: String,
     pub max_connections: u32,
     pub sql_type: SqlType,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct OpsmlAuthSettings {
+#[derive(Debug, Clone, Default, Serialize)]
+#[pyclass]
+pub struct AuthSettings {
     pub enabled: bool,
+    pub jwt_secret: String,
+    pub refresh_secret: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub prod_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[pyclass]
+pub struct ScouterSettings {
+    #[pyo3(get)]
+    pub server_uri: Option<String>,
+    #[pyo3(get)]
+    pub username: Option<String>,
+    #[pyo3(get)]
+    pub password: Option<String>,
+    #[pyo3(get)]
+    pub auth: bool,
 }
 
 /// OpsmlConfig for use with both server and client implementations
 /// OpsmlConfig is the main primary configuration struct for the Opsml system
 /// Based on provided env variables, it will be used to determine if opsml is running in client or server mode.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 #[pyclass]
 pub struct OpsmlConfig {
+    #[pyo3(get)]
     pub app_name: String,
+    #[pyo3(get)]
     pub app_env: String,
+    #[pyo3(get)]
     pub app_version: String,
+    #[pyo3(get)]
     pub opsml_storage_uri: String,
+    #[pyo3(get)]
     pub opsml_tracking_uri: String,
-    pub opsml_max_pool_connections: u32,
-    pub opsml_prod_token: String,
+    #[pyo3(get)]
     pub opsml_proxy_root: String,
+    #[pyo3(get)]
     pub opsml_registry_path: String,
-    pub opsml_testing: bool,
-    pub download_chunk_size: usize,
-    pub upload_chunk_size: usize,
-    pub opsml_jwt_secret: String,
-    pub opsml_refresh_secret: String,
-    pub opsml_username: Option<String>,
-    pub opsml_password: Option<String>,
-    pub scouter_server_uri: Option<String>,
-    pub scouter_username: Option<String>,
-    pub scouter_password: Option<String>,
-    pub scouter_auth: bool,
-    pub opsml_auth: bool,
+    #[pyo3(get)]
+    pub scouter_settings: ScouterSettings,
+    #[pyo3(get)]
+    pub auth_settings: AuthSettings,
+    #[pyo3(get)]
+    pub database_settings: DatabaseSettings,
+    #[pyo3(get)]
     pub client_mode: bool,
 }
 
@@ -91,48 +111,56 @@ impl Default for OpsmlConfig {
 
         let using_client = OpsmlConfig::is_using_client(&opsml_tracking_uri);
 
+        // set scouter settings
+        let scouter_settings = ScouterSettings {
+            server_uri: env::var("SCOUTER_SERVER_URI").ok(),
+            username: env::var("SCOUTER_USERNAME").ok(),
+            password: env::var("SCOUTER_PASSWORD").ok(),
+            auth: env::var("SCOUTER_AUTH")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+        };
+
+        // set auth settings
+        let auth_settings = AuthSettings {
+            jwt_secret: env::var("OPSML_JWT_SECRET").unwrap_or_else(|_| generate_jwt_secret()),
+            refresh_secret: env::var("OPSML_REFRESH_SECRET")
+                .unwrap_or_else(|_| generate_jwt_secret()),
+
+            username: env::var("OPSML_USERNAME").ok(),
+            password: env::var("OPSML_PASSWORD").ok(),
+            enabled: env::var("OPSML_AUTH")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+            prod_token: env::var("OPSML_PROD_TOKEN").ok(),
+        };
+
+        // set database settings
+        let database_settings = DatabaseSettings {
+            connection_uri: opsml_tracking_uri.clone(),
+            max_connections: env::var("OPSML_MAX_POOL_CONNECTIONS")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .unwrap_or(10),
+            sql_type: OpsmlConfig::get_sql_type(&opsml_tracking_uri),
+        };
+
         OpsmlConfig {
             app_name: "opsml".to_string(),
             app_env: env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
             app_version: env!("CARGO_PKG_VERSION").to_string(),
             opsml_storage_uri: OpsmlConfig::set_opsml_storage_uri(opsml_storage_uri, using_client),
             opsml_tracking_uri,
-            opsml_prod_token: env::var("OPSML_PROD_TOKEN").unwrap_or_else(|_| "".to_string()),
 
             opsml_proxy_root: "opsml-root:/".to_string(),
             opsml_registry_path: env::var("OPSML_REGISTRY_PATH")
                 .unwrap_or_else(|_| "model_registry".to_string()),
 
-            opsml_testing: env::var("OPSML_TESTING")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse()
-                .unwrap_or(false),
-
-            download_chunk_size: 31457280,
-            upload_chunk_size: 31457280,
-
-            opsml_jwt_secret: env::var("OPSML_JWT_SECRET")
-                .unwrap_or_else(|_| generate_jwt_secret()),
-            opsml_refresh_secret: env::var("OPSML_REFRESH_SECRET")
-                .unwrap_or_else(|_| generate_jwt_secret()),
-
-            opsml_username: env::var("OPSML_USERNAME").ok(),
-            opsml_password: env::var("OPSML_PASSWORD").ok(),
-            opsml_max_pool_connections: env::var("OPSML_MAX_POOL_CONNECTIONS")
-                .unwrap_or_else(|_| "10".to_string())
-                .parse()
-                .unwrap_or(10),
-            scouter_server_uri: env::var("SCOUTER_SERVER_URI").ok(),
-            scouter_username: env::var("SCOUTER_USERNAME").ok(),
-            scouter_password: env::var("SCOUTER_PASSWORD").ok(),
-            scouter_auth: env::var("SCOUTER_AUTH")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse()
-                .unwrap_or(false),
-            opsml_auth: env::var("OPSML_AUTH")
-                .unwrap_or_else(|_| "false".to_string())
-                .parse()
-                .unwrap_or(false),
+            database_settings,
+            scouter_settings,
+            auth_settings,
             client_mode: using_client,
         }
     }
@@ -189,10 +217,8 @@ impl OpsmlConfig {
         }
     }
 
-    pub fn auth_settings(&self) -> OpsmlAuthSettings {
-        OpsmlAuthSettings {
-            enabled: self.opsml_auth,
-        }
+    pub fn auth_settings(&self) -> &AuthSettings {
+        &self.auth_settings
     }
 
     fn get_storage_type(&self) -> StorageType {
@@ -208,8 +234,8 @@ impl OpsmlConfig {
         }
     }
 
-    fn get_sql_type(&self) -> SqlType {
-        let tracking_uri_lower = self.opsml_tracking_uri.to_lowercase();
+    fn get_sql_type(tracking_uri: &str) -> SqlType {
+        let tracking_uri_lower = tracking_uri.to_lowercase();
         if tracking_uri_lower.starts_with("postgres") {
             SqlType::Postgres
         } else if tracking_uri_lower.starts_with("mysql") {
@@ -247,23 +273,14 @@ impl OpsmlConfig {
             storage_type: self.get_storage_type(),
             api_settings: ApiSettings {
                 base_url: self.opsml_tracking_uri.clone(),
-                use_auth: self.opsml_auth,
+                use_auth: self.auth_settings.enabled,
                 opsml_dir: "opsml".to_string(),
                 scouter_dir: "scouter".to_string(),
-                username: self.opsml_username.clone().unwrap_or_default(),
-                password: self.opsml_password.clone().unwrap_or_default(),
+                username: self.auth_settings.username.clone().unwrap_or_default(),
+                password: self.auth_settings.password.clone().unwrap_or_default(),
                 auth_token: "".to_string(),
-                prod_token: self.opsml_prod_token.clone(),
+                prod_token: self.auth_settings.prod_token.clone(),
             },
-        }
-    }
-
-    pub fn database_settings(&self) -> OpsmlDatabaseSettings {
-        let sql_type = self.get_sql_type();
-        OpsmlDatabaseSettings {
-            connection_uri: self.opsml_tracking_uri.clone(),
-            max_connections: self.opsml_max_pool_connections,
-            sql_type,
         }
     }
 }
@@ -384,18 +401,24 @@ mod tests {
     #[test]
     fn test_auth_settings() {
         let opsml_config = OpsmlConfig {
-            opsml_auth: true,
+            auth_settings: AuthSettings {
+                enabled: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let auth_settings = opsml_config.auth_settings();
         assert!(auth_settings.enabled);
 
         let opsml_config = OpsmlConfig {
-            opsml_auth: false,
+            auth_settings: AuthSettings {
+                enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
-        let auth_settings = opsml_config.auth_settings();
-        assert!(!auth_settings.enabled);
+
+        assert!(!opsml_config.auth_settings.enabled);
         cleanup();
     }
 
@@ -414,20 +437,21 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(opsml_config.opsml_tracking_uri, "sqlite:///opsml.db");
-        assert_eq!(opsml_config.opsml_prod_token, "staging");
+        assert_eq!(
+            opsml_config.auth_settings.prod_token,
+            Some("staging".to_string())
+        );
         assert_eq!(opsml_config.opsml_proxy_root, "opsml-root:/");
         assert_eq!(opsml_config.opsml_registry_path, "model_registry");
-        assert!(!opsml_config.opsml_testing);
-        assert_eq!(opsml_config.download_chunk_size, 31457280);
-        assert_eq!(opsml_config.upload_chunk_size, 31457280);
-        assert_eq!(opsml_config.opsml_jwt_secret.len(), 32);
-        assert_eq!(opsml_config.opsml_username, None);
-        assert_eq!(opsml_config.opsml_password, None);
-        assert_eq!(opsml_config.scouter_server_uri, None);
-        assert_eq!(opsml_config.scouter_username, None);
-        assert_eq!(opsml_config.scouter_password, None);
-        assert!(!opsml_config.scouter_auth);
-        assert!(!opsml_config.opsml_auth);
+
+        assert_eq!(opsml_config.auth_settings.jwt_secret.len(), 32);
+        assert_eq!(opsml_config.auth_settings.username, None);
+        assert_eq!(opsml_config.auth_settings.password, None);
+        assert_eq!(opsml_config.scouter_settings.server_uri, None);
+        assert_eq!(opsml_config.scouter_settings.username, None);
+        assert_eq!(opsml_config.scouter_settings.password, None);
+        assert!(!opsml_config.scouter_settings.auth);
+        assert!(!opsml_config.auth_settings.enabled);
 
         cleanup();
     }

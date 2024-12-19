@@ -6,11 +6,6 @@ class OpsmlError(Exception):
     def __init__(self, message: str) -> None: ...
     def __str__(self) -> str: ...
 
-class StorageType(str, Enum):
-    Google = "google"
-    AWS = "aws"
-    Local = "local"
-
 class HuggingFaceORTModel:
     OrtAudioClassification: "HuggingFaceORTModel"
     OrtAudioFrameClassification: "HuggingFaceORTModel"
@@ -41,80 +36,6 @@ class HuggingFaceORTModel:
     OrtStableDiffusionInpaintPipeline: "HuggingFaceORTModel"
     OrtStableDiffusionXlPipeline: "HuggingFaceORTModel"
     OrtStableDiffusionXlImg2ImgPipeline: "HuggingFaceORTModel"
-
-class FileInfo:
-    @property
-    def name(self) -> str:
-        """The name of the file."""
-
-    @property
-    def size(self) -> int:
-        """The size of the file."""
-
-    @property
-    def object_type(self) -> str:
-        """The type of the object."""
-
-    @property
-    def created(self) -> str:
-        """The creation time of the file."""
-
-    @property
-    def suffix(self) -> str:
-        """The suffix of the file."""
-
-    def __str__(self) -> str:
-        """Return a string representation of the FileInfo object."""
-
-class ApiSettings:
-    @property
-    def base_url(self) -> str:
-        """The base URL of the API."""
-
-    @property
-    def use_auth(self) -> bool:
-        """Whether to use authentication."""
-
-    @property
-    def opsml_dir(self) -> str:
-        """The directory of the OPSML file."""
-
-    @property
-    def scouter_dir(self) -> str:
-        """The directory of the Scouter file."""
-
-    @property
-    def username(self) -> str:
-        """The username."""
-
-    @property
-    def password(self) -> str:
-        """The password."""
-
-    @property
-    def auth_token(self) -> str:
-        """The authentication token."""
-
-    @property
-    def prod_token(self) -> str:
-        """The production token."""
-
-class OpsmlStorageSettings:
-    @property
-    def storage_uri(self) -> str:
-        """The storage URI."""
-
-    @property
-    def client_mode(self) -> bool:
-        """Whether to use the client."""
-
-    @property
-    def api_settings(self) -> ApiSettings:
-        """The API settings."""
-
-    @property
-    def storage_type(self) -> StorageType:
-        """The storage type."""
 
 class OpsmlConfig:
     def __init__(self, client_mode: Optional[bool] = None) -> None:

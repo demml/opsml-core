@@ -16,6 +16,7 @@ pub enum StorageType {
     Azure,
 }
 
+#[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SqlType {
     Postgres,

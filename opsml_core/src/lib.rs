@@ -20,36 +20,36 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add("OpsmlError", _m.py().get_type::<OpsmlError>())?;
 
     // config
-    _m.add_class::<OpsmlConfig>()?;
+    _m.add_class::<OpsmlConfig>()?; // TODO: pyi
 
     // shared
-    _m.add_class::<CommonKwargs>()?;
-    _m.add_class::<SaveName>()?;
-    _m.add_class::<Suffix>()?;
+    _m.add_class::<CommonKwargs>()?; // TODO: pyi
+    _m.add_class::<SaveName>()?; // TODO: pyi
+    _m.add_class::<Suffix>()?; // TODO: pyi
 
     // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
     _m.add_class::<HuggingFaceORTModel>()?;
     _m.add_class::<TorchOnnxArgs>()?;
     _m.add_class::<TorchSaveArgs>()?;
-    _m.add_class::<Feature>()?;
-    _m.add_class::<Description>()?;
-    _m.add_class::<VersionType>()?;
-    _m.add_class::<DataSchema>()?;
-    _m.add_class::<OnnxSchema>()?;
+    _m.add_class::<Feature>()?; // TODO: pyi
+    _m.add_class::<Description>()?; // TODO: pyi
+    _m.add_class::<VersionType>()?; // TODO: pyi
+    _m.add_class::<DataSchema>()?; // TODO: pyi
+    _m.add_class::<OnnxSchema>()?; // TODO: pyi
 
     // Model Interface args
-    _m.add_class::<ModelInterfaceArgs>()?;
-    _m.add_class::<CatBoostModelInterfaceArgs>()?;
-    _m.add_class::<HuggingFaceModelInterfaceArgs>()?;
-    _m.add_class::<LightGBMModelInterfaceArgs>()?;
-    _m.add_class::<LightningInterfaceArgs>()?;
-    _m.add_class::<SklearnModelInterfaceArgs>()?;
-    _m.add_class::<TensorFlowInterfaceArgs>()?;
-    _m.add_class::<TorchInterfaceArgs>()?;
-    _m.add_class::<VowpalWabbitInterfaceArgs>()?;
-    _m.add_class::<XGBoostModelInterfaceArgs>()?;
-    _m.add_class::<ModelInterfaceArgsEnum>()?;
+    _m.add_class::<ModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<CatBoostModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<HuggingFaceModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<LightGBMModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<LightningInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<SklearnModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<TensorFlowInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<TorchInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<VowpalWabbitInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<XGBoostModelInterfaceArgs>()?; // TODO: pyi
+    _m.add_class::<ModelInterfaceArgsEnum>()?; // TODO: pyi
 
     Ok(())
 }
