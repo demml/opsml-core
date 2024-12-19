@@ -112,7 +112,7 @@ impl UriNames {
 }
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub enum CommonKwargs {
     IsPipeline,
     ModelType,

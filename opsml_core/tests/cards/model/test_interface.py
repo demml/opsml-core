@@ -1,5 +1,5 @@
 from opsml_core import HuggingFaceORTModel, HuggingFaceOnnxArgs, OpsmlError
-from optimum.onnxruntime.configuration import AutoQuantizationConfig
+from optimum.onnxruntime.configuration import AutoQuantizationConfig  # type: ignore
 import pytest
 
 

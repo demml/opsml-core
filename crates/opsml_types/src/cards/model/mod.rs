@@ -1,3 +1,4 @@
+pub mod base;
 pub mod huggingface;
 pub mod lightgbm;
 pub mod lightning;
@@ -8,6 +9,7 @@ pub mod vowpal;
 pub mod xgboost;
 
 pub use huggingface::*;
+pub mod interface;
 //pub use lightgbm::*;
 //pub use lightning::*;
 //pub use sklearn::*;
