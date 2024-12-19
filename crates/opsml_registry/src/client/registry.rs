@@ -165,6 +165,7 @@ impl ClientRegistry {
         }
     }
 
+    #[allow(dead_code)]
     async fn check_uid_exists(
         &mut self,
         uid: &str,

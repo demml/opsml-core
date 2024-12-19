@@ -61,7 +61,7 @@ impl BaseArgs {
         value
             .as_ref()
             .or_else(|| card_info_value.and_then(|v| v.as_ref()))
-            .or_else(|| env_val.as_ref())
+            .or(env_val.as_ref())
             .map(|s| s.to_string())
             .ok_or_else(|| CardError::Error(format!("{} not provided", key)))
     }

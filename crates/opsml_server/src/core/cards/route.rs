@@ -193,42 +193,27 @@ pub async fn list_cards(
     // convert to Cards struct
     match cards {
         CardResults::Data(data) => {
-            let cards = data
-                .into_iter()
-                .map(|card| convert_datacard(card))
-                .collect();
+            let cards = data.into_iter().map(convert_datacard).collect();
             Ok(Json(cards))
         }
         CardResults::Model(data) => {
-            let cards = data
-                .into_iter()
-                .map(|card| convert_modelcard(card))
-                .collect();
+            let cards = data.into_iter().map(convert_modelcard).collect();
             Ok(Json(cards))
         }
         CardResults::Project(data) => {
-            let cards = data
-                .into_iter()
-                .map(|card| convert_projectcard(card))
-                .collect();
+            let cards = data.into_iter().map(convert_projectcard).collect();
             Ok(Json(cards))
         }
         CardResults::Run(data) => {
-            let cards = data.into_iter().map(|card| convert_runcard(card)).collect();
+            let cards = data.into_iter().map(convert_runcard).collect();
             Ok(Json(cards))
         }
         CardResults::Pipeline(data) => {
-            let cards = data
-                .into_iter()
-                .map(|card| convert_pipelinecard(card))
-                .collect();
+            let cards = data.into_iter().map(convert_pipelinecard).collect();
             Ok(Json(cards))
         }
         CardResults::Audit(data) => {
-            let cards = data
-                .into_iter()
-                .map(|card| convert_auditcard(card))
-                .collect();
+            let cards = data.into_iter().map(convert_auditcard).collect();
             Ok(Json(cards))
         }
     }

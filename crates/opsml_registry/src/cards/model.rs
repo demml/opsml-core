@@ -3,7 +3,6 @@ use anyhow::{Context, Result as AnyhowResult};
 use opsml_error::error::CardError;
 use opsml_types::*;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySet};
 use pyo3::{IntoPyObjectExt, PyObject};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -137,60 +136,60 @@ impl ModelCard {
     }
 }
 
-impl ModelCard {
-    pub fn serialize(&self) -> Result<(), CardError> {
-        Python::with_gil(|py| {
-            let obj = &self.interface;
-
-            // Create the exclude dictionary
-            let exclude_dict = PyDict::new(py);
-            let exclude_set = PySet::new(
-                py,
-                &[
-                    "model",
-                    "preprocessor",
-                    "sample_data",
-                    "onnx_model",
-                    "feature_extractor",
-                    "tokenizer",
-                    "drift_profile",
-                ],
-            )
-            .map_err(|e| CardError::Error(e.to_string()))?;
-            exclude_dict
-                .set_item("exclude", exclude_set)
-                .map_err(|e| CardError::Error(e.to_string()))?;
-
-            // Call the model_dump method with the exclude argument
-            let result = obj
-                .call_method(py, "model_dump", (), Some(&exclude_dict))
-                .map_err(|e| {
-                    CardError::Error(format!(
-                        "Error calling model_dump method on interface: {}",
-                        e
-                    ))
-                })?;
-
-            // cast to pydict
-            let dumped_interface = result
-                .downcast_bound::<PyDict>(py)
-                .map_err(|e| CardError::Error(e.to_string()))?;
-
-            if let Ok(Some(onnx_args)) = dumped_interface.get_item("onnx_args") {
-                let args = onnx_args
-                    .downcast::<PyDict>()
-                    .map_err(|e| CardError::Error(e.to_string()))?;
-
-                // check if config in args. if it is, pop it
-                if let Ok(Some(_)) = args.get_item("config") {
-                    args.del_item("config")
-                        .map_err(|e| CardError::Error(e.to_string()))?;
-                }
-            }
-
-            println!("{:?}", result); // Print the result for debugging
-
-            Ok(())
-        })
-    }
-}
+//impl ModelCard {
+//    pub fn serialize(&self) -> Result<(), CardError> {
+//        Python::with_gil(|py| {
+//            let obj = &self.interface;
+//
+//            // Create the exclude dictionary
+//            let exclude_dict = PyDict::new(py);
+//            let exclude_set = PySet::new(
+//                py,
+//                &[
+//                    "model",
+//                    "preprocessor",
+//                    "sample_data",
+//                    "onnx_model",
+//                    "feature_extractor",
+//                    "tokenizer",
+//                    "drift_profile",
+//                ],
+//            )
+//            .map_err(|e| CardError::Error(e.to_string()))?;
+//            exclude_dict
+//                .set_item("exclude", exclude_set)
+//                .map_err(|e| CardError::Error(e.to_string()))?;
+//
+//            // Call the model_dump method with the exclude argument
+//            let result = obj
+//                .call_method(py, "model_dump", (), Some(&exclude_dict))
+//                .map_err(|e| {
+//                    CardError::Error(format!(
+//                        "Error calling model_dump method on interface: {}",
+//                        e
+//                    ))
+//                })?;
+//
+//            // cast to pydict
+//            let dumped_interface = result
+//                .downcast_bound::<PyDict>(py)
+//                .map_err(|e| CardError::Error(e.to_string()))?;
+//
+//            if let Ok(Some(onnx_args)) = dumped_interface.get_item("onnx_args") {
+//                let args = onnx_args
+//                    .downcast::<PyDict>()
+//                    .map_err(|e| CardError::Error(e.to_string()))?;
+//
+//                // check if config in args. if it is, pop it
+//                if let Ok(Some(_)) = args.get_item("config") {
+//                    args.del_item("config")
+//                        .map_err(|e| CardError::Error(e.to_string()))?;
+//                }
+//            }
+//
+//            println!("{:?}", result); // Print the result for debugging
+//
+//            Ok(())
+//        })
+//    }
+//}

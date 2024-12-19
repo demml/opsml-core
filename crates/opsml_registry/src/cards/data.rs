@@ -75,6 +75,7 @@ pub struct DataCard {
 #[pymethods]
 impl DataCard {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None))]
     pub fn new(
         interface: PyObject,
