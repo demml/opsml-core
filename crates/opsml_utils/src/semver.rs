@@ -1,5 +1,5 @@
 use opsml_error::error::VersionError;
-use opsml_types::enums::VersionType;
+use opsml_types::cards::types::VersionType;
 use semver::{BuildMetadata, Prerelease, Version};
 
 #[derive(Debug, PartialEq)]

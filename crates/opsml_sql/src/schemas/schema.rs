@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use opsml_error::error::VersionError;
-use opsml_types::enums::CommonKwargs;
+use opsml_types::CommonKwargs;
 use opsml_utils::utils::get_utc_datetime;
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::{Deserialize, Serialize};

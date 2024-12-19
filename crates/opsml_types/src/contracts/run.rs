@@ -1,5 +1,4 @@
-use crate::HardwareMetrics;
-use crate::{Metric, Parameter};
+use crate::cards::run::types::{HardwareMetrics, Metric, Parameter};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

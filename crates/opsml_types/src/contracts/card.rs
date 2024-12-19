@@ -1,5 +1,5 @@
-use crate::{PyHelperFuncs, RegistryType, VersionType};
-
+use crate::cards::types::{RegistryType, VersionType};
+use crate::shared::PyHelperFuncs;
 use chrono::NaiveDateTime;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};

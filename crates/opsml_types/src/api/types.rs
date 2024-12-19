@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone)]
 pub enum RequestType {
     Get,
@@ -47,4 +49,9 @@ impl Routes {
             Routes::CardUpdate => "card/update",
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JwtToken {
+    pub token: String,
 }

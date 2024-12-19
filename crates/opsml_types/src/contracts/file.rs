@@ -1,5 +1,5 @@
-use crate::enums::StorageType;
-use crate::helper::PyHelperFuncs;
+use crate::PyHelperFuncs;
+use crate::StorageType;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 

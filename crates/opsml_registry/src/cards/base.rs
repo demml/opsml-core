@@ -35,8 +35,8 @@ impl BaseArgs {
         )?);
         let contact = Self::get_value("CONTACT", &contact, info.as_ref().map(|i| &i.contact))?;
 
-        let version = version.unwrap_or_else(|| enums::CommonKwargs::BaseVersion.to_string());
-        let uid = uid.unwrap_or_else(|| enums::CommonKwargs::Undefined.to_string());
+        let version = version.unwrap_or_else(|| CommonKwargs::BaseVersion.to_string());
+        let uid = uid.unwrap_or_else(|| CommonKwargs::Undefined.to_string());
 
         validate_name_repository_pattern(&name, &repository)?;
 

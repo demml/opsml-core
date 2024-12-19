@@ -1,10 +1,46 @@
-use crate::{GraphStyle, GraphType, PyHelperFuncs, Suffix};
+use crate::shared::{PyHelperFuncs, Suffix};
 use chrono::NaiveDateTime;
 use opsml_error::error::TypeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Display;
 use std::path::PathBuf;
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
+pub enum GraphStyle {
+    #[default]
+    Line,
+    Scatter,
+}
+
+impl Display for GraphStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GraphStyle::Line => write!(f, "line"),
+            GraphStyle::Scatter => write!(f, "scatter"),
+        }
+    }
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
+pub enum GraphType {
+    #[default]
+    Single,
+    Group,
+}
+
+impl Display for GraphType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GraphType::Single => write!(f, "single"),
+            GraphType::Group => write!(f, "group"),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CPUMetrics {
