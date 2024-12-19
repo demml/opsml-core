@@ -183,3 +183,15 @@ def test_description_creation():
     assert description.summary == summary
     assert description.sample_code == sample_code
     assert description.notes == notes
+
+
+def test_description_creation_markdown():
+    summary = "assets/readme.md"
+    sample_code = "print('Hello, world!')"
+    notes = "These are some notes."
+
+    description = Description(summary, sample_code, notes)
+
+    assert description.summary != summary
+    assert description.sample_code == sample_code
+    assert description.notes == notes
