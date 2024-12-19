@@ -32,11 +32,11 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<HuggingFaceORTModel>()?;
     _m.add_class::<TorchOnnxArgs>()?;
     _m.add_class::<TorchSaveArgs>()?;
-    _m.add_class::<Feature>()?; // TODO: pyi
-    _m.add_class::<Description>()?; // TODO: pyi
-    _m.add_class::<VersionType>()?; // TODO: pyi
-    _m.add_class::<DataSchema>()?; // TODO: pyi
-    _m.add_class::<OnnxSchema>()?; // TODO: pyi
+    _m.add_class::<Feature>()?;
+    _m.add_class::<Description>()?;
+    _m.add_class::<VersionType>()?;
+    _m.add_class::<DataSchema>()?;
+    _m.add_class::<OnnxSchema>()?;
 
     // Model Interface args
     _m.add_class::<ModelInterfaceArgs>()?; // TODO: pyi

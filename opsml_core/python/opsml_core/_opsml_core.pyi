@@ -1,6 +1,4 @@
-from pathlib import Path
-from typing import List, Optional, Any, Dict
-from enum import Enum
+from typing import List, Optional, Any, Dict, Union
 
 # shared
 class CommonKwargs:
@@ -367,4 +365,307 @@ class Description:
 
         Returns:
             String representation of the Description.
+        """
+
+class ModelInterfaceArgs:
+    task_type: str
+    model_type: str
+    data_type: str
+    modelcard_uid: str
+    feature_map: dict[str, Feature]
+    sample_data_interface_type: str
+    metadata: dict[str, str]
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        sample_data_interface_type: str,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            sample_data_interface_type:
+                The type of sample data interface
+            metadata:
+                Any additional metadata
+        """
+
+class SklearnModelInterfaceArgs(ModelInterfaceArgs):
+    preprocessor_name: str
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        sample_data_interface_type: str,
+        preprocessor_name: str,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            sample_data_interface_type:
+                The type of sample data interface
+            preprocessor_name:
+                The name of the preprocessor
+            metadata:
+                Any additional metadata
+        """
+
+class CatBoostModelInterfaceArgs(SklearnModelInterfaceArgs): ...
+
+class HuggingFaceOnnxSaveArgs:
+    ort_type: HuggingFaceORTModel
+    provider: str
+    quantize: bool
+
+    def __init__(
+        self, ort_type: HuggingFaceORTModel, provider: str, quantize: bool
+    ) -> None:
+        """Optional Args to use with a huggingface model
+
+        Args:
+            ort_type:
+                Optimum onnx class name
+            provider:
+                Onnx runtime provider to use
+            quantize:
+                Whether to quantize the model
+        """
+
+class HuggingFaceModelInterfaceArgs(SklearnModelInterfaceArgs):
+    is_pipeline: bool
+    backend: CommonKwargs
+    onnx_args: HuggingFaceOnnxSaveArgs
+    tokenizer_name: str
+    feature_extractor_name: str
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        sample_data_interface_type: str,
+        preprocessor_name: str,
+        is_pipeline: bool,
+        backend: CommonKwargs,
+        onnx_args: HuggingFaceOnnxSaveArgs,
+        tokenizer_name: str,
+        feature_extractor_name: str,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            sample_data_interface_type:
+                The type of sample data interface
+            preprocessor_name:
+                The name of the preprocessor
+            is_pipeline:
+                Whether the model is a pipeline
+            backend:
+                The backend to use
+            onnx_args:
+                The onnx args to use
+            tokenizer_name:
+                The name of the tokenizer
+            feature_extractor_name:
+                The name of the feature extractor
+            metadata:
+                Any additional metadata
+        """
+
+class LightGBMModelInterfaceArgs(SklearnModelInterfaceArgs): ...
+
+class LightningInterfaceArgs(SklearnModelInterfaceArgs):
+    onnx_args: Optional[TorchOnnxArgs]
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        sample_data_interface_type: str,
+        preprocessor_name: str,
+        onnx_args: Optional[TorchOnnxArgs] = None,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            sample_data_interface_type:
+                The type of sample data interface
+            preprocessor_name:
+                The name of the preprocessor
+            onnx_args:
+                The onnx args to use
+            metadata:
+                Any additional metadata
+        """
+
+class TorchInterfaceArgs(SklearnModelInterfaceArgs):
+    onnx_args: Optional[TorchOnnxArgs]
+    save_args: TorchSaveArgs
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        sample_data_interface_type: str,
+        preprocessor_name: str,
+        onnx_args: Optional[TorchOnnxArgs] = None,
+        save_args: Optional[TorchSaveArgs] = None,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            sample_data_interface_type:
+                The type of sample data interface
+            preprocessor_name:
+                The name of the preprocessor
+            onnx_args:
+                The onnx args to use
+            save_args:
+                The save args to use
+            metadata:
+                Any additional metadata
+        """
+
+class TensorFlowInterfaceArgs(SklearnModelInterfaceArgs): ...
+
+class VowpalWabbitInterfaceArgs(ModelInterfaceArgs):
+    arguments: str
+
+    def __init__(
+        self,
+        task_type: str,
+        model_type: str,
+        data_type: str,
+        modelcard_uid: str,
+        feature_map: dict[str, Feature],
+        arguments: str,
+        sample_data_interface_type: str,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            task_type:
+                The type of task the model performs
+            model_type:
+                The type of model
+            data_type:
+                The type of data the model uses
+            modelcard_uid:
+                The modelcard uid
+            feature_map:
+                A dictionary of features
+            arguments:
+                The arguments to use
+            sample_data_interface_type:
+                The type of sample data interface
+            metadata:
+                Any additional metadata
+        """
+
+class XGBoostModelInterfaceArgs(SklearnModelInterfaceArgs): ...
+
+class ModelInterfaceArgsEnum:
+    Huggingface: HuggingFaceModelInterfaceArgs
+    Lightgbm: LightGBMModelInterfaceArgs
+    Lightning: LightningInterfaceArgs
+    Sklearn: SklearnModelInterfaceArgs
+    Tensorflow: TensorFlowInterfaceArgs
+    Torch: TorchInterfaceArgs
+    Vowpal: VowpalWabbitInterfaceArgs
+    Xgboost: XGBoostModelInterfaceArgs
+    CatBoost: CatBoostModelInterfaceArgs
+    Base: ModelInterfaceArgs
+
+    def __init__(
+        self,
+        interface_args: Union[
+            HuggingFaceModelInterfaceArgs,
+            LightGBMModelInterfaceArgs,
+            LightningInterfaceArgs,
+            SklearnModelInterfaceArgs,
+            TensorFlowInterfaceArgs,
+            TorchInterfaceArgs,
+            VowpalWabbitInterfaceArgs,
+            XGBoostModelInterfaceArgs,
+            CatBoostModelInterfaceArgs,
+            ModelInterfaceArgs,
+        ],
+    ) -> None:
+        """Define a model interface
+
+        Args:
+            interface_args:
+                The interface args to use
         """
