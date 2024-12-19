@@ -1,4 +1,4 @@
-use opsml_types::{SqlType, StorageType};
+use opsml_types::{PyHelperFuncs, SqlType, StorageType};
 use pyo3::prelude::*;
 use rand::Rng;
 use serde::Serialize;
@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 /// ApiSettings for use with ApiClient
 #[derive(Debug, Clone)]
-#[pyclass]
 pub struct ApiSettings {
     pub base_url: String,
     pub use_auth: bool,
@@ -22,7 +21,6 @@ pub struct ApiSettings {
 
 /// StorageSettings for used with all storage clients
 #[derive(Debug, Clone)]
-#[pyclass]
 pub struct OpsmlStorageSettings {
     pub storage_uri: String,
     pub client_mode: bool,
@@ -32,7 +30,6 @@ pub struct OpsmlStorageSettings {
 
 /// DatabaseSettings for used with all database clients
 #[derive(Debug, Clone, Serialize)]
-#[pyclass]
 pub struct DatabaseSettings {
     pub connection_uri: String,
     pub max_connections: u32,
@@ -40,7 +37,6 @@ pub struct DatabaseSettings {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
-#[pyclass]
 pub struct AuthSettings {
     pub enabled: bool,
     pub jwt_secret: String,
@@ -51,15 +47,10 @@ pub struct AuthSettings {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
-#[pyclass]
 pub struct ScouterSettings {
-    #[pyo3(get)]
     pub server_uri: Option<String>,
-    #[pyo3(get)]
     pub username: Option<String>,
-    #[pyo3(get)]
     pub password: Option<String>,
-    #[pyo3(get)]
     pub auth: bool,
 }
 
@@ -69,27 +60,16 @@ pub struct ScouterSettings {
 #[derive(Debug, Clone, Serialize)]
 #[pyclass]
 pub struct OpsmlConfig {
-    #[pyo3(get)]
     pub app_name: String,
-    #[pyo3(get)]
     pub app_env: String,
-    #[pyo3(get)]
     pub app_version: String,
-    #[pyo3(get)]
     pub opsml_storage_uri: String,
-    #[pyo3(get)]
     pub opsml_tracking_uri: String,
-    #[pyo3(get)]
     pub opsml_proxy_root: String,
-    #[pyo3(get)]
     pub opsml_registry_path: String,
-    #[pyo3(get)]
     pub scouter_settings: ScouterSettings,
-    #[pyo3(get)]
     pub auth_settings: AuthSettings,
-    #[pyo3(get)]
     pub database_settings: DatabaseSettings,
-    #[pyo3(get)]
     pub client_mode: bool,
 }
 
@@ -240,6 +220,25 @@ impl OpsmlConfig {
             SqlType::Sqlite
         }
     }
+
+    /// Get the storage settings for the OpsmlConfig
+    pub fn storage_settings(&self) -> OpsmlStorageSettings {
+        OpsmlStorageSettings {
+            storage_uri: self.opsml_storage_uri.clone(),
+            client_mode: self.client_mode,
+            storage_type: self.get_storage_type(),
+            api_settings: ApiSettings {
+                base_url: self.opsml_tracking_uri.clone(),
+                use_auth: self.auth_settings.enabled,
+                opsml_dir: "opsml".to_string(),
+                scouter_dir: "scouter".to_string(),
+                username: self.auth_settings.username.clone().unwrap_or_default(),
+                password: self.auth_settings.password.clone().unwrap_or_default(),
+                auth_token: "".to_string(),
+                prod_token: self.auth_settings.prod_token.clone(),
+            },
+        }
+    }
 }
 
 #[pymethods]
@@ -261,23 +260,8 @@ impl OpsmlConfig {
         config
     }
 
-    /// Get the storage settings for the OpsmlConfig
-    pub fn storage_settings(&self) -> OpsmlStorageSettings {
-        OpsmlStorageSettings {
-            storage_uri: self.opsml_storage_uri.clone(),
-            client_mode: self.client_mode,
-            storage_type: self.get_storage_type(),
-            api_settings: ApiSettings {
-                base_url: self.opsml_tracking_uri.clone(),
-                use_auth: self.auth_settings.enabled,
-                opsml_dir: "opsml".to_string(),
-                scouter_dir: "scouter".to_string(),
-                username: self.auth_settings.username.clone().unwrap_or_default(),
-                password: self.auth_settings.password.clone().unwrap_or_default(),
-                auth_token: "".to_string(),
-                prod_token: self.auth_settings.prod_token.clone(),
-            },
-        }
+    pub fn __str__(&self) -> String {
+        PyHelperFuncs::__str__(self)
     }
 }
 

@@ -3,14 +3,10 @@
 use crate::storage::filesystem::FileSystem;
 use crate::storage::http::base::OpsmlApiClient;
 use crate::storage::local::client::{LocalFSStorageClient, LocalMultiPartUpload};
-use anyhow::Context;
-use anyhow::Result as AnyhowResult;
 use opsml_error::error::StorageError;
-use opsml_settings::config::{OpsmlConfig, OpsmlStorageSettings};
+use opsml_settings::config::OpsmlStorageSettings;
 use opsml_types::{FileInfo, StorageType};
-use pyo3::prelude::*;
 use std::path::Path;
-use std::path::PathBuf;
 
 use crate::storage::aws::client::{AWSMulitPartUpload, S3FStorageClient};
 use crate::storage::azure::client::{AzureFSStorageClient, AzureMultipartUpload};
@@ -276,115 +272,115 @@ impl StorageClientEnum {
     }
 }
 
-#[pyclass]
-pub struct PyStorageClient {
-    inner: StorageClientEnum,
-    runtime: tokio::runtime::Runtime,
-}
-
-#[pymethods]
-impl PyStorageClient {
-    #[new]
-    pub fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let client = rt
-            .block_on(StorageClientEnum::new(settings))
-            .map_err(|e| StorageError::Error(format!("{:?}", e)))?;
-
-        Ok(PyStorageClient {
-            inner: client,
-            runtime: rt,
-        })
-    }
-
-    #[pyo3(signature = (path=PathBuf::new()))]
-    fn find(&self, path: PathBuf) -> PyResult<Vec<String>> {
-        let result = self
-            .runtime
-            .block_on(self.inner.find(&path))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(result)
-    }
-
-    fn find_info(&self, path: PathBuf) -> PyResult<Vec<FileInfo>> {
-        let result = self
-            .runtime
-            .block_on(self.inner.find_info(&path))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(result)
-    }
-
-    #[pyo3(signature = (lpath, rpath, recursive = false))]
-    pub fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
-        self.runtime
-            .block_on(self.inner.get(&lpath, &rpath, recursive))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(())
-    }
-
-    #[pyo3(signature = (lpath, rpath, recursive = false))]
-    pub fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
-        self.runtime
-            .block_on(self.inner.put(&lpath, &rpath, recursive))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(())
-    }
-
-    pub fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> PyResult<()> {
-        self.runtime
-            .block_on(self.inner.copy(&src, &dest, recursive))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(())
-    }
-
-    pub fn rm(&self, path: PathBuf, recursive: bool) -> PyResult<()> {
-        self.runtime
-            .block_on(self.inner.rm(&path, recursive))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-
-        Ok(())
-    }
-
-    pub fn exists(&self, path: PathBuf) -> PyResult<bool> {
-        let result = self
-            .runtime
-            .block_on(self.inner.exists(&path))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(result)
-    }
-
-    pub fn generate_presigned_url(&self, path: PathBuf, expiration: u64) -> PyResult<String> {
-        let result = self
-            .runtime
-            .block_on(self.inner.generate_presigned_url(&path, expiration))
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-        Ok(result)
-    }
-}
-
-pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
-    // check storage_uri for prefix
-    let storage_settings = config.storage_settings();
-
-    StorageClientEnum::new(&storage_settings)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to create storage client for storage type: {:?}",
-                storage_settings.storage_type
-            )
-        })
-}
-
-#[pyfunction]
-pub fn get_opsml_storage_system(config: &OpsmlConfig) -> AnyhowResult<PyStorageClient> {
-    // check storage_uri for prefix
-    let storage_settings = config.storage_settings();
-
-    PyStorageClient::new(&storage_settings).with_context(|| {
-        format!(
-            "Failed to create storage client for storage type: {:?}",
-            storage_settings.storage_type
-        )
-    })
-}
+//#[pyclass]
+//pub struct PyStorageClient {
+//    inner: StorageClientEnum,
+//    runtime: tokio::runtime::Runtime,
+//}
+//
+//#[pymethods]
+//impl PyStorageClient {
+//    #[new]
+//    pub fn new(settings: &OpsmlStorageSettings) -> Result<Self, StorageError> {
+//        let rt = tokio::runtime::Runtime::new().unwrap();
+//        let client = rt
+//            .block_on(StorageClientEnum::new(settings))
+//            .map_err(|e| StorageError::Error(format!("{:?}", e)))?;
+//
+//        Ok(PyStorageClient {
+//            inner: client,
+//            runtime: rt,
+//        })
+//    }
+//
+//    #[pyo3(signature = (path=PathBuf::new()))]
+//    fn find(&self, path: PathBuf) -> PyResult<Vec<String>> {
+//        let result = self
+//            .runtime
+//            .block_on(self.inner.find(&path))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(result)
+//    }
+//
+//    fn find_info(&self, path: PathBuf) -> PyResult<Vec<FileInfo>> {
+//        let result = self
+//            .runtime
+//            .block_on(self.inner.find_info(&path))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(result)
+//    }
+//
+//    #[pyo3(signature = (lpath, rpath, recursive = false))]
+//    pub fn get(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
+//        self.runtime
+//            .block_on(self.inner.get(&lpath, &rpath, recursive))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(())
+//    }
+//
+//    #[pyo3(signature = (lpath, rpath, recursive = false))]
+//    pub fn put(&self, lpath: PathBuf, rpath: PathBuf, recursive: bool) -> PyResult<()> {
+//        self.runtime
+//            .block_on(self.inner.put(&lpath, &rpath, recursive))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(())
+//    }
+//
+//    pub fn copy(&self, src: PathBuf, dest: PathBuf, recursive: bool) -> PyResult<()> {
+//        self.runtime
+//            .block_on(self.inner.copy(&src, &dest, recursive))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(())
+//    }
+//
+//    pub fn rm(&self, path: PathBuf, recursive: bool) -> PyResult<()> {
+//        self.runtime
+//            .block_on(self.inner.rm(&path, recursive))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//
+//        Ok(())
+//    }
+//
+//    pub fn exists(&self, path: PathBuf) -> PyResult<bool> {
+//        let result = self
+//            .runtime
+//            .block_on(self.inner.exists(&path))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(result)
+//    }
+//
+//    pub fn generate_presigned_url(&self, path: PathBuf, expiration: u64) -> PyResult<String> {
+//        let result = self
+//            .runtime
+//            .block_on(self.inner.generate_presigned_url(&path, expiration))
+//            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+//        Ok(result)
+//    }
+//}
+//
+//pub async fn get_storage_system(config: &OpsmlConfig) -> AnyhowResult<StorageClientEnum> {
+//    // check storage_uri for prefix
+//    let storage_settings = config.storage_settings();
+//
+//    StorageClientEnum::new(&storage_settings)
+//        .await
+//        .with_context(|| {
+//            format!(
+//                "Failed to create storage client for storage type: {:?}",
+//                storage_settings.storage_type
+//            )
+//        })
+//}
+//
+//#[pyfunction]
+//pub fn get_opsml_storage_system(config: &OpsmlConfig) -> AnyhowResult<PyStorageClient> {
+//    // check storage_uri for prefix
+//    let storage_settings = config.storage_settings();
+//
+//    PyStorageClient::new(&storage_settings).with_context(|| {
+//        format!(
+//            "Failed to create storage client for storage type: {:?}",
+//            storage_settings.storage_type
+//        )
+//    })
+//}
