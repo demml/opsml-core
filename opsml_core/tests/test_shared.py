@@ -1,4 +1,4 @@
-from opsml_core import CommonKwargs, SaveName, Suffix
+from opsml_core import CommonKwargs, SaveName, Suffix, OpsmlConfig
 import pytest
 
 
@@ -86,3 +86,8 @@ def test_save_name_as_string(variant, expected_string):
 )
 def test_suffix_as_string(variant, expected_string):
     assert variant.as_string() == expected_string
+
+
+def test_opsml_config():
+    config = OpsmlConfig()
+    assert config is not None

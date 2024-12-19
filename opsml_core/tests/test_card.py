@@ -8,6 +8,44 @@ from optimum.onnxruntime.configuration import AutoQuantizationConfig  # type: ig
 import pytest
 
 
+@pytest.mark.parametrize(
+    "variant",
+    [
+        HuggingFaceORTModel.OrtAudioClassification,
+        HuggingFaceORTModel.OrtAudioFrameClassification,
+        HuggingFaceORTModel.OrtAudioXVector,
+        HuggingFaceORTModel.OrtCustomTasks,
+        HuggingFaceORTModel.OrtCtc,
+        HuggingFaceORTModel.OrtFeatureExtraction,
+        HuggingFaceORTModel.OrtImageClassification,
+        HuggingFaceORTModel.OrtMaskedLm,
+        HuggingFaceORTModel.OrtMultipleChoice,
+        HuggingFaceORTModel.OrtQuestionAnswering,
+        HuggingFaceORTModel.OrtSemanticSegmentation,
+        HuggingFaceORTModel.OrtSequenceClassification,
+        HuggingFaceORTModel.OrtTokenClassification,
+        HuggingFaceORTModel.OrtSeq2SeqLm,
+        HuggingFaceORTModel.OrtSpeechSeq2Seq,
+        HuggingFaceORTModel.OrtVision2Seq,
+        HuggingFaceORTModel.OrtPix2Struct,
+        HuggingFaceORTModel.OrtCausalLm,
+        HuggingFaceORTModel.OrtOptimizer,
+        HuggingFaceORTModel.OrtQuantizer,
+        HuggingFaceORTModel.OrtTrainer,
+        HuggingFaceORTModel.OrtSeq2SeqTrainer,
+        HuggingFaceORTModel.OrtTrainingArguments,
+        HuggingFaceORTModel.OrtSeq2SeqTrainingArguments,
+        HuggingFaceORTModel.OrtStableDiffusionPipeline,
+        HuggingFaceORTModel.OrtStableDiffusionImg2ImgPipeline,
+        HuggingFaceORTModel.OrtStableDiffusionInpaintPipeline,
+        HuggingFaceORTModel.OrtStableDiffusionXlPipeline,
+        HuggingFaceORTModel.OrtStableDiffusionXlImg2ImgPipeline,
+    ],
+)
+def test_huggingface_ort_model_variants(variant):
+    assert variant is not None
+
+
 def test_hugging_face_ort_model():
     args = HuggingFaceOnnxArgs(
         ort_type=HuggingFaceORTModel.OrtAudioClassification,
