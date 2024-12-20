@@ -18,7 +18,7 @@ pub mod server_logic {
     #[derive(Debug)]
     pub struct ServerRegistry {
         sql_client: SqlClientEnum,
-        registry_type: RegistryType,
+        pub registry_type: RegistryType,
         pub table_name: CardSQLTableNames,
     }
 

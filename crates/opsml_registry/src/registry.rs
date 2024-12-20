@@ -3,7 +3,6 @@ use crate::enums::OpsmlRegistry;
 use opsml_error::error::OpsmlError;
 use opsml_error::error::RegistryError;
 use opsml_types::*;
-use opsml_utils::VersionValidator;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
