@@ -83,7 +83,7 @@ impl CardSQLTableNames {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass]
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub enum VersionType {
     Major,
@@ -107,6 +107,23 @@ impl FromStr for VersionType {
             "pre_build" => Ok(VersionType::PreBuild),
             _ => Err(()),
         }
+    }
+}
+
+#[pymethods]
+impl VersionType {
+    #[new]
+    fn new(version_type: String) -> PyResult<Self> {
+        match VersionType::from_str(&version_type) {
+            Ok(version_type) => Ok(version_type),
+            Err(_) => Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid version type",
+            )),
+        }
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
     }
 }
 
@@ -294,6 +311,25 @@ impl DataSchema {
             output_features,
             onnx_schema,
         }
+    }
+    pub fn __str__(&self) -> String {
+        // serialize the struct to a string
+        PyHelperFuncs::__str__(self)
+    }
+}
+
+#[pyclass(eq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct OpsmlMixin {
+    #[pyo3(get)]
+    pub is_interface: bool,
+}
+
+#[pymethods]
+impl OpsmlMixin {
+    #[new]
+    fn new() -> Self {
+        OpsmlMixin { is_interface: true }
     }
     pub fn __str__(&self) -> String {
         // serialize the struct to a string

@@ -1,4 +1,4 @@
-from opsml_core import CommonKwargs, SaveName, Suffix, OpsmlConfig
+from opsml_core import CommonKwargs, SaveName, Suffix, OpsmlConfig, VersionType
 import pytest
 
 
@@ -91,3 +91,33 @@ def test_suffix_as_string(variant, expected_string):
 def test_opsml_config():
     config = OpsmlConfig()
     assert config is not None
+
+
+def test_version_type_enum():
+    assert VersionType.Major == VersionType.Major
+    assert VersionType.Minor == VersionType.Minor
+    assert VersionType.Patch == VersionType.Patch
+    assert VersionType.Pre == VersionType.Pre
+    assert VersionType.Build == VersionType.Build
+    assert VersionType.PreBuild == VersionType.PreBuild
+
+
+def test_version_type_from_str():
+    assert VersionType("major") == VersionType.Major
+    assert VersionType("minor") == VersionType.Minor
+    assert VersionType("patch") == VersionType.Patch
+    assert VersionType("pre") == VersionType.Pre
+    assert VersionType("build") == VersionType.Build
+    assert VersionType("pre_build") == VersionType.PreBuild
+
+    with pytest.raises(ValueError):
+        VersionType("invalid")
+
+
+def test_version_type_str():
+    assert str(VersionType.Major) == "VersionType.Major"
+    assert str(VersionType.Minor) == "VersionType.Minor"
+    assert str(VersionType.Patch) == "VersionType.Patch"
+    assert str(VersionType.Pre) == "VersionType.Pre"
+    assert str(VersionType.Build) == "VersionType.Build"
+    assert str(VersionType.PreBuild) == "VersionType.PreBuild"

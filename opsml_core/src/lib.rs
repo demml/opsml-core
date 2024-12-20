@@ -8,7 +8,7 @@ use opsml_types::cards::model::{
 };
 use opsml_types::cards::{
     DataSchema, Description, Feature, HuggingFaceORTModel, HuggingFaceOnnxArgs,
-    HuggingFaceOnnxSaveArgs, OnnxSchema, TorchOnnxArgs, TorchSaveArgs, VersionType,
+    HuggingFaceOnnxSaveArgs, OnnxSchema, OpsmlMixin, TorchOnnxArgs, TorchSaveArgs, VersionType,
 };
 use opsml_types::shared::{CommonKwargs, SaveName, Suffix};
 
@@ -26,6 +26,7 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<CommonKwargs>()?;
     _m.add_class::<SaveName>()?;
     _m.add_class::<Suffix>()?;
+    _m.add_class::<OpsmlMixin>()?;
 
     // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
