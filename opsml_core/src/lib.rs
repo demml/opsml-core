@@ -1,5 +1,8 @@
+#[cfg(feature = "server")]
+use opsml_registry::RegistryTestHelper;
+
 use opsml_error::error::OpsmlError;
-use opsml_registry::{PyCardRegistry, RegistryTestHelper};
+use opsml_registry::PyCardRegistry;
 use opsml_settings::config::OpsmlConfig;
 use opsml_types::cards::model::{
     CatBoostModelInterfaceArgs, HuggingFaceModelInterfaceArgs, LightGBMModelInterfaceArgs,
@@ -60,6 +63,8 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // registry
     _m.add_class::<PyCardRegistry>()?;
+
+    #[cfg(feature = "server")]
     _m.add_class::<RegistryTestHelper>()?;
 
     Ok(())

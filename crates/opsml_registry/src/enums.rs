@@ -30,6 +30,11 @@ impl OpsmlRegistry {
                 .await?;
                 Ok(Self::ServerRegistry(server_registry))
             }
+
+            #[cfg(not(feature = "server"))]
+            false => Err(RegistryError::NewError(
+                "Server mode is not enabled in the settings".to_string(),
+            )),
         }
     }
 
