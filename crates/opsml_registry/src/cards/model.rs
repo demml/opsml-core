@@ -118,9 +118,10 @@ impl ModelCard {
             .unwrap_or(false);
 
         if !is_interface {
-            return Err(
-                OpsmlError::new_err("Interface is not a model interface".to_string()).into(),
-            );
+            return Err(OpsmlError::new_err(
+                "Interface argument is not a model interface".to_string(),
+            )
+            .into());
         }
 
         Ok(Self {
