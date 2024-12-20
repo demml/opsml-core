@@ -110,9 +110,12 @@ impl ModelCard {
         // check if interface is a model interface (should be a bool)
         let is_interface: bool = interface
             .call_method0("is_interface")
-            .map_err(|e| OpsmlError::new_err(e.to_string()))?
-            .extract()
-            .unwrap();
+            .and_then(|result| {
+                result
+                    .extract()
+                    .map_err(|e| OpsmlError::new_err(e.to_string()))
+            })
+            .unwrap_or(false);
 
         if !is_interface {
             return Err(
@@ -132,6 +135,32 @@ impl ModelCard {
             tags: base_args.tags,
             metadata: metadata.unwrap_or_default(),
             card_type: CardType::Data,
+        })
+    }
+}
+
+impl FromPyObject<'_> for ModelCard {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let interface = ob.getattr("interface")?;
+        let name = ob.getattr("name")?.extract()?;
+        let repository = ob.getattr("repository")?.extract()?;
+        let contact = ob.getattr("contact")?.extract()?;
+        let version = ob.getattr("version")?.extract()?;
+        let uid = ob.getattr("uid")?.extract()?;
+        let tags = ob.getattr("tags")?.extract()?;
+        let metadata = ob.getattr("metadata")?.extract()?;
+        let card_type = ob.getattr("card_type")?.extract()?;
+
+        Ok(ModelCard {
+            interface: interface.into(),
+            name,
+            repository,
+            contact,
+            version,
+            uid,
+            tags,
+            metadata,
+            card_type,
         })
     }
 }

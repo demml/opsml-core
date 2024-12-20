@@ -219,7 +219,11 @@ impl PyCardRegistry {
         pre_tag: Option<String>,
         build_tag: Option<String>,
     ) -> PyResult<()> {
+        // card comes is
+        let py = card.py();
         if card.is_instance_of::<ModelCard>() {
+            let result: ModelCard = card.extract().unwrap();
+            let card_enum = CardEnum::Model(result);
             Ok(())
         } else {
             Err(OpsmlError::new_err("Invalid card type"))

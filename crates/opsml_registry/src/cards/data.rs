@@ -1,20 +1,10 @@
 use crate::cards::*;
-use anyhow::{Context, Result as AnyhowResult};
+use opsml_error::error::OpsmlError;
 use opsml_types::*;
 use pyo3::prelude::*;
+use pyo3::IntoPyObjectExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SerializedCard {
-    name: String,
-    repository: String,
-    contact: String,
-    version: String,
-    uid: String,
-    tags: HashMap<String, String>,
-    metadata: DataCardMetadata,
-}
 
 #[pyclass]
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -78,7 +68,7 @@ impl DataCard {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None))]
     pub fn new(
-        interface: PyObject,
+        interface: &Bound<'_, PyAny>,
         name: Option<String>,
         repository: Option<String>,
         contact: Option<String>,
@@ -97,8 +87,28 @@ impl DataCard {
             info,
             tags.unwrap_or_default(),
         )?;
+
+        let py = interface.py();
+        // check if interface is a model interface (should be a bool)
+        let is_interface: bool = interface
+            .call_method0("is_interface")
+            .and_then(|result| {
+                result
+                    .extract()
+                    .map_err(|e| OpsmlError::new_err(e.to_string()))
+            })
+            .unwrap_or(false);
+
+        if !is_interface {
+            return Err(
+                OpsmlError::new_err("Interface is not a data interface".to_string()).into(),
+            );
+        }
+
         Ok(Self {
-            interface,
+            interface: interface
+                .into_py_any(py)
+                .map_err(|e| OpsmlError::new_err(e.to_string()))?,
             name: base_args.name,
             repository: base_args.repository,
             contact: base_args.contact,
@@ -108,48 +118,5 @@ impl DataCard {
             metadata: metadata.unwrap_or_default(),
             card_type: CardType::Data,
         })
-    }
-
-    pub fn model_dump_json(&self) -> String {
-        // serialize the struct to a string
-
-        PyHelperFuncs::__json__(self.serialize_card())
-    }
-
-    #[staticmethod]
-    pub fn model_validate_json(json_string: String, interface: PyObject) -> AnyhowResult<DataCard> {
-        // deserialize the string to a struct
-        let card: SerializedCard = serde_json::from_str(&json_string).with_context(|| {
-            format!(
-                "Failed to deserialize json string to card struct: {}",
-                json_string
-            )
-        })?;
-
-        Ok(DataCard {
-            interface,
-            name: card.name,
-            repository: card.repository,
-            contact: card.contact,
-            version: card.version,
-            uid: card.uid,
-            tags: card.tags,
-            metadata: card.metadata,
-            card_type: CardType::Data,
-        })
-    }
-}
-
-impl DataCard {
-    fn serialize_card(&self) -> SerializedCard {
-        SerializedCard {
-            name: self.name.clone(),
-            repository: self.repository.clone(),
-            contact: self.contact.clone(),
-            version: self.version.clone(),
-            uid: self.uid.clone(),
-            tags: self.tags.clone(),
-            metadata: self.metadata.clone(),
-        }
     }
 }

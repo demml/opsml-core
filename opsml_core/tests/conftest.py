@@ -1,5 +1,5 @@
 import pytest
-from opsml_core import Feature, OpsmlMixin
+from opsml_core import Feature
 from typing import Tuple, Dict
 from pydantic import BaseModel
 
