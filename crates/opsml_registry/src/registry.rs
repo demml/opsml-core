@@ -1,6 +1,7 @@
 use crate::cards::*;
 use crate::enums::OpsmlRegistry;
-use anyhow::{Context, Ok, Result as AnyhowResult};
+use opsml_error::error::OpsmlError;
+use opsml_error::error::RegistryError;
 use opsml_types::*;
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -10,23 +11,16 @@ pub struct CardRegistry {
     registry_type: RegistryType,
     table_name: String,
     registry: OpsmlRegistry,
-    runtime: tokio::runtime::Runtime,
 }
 
 impl CardRegistry {
-    pub fn new(registry_type: RegistryType) -> AnyhowResult<Self> {
-        // Create a new tokio runtime for the registry (needed for async calls)
-        let rt = tokio::runtime::Runtime::new().unwrap();
-
-        let registry = rt
-            .block_on(async { OpsmlRegistry::new(registry_type.clone()).await })
-            .context("Failed to create registry")?;
+    pub async fn new(registry_type: RegistryType) -> Result<Self, RegistryError> {
+        let registry = OpsmlRegistry::new(registry_type.clone()).await?;
 
         Ok(Self {
             registry_type: registry_type.clone(),
             table_name: CardSQLTableNames::from_registry_type(&registry_type).to_string(),
             registry,
-            runtime: rt,
         })
     }
 
@@ -42,7 +36,7 @@ impl CardRegistry {
         self.registry.mode()
     }
 
-    pub fn list_cards(
+    pub async fn list_cards(
         &mut self,
         info: Option<CardInfo>,
         uid: Option<String>,
@@ -53,7 +47,7 @@ impl CardRegistry {
         tags: Option<HashMap<String, String>>,
         limit: Option<i32>,
         sort_by_timestamp: Option<bool>,
-    ) -> AnyhowResult<Vec<Card>> {
+    ) -> Result<Vec<Card>, RegistryError> {
         let mut uid = uid;
         let mut name = name;
         let mut repository = repository;
@@ -102,11 +96,7 @@ impl CardRegistry {
             sort_by_timestamp,
         };
 
-        let cards = self
-            .runtime
-            .block_on(async { self.registry.list_cards(query_args).await })?;
-
-        Ok(cards)
+        self.registry.list_cards(query_args).await
     }
 }
 
@@ -122,13 +112,13 @@ pub struct PyCardRegistry {
 #[pymethods]
 impl PyCardRegistry {
     #[new]
-    pub fn new(registry_type: RegistryType) -> AnyhowResult<Self> {
+    pub fn new(registry_type: RegistryType) -> PyResult<Self> {
         // Create a new tokio runtime for the registry (needed for async calls)
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         let registry = rt
             .block_on(async { OpsmlRegistry::new(registry_type.clone()).await })
-            .context("Failed to create registry")?;
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         Ok(Self {
             registry_type: registry_type.clone(),
@@ -165,7 +155,7 @@ impl PyCardRegistry {
         tags: Option<HashMap<String, String>>,
         limit: Option<i32>,
         sort_by_timestamp: Option<bool>,
-    ) -> AnyhowResult<Vec<Card>> {
+    ) -> PyResult<Vec<Card>> {
         let mut uid = uid;
         let mut name = name;
         let mut repository = repository;
@@ -221,11 +211,11 @@ impl PyCardRegistry {
         Ok(cards)
     }
 
-    pub fn register_card(&self, card: &Bound<'_, PyAny>) -> AnyhowResult<()> {
+    pub fn register_card(&self, card: &Bound<'_, PyAny>) -> PyResult<()> {
         if card.is_instance_of::<ModelCard>() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Card is not an instance of ModelCard"))
+            Err(OpsmlError::new_err("Invalid card type"))
         }
     }
 }
@@ -299,15 +289,15 @@ mod tests {
         env::set_var("OPSML_TRACKING_URI", "http://0.0.0.0:3000");
     }
 
-    #[test]
-    fn test_registry_client_list_cards() {
+    #[tokio::test]
+    async fn test_registry_client_list_cards() {
         cleanup();
 
         //cleanup();
         setup();
 
         env::set_var("OPSML_TRACKING_URI", "http://0.0.0.0:3000");
-        let mut registry = CardRegistry::new(RegistryType::Data).unwrap();
+        let mut registry = CardRegistry::new(RegistryType::Data).await.unwrap();
 
         // Test mode
         assert_eq!(registry.mode(), RegistryMode::Client);
@@ -318,6 +308,7 @@ mod tests {
         // Test list cards
         let cards = registry
             .list_cards(None, None, None, None, None, None, None, None, None)
+            .await
             .unwrap();
 
         assert_eq!(cards.len(), 10);
