@@ -242,6 +242,10 @@ def test_card_info_set_env():
     )
 
     card.set_env()
+
+    # this is only used for testing purposes because of the different env contexts between rust and python.
+    # It works, but we don't necessarily want to expose this method to the user.
+    # So we don't include the method in the .pyi class definition.
     set_vars = card.get_vars()
 
     assert set_vars["OPSML_RUNTIME_NAME"] == "card"
