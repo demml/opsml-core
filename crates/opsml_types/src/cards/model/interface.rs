@@ -536,14 +536,14 @@ impl XGBoostModelInterfaceArgs {
 #[pyclass]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ModelInterfaceArgsEnum {
-    Huggingface(HuggingFaceModelInterfaceArgs),
-    Lightgbm(LightGBMModelInterfaceArgs),
+    HuggingFace(HuggingFaceModelInterfaceArgs),
+    LightGBM(LightGBMModelInterfaceArgs),
     Lightning(LightningInterfaceArgs),
     Sklearn(SklearnModelInterfaceArgs),
-    Tensorflow(TensorFlowInterfaceArgs),
+    TensorFlow(TensorFlowInterfaceArgs),
     Torch(TorchInterfaceArgs),
     Vowpal(VowpalWabbitInterfaceArgs),
-    Xgboost(XGBoostModelInterfaceArgs),
+    XGBoost(XGBoostModelInterfaceArgs),
     CatBoost(CatBoostModelInterfaceArgs),
     Base(ModelInterfaceArgs),
 }
@@ -560,7 +560,7 @@ impl ModelInterfaceArgsEnum {
                     e
                 ))
             })?;
-            Ok(ModelInterfaceArgsEnum::Huggingface(args))
+            Ok(ModelInterfaceArgsEnum::HuggingFace(args))
         } else if interface_args.is_instance_of::<LightGBMModelInterfaceArgs>() {
             let args: LightGBMModelInterfaceArgs = interface_args.extract().map_err(|e| {
                 OpsmlError::new_err(format!(
@@ -568,7 +568,7 @@ impl ModelInterfaceArgsEnum {
                     e
                 ))
             })?;
-            Ok(ModelInterfaceArgsEnum::Lightgbm(args))
+            Ok(ModelInterfaceArgsEnum::LightGBM(args))
         } else if interface_args.is_instance_of::<LightningInterfaceArgs>() {
             let args: LightningInterfaceArgs = interface_args.extract().map_err(|e| {
                 OpsmlError::new_err(format!("Failed to extract LightningInterfaceArgs: {}", e))
@@ -586,7 +586,7 @@ impl ModelInterfaceArgsEnum {
             let args: TensorFlowInterfaceArgs = interface_args.extract().map_err(|e| {
                 OpsmlError::new_err(format!("Failed to extract TensorFlowInterfaceArgs: {}", e))
             })?;
-            Ok(ModelInterfaceArgsEnum::Tensorflow(args))
+            Ok(ModelInterfaceArgsEnum::TensorFlow(args))
         } else if interface_args.is_instance_of::<TorchInterfaceArgs>() {
             let args: TorchInterfaceArgs = interface_args.extract().map_err(|e| {
                 OpsmlError::new_err(format!("Failed to extract TorchInterfaceArgs: {}", e))
@@ -607,7 +607,7 @@ impl ModelInterfaceArgsEnum {
                     e
                 ))
             })?;
-            Ok(ModelInterfaceArgsEnum::Xgboost(args))
+            Ok(ModelInterfaceArgsEnum::XGBoost(args))
         } else if interface_args.is_instance_of::<CatBoostModelInterfaceArgs>() {
             let args: CatBoostModelInterfaceArgs = interface_args.extract().map_err(|e| {
                 OpsmlError::new_err(format!(
@@ -628,14 +628,14 @@ impl ModelInterfaceArgsEnum {
 
     pub fn type_name(&self) -> &str {
         match self {
-            ModelInterfaceArgsEnum::Huggingface(_) => "HuggingFace",
-            ModelInterfaceArgsEnum::Lightgbm(_) => "LightGBM",
+            ModelInterfaceArgsEnum::HuggingFace(_) => "HuggingFace",
+            ModelInterfaceArgsEnum::LightGBM(_) => "LightGBM",
             ModelInterfaceArgsEnum::Lightning(_) => "Lightning",
             ModelInterfaceArgsEnum::Sklearn(_) => "Sklearn",
-            ModelInterfaceArgsEnum::Tensorflow(_) => "TensorFlow",
+            ModelInterfaceArgsEnum::TensorFlow(_) => "TensorFlow",
             ModelInterfaceArgsEnum::Torch(_) => "Torch",
-            ModelInterfaceArgsEnum::Vowpal(_) => "Vowpal",
-            ModelInterfaceArgsEnum::Xgboost(_) => "XgBoost",
+            ModelInterfaceArgsEnum::Vowpal(_) => "VowpalWabbit",
+            ModelInterfaceArgsEnum::XGBoost(_) => "XGBoost",
             ModelInterfaceArgsEnum::CatBoost(_) => "CatBoost",
             ModelInterfaceArgsEnum::Base(_) => "Base",
         }
