@@ -17,17 +17,14 @@ from opsml_core import (
     CommonKwargs,
     TorchSaveArgs,
 )
+from typing import Dict, Tuple
+from tests.conftest import MockInterface
 
 
-def create_common_args():
-    feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
-    metadata = {"key1": "value1"}
-    return feature_map, metadata
-
-
-def test_model_interface_args_creation():
-    feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
-    metadata = {"key1": "value1"}
+def test_model_interface_args_creation(
+    card_args: Tuple[Dict[str, Feature], Dict[str, str]],
+):
+    feature_map, metadata = card_args
 
     args = ModelInterfaceArgs(
         task_type="classification",
@@ -48,9 +45,10 @@ def test_model_interface_args_creation():
     assert args.metadata == metadata
 
 
-def test_sklearn_model_interface_args_creation():
-    feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
-    metadata = {"key1": "value1"}
+def test_sklearn_model_interface_args_creation(
+    card_args: Tuple[Dict[str, Feature], Dict[str, str]],
+):
+    feature_map, metadata = card_args
 
     args = SklearnModelInterfaceArgs(
         task_type="classification",
@@ -73,9 +71,9 @@ def test_sklearn_model_interface_args_creation():
     assert args.metadata == metadata
 
 
-def test_model_interface_args_enum_creation():
-    feature_map = {"feature1": Feature("type1", [1, 2, 3], {"arg1": "value1"})}
-    metadata = {"key1": "value1"}
+def test_model_interface_args_enum_creation(card_args):
+    feature_map, metadata = card_args
+
     onnx_args = HuggingFaceOnnxSaveArgs(
         HuggingFaceORTModel.OrtAudioClassification,
         "provider",
@@ -105,8 +103,8 @@ def test_model_interface_args_enum_creation():
     assert enum_args.type_name() == "HuggingFace"
 
 
-def test_model_interface_args_enum_lightgbm():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_lightgbm(card_args):
+    feature_map, metadata = card_args
 
     args = LightGBMModelInterfaceArgs(
         task_type="classification",
@@ -124,8 +122,8 @@ def test_model_interface_args_enum_lightgbm():
     assert enum_args.type_name() == "LightGBM"
 
 
-def test_model_interface_args_enum_lightning():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_lightning(card_args):
+    feature_map, metadata = card_args
     onnx_args = TorchOnnxArgs(
         input_names=["input"],
         output_names=["output"],
@@ -148,8 +146,8 @@ def test_model_interface_args_enum_lightning():
     assert enum_args.type_name() == "Lightning"
 
 
-def test_model_interface_args_enum_sklearn():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_sklearn(card_args):
+    feature_map, metadata = card_args
 
     args = SklearnModelInterfaceArgs(
         task_type="classification",
@@ -167,8 +165,8 @@ def test_model_interface_args_enum_sklearn():
     assert enum_args.type_name() == "Sklearn"
 
 
-def test_model_interface_args_enum_tensorflow():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_tensorflow(card_args):
+    feature_map, metadata = card_args
 
     args = TensorFlowInterfaceArgs(
         task_type="classification",
@@ -186,8 +184,8 @@ def test_model_interface_args_enum_tensorflow():
     assert enum_args.type_name() == "TensorFlow"
 
 
-def test_model_interface_args_enum_torch():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_torch(card_args):
+    feature_map, metadata = card_args
     onnx_args = TorchOnnxArgs(
         input_names=["input"],
         output_names=["output"],
@@ -212,8 +210,8 @@ def test_model_interface_args_enum_torch():
     assert enum_args.type_name() == "Torch"
 
 
-def test_model_interface_args_enum_vowpal():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_vowpal(card_args):
+    feature_map, metadata = card_args
 
     args = VowpalWabbitInterfaceArgs(
         task_type="classification",
@@ -231,8 +229,8 @@ def test_model_interface_args_enum_vowpal():
     assert enum_args.type_name() == "VowpalWabbit"
 
 
-def test_model_interface_args_enum_xgboost():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_xgboost(card_args):
+    feature_map, metadata = card_args
 
     args = XGBoostModelInterfaceArgs(
         task_type="classification",
@@ -250,8 +248,8 @@ def test_model_interface_args_enum_xgboost():
     assert enum_args.type_name() == "XGBoost"
 
 
-def test_model_interface_args_enum_catboost():
-    feature_map, metadata = create_common_args()
+def test_model_interface_args_enum_catboost(card_args):
+    feature_map, metadata = card_args
 
     args = CatBoostModelInterfaceArgs(
         task_type="classification",
@@ -267,3 +265,7 @@ def test_model_interface_args_enum_catboost():
     enum_args = ModelInterfaceArgsEnum(args)
     assert isinstance(enum_args, ModelInterfaceArgsEnum)
     assert enum_args.type_name() == "CatBoost"
+
+
+def test_opsml_interface_mixin(mock_interface: MockInterface):
+    assert mock_interface.is_interface is True

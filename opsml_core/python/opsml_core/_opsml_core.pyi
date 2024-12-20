@@ -378,9 +378,6 @@ class VersionType:
     def __init__(self, version_type: str) -> None: ...
     def __eq__(self, other: object) -> bool: ...
 
-class OpsmlMixin:
-    is_interface: bool
-
 class ModelInterfaceArgs:
     task_type: str
     model_type: str

@@ -317,22 +317,3 @@ impl DataSchema {
         PyHelperFuncs::__str__(self)
     }
 }
-
-#[pyclass(eq)]
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct OpsmlMixin {
-    #[pyo3(get)]
-    pub is_interface: bool,
-}
-
-#[pymethods]
-impl OpsmlMixin {
-    #[new]
-    fn new() -> Self {
-        OpsmlMixin { is_interface: true }
-    }
-    pub fn __str__(&self) -> String {
-        // serialize the struct to a string
-        PyHelperFuncs::__str__(self)
-    }
-}
