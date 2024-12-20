@@ -5,7 +5,6 @@ use opsml_types::*;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-#[pyclass]
 #[derive(Debug)]
 pub struct CardRegistry {
     registry_type: RegistryType,
@@ -14,9 +13,7 @@ pub struct CardRegistry {
     runtime: tokio::runtime::Runtime,
 }
 
-#[pymethods]
 impl CardRegistry {
-    #[new]
     pub fn new(registry_type: RegistryType) -> AnyhowResult<Self> {
         // Create a new tokio runtime for the registry (needed for async calls)
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -33,12 +30,10 @@ impl CardRegistry {
         })
     }
 
-    #[getter]
     pub fn registry_type(&self) -> RegistryType {
         self.registry_type.clone()
     }
 
-    #[getter]
     pub fn table_name(&self) -> &str {
         self.table_name.as_str()
     }
@@ -47,8 +42,6 @@ impl CardRegistry {
         self.registry.mode()
     }
 
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (info=None, uid=None, name=None, repository=None, version=None, max_date=None, tags=None, limit=None, sort_by_timestamp=None))]
     pub fn list_cards(
         &mut self,
         info: Option<CardInfo>,
