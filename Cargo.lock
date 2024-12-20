@@ -3039,6 +3039,7 @@ name = "opsml-core"
 version = "0.1.0"
 dependencies = [
  "opsml-error",
+ "opsml-registry",
  "opsml-settings",
  "opsml-storage",
  "opsml-todo",

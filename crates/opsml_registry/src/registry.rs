@@ -101,7 +101,7 @@ impl CardRegistry {
     }
 }
 
-#[pyclass]
+#[pyclass(name = "CardRegistry")]
 #[derive(Debug)]
 pub struct PyCardRegistry {
     registry_type: RegistryType,

@@ -640,7 +640,7 @@ impl CardInfo {
         PyHelperFuncs::__str__(self)
     }
 
-    pub fn set_env(&mut self) {
+    pub fn set_env(&self) {
         // if check name, repo and contact. If any is set, set environment variable
         // if name is set, set OPSML_RUNTIME_NAME
         // if repository is set, set OPSML_RUNTIME_REPOSITORY
@@ -657,6 +657,24 @@ impl CardInfo {
         if let Some(contact) = &self.contact {
             std::env::set_var("OPSML_RUNTIME_CONTACT", contact);
         }
+    }
+
+    // primarily used for checking and testing. Do not write .pyi file for this method
+    pub fn get_vars(&self) -> HashMap<String, String> {
+        // check if OPSML_RUNTIME_NAME, OPSML_RUNTIME_REPOSITORY, OPSML_RUNTIME_CONTACT are set
+        // Print out the values if they are set
+
+        let name = std::env::var("OPSML_RUNTIME_NAME").unwrap_or_default();
+        let repo = std::env::var("OPSML_RUNTIME_REPOSITORY").unwrap_or_default();
+        let contact = std::env::var("OPSML_RUNTIME_CONTACT").unwrap_or_default();
+
+        // print
+        let mut map = HashMap::new();
+        map.insert("OPSML_RUNTIME_NAME".to_string(), name);
+        map.insert("OPSML_RUNTIME_REPOSITORY".to_string(), repo);
+        map.insert("OPSML_RUNTIME_CONTACT".to_string(), contact);
+
+        map
     }
 }
 

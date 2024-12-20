@@ -1,4 +1,5 @@
 use opsml_error::error::OpsmlError;
+use opsml_registry::PyCardRegistry;
 use opsml_settings::config::OpsmlConfig;
 use opsml_types::cards::model::{
     CatBoostModelInterfaceArgs, HuggingFaceModelInterfaceArgs, LightGBMModelInterfaceArgs,
@@ -11,6 +12,7 @@ use opsml_types::cards::{
     HuggingFaceOnnxSaveArgs, OnnxSchema, RegistryType, TorchOnnxArgs, TorchSaveArgs, VersionType,
 };
 use opsml_types::shared::{CommonKwargs, SaveName, Suffix};
+use opsml_types::{Card, CardInfo};
 
 use pyo3::prelude::*;
 
@@ -39,6 +41,8 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<VersionType>()?;
     _m.add_class::<DataSchema>()?;
     _m.add_class::<OnnxSchema>()?;
+    _m.add_class::<CardInfo>()?;
+    _m.add_class::<Card>()?;
 
     // Model Interface args
     _m.add_class::<ModelInterfaceArgs>()?;
@@ -52,6 +56,9 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<VowpalWabbitInterfaceArgs>()?;
     _m.add_class::<XGBoostModelInterfaceArgs>()?;
     _m.add_class::<ModelInterfaceArgsEnum>()?;
+
+    // registry
+    _m.add_class::<PyCardRegistry>()?;
 
     Ok(())
 }

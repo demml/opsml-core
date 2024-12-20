@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 opsml-error = { workspace = true }
+opsml-registry = { workspace = true, features = ["server"] }
 opsml-settings = { workspace = true }
 opsml-storage = { workspace = true}
 opsml-todo = { workspace = true }
