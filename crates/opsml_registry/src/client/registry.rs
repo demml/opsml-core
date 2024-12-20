@@ -165,17 +165,10 @@ impl ClientRegistry {
         }
     }
 
-    #[allow(dead_code)]
-    async fn check_uid_exists(
-        &mut self,
-        uid: &str,
-        registry_type: Option<RegistryType>,
-    ) -> Result<bool, RegistryError> {
-        let registry = registry_type.unwrap_or(self.registry_type.clone());
-
+    pub async fn check_uid_exists(&mut self, uid: &str) -> Result<bool, RegistryError> {
         let uid_request = UidRequest {
             uid: uid.to_string(),
-            registry_type: registry,
+            registry_type: self.registry_type.clone(),
         };
         let query_string = serde_qs::to_string(&uid_request)
             .map_err(|e| RegistryError::Error(format!("Failed to serialize query args {}", e)))?;

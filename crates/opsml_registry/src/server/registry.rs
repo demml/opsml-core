@@ -1,5 +1,6 @@
 #[cfg(feature = "server")]
 pub mod server_logic {
+    // We implement 2 versions of the registry, one for rust compatibility and one for python compatibility
 
     use opsml_error::error::RegistryError;
     use opsml_settings::config::OpsmlConfig;
@@ -9,13 +10,17 @@ pub mod server_logic {
         schemas::*,
     };
     use opsml_types::*;
+    use pyo3::Python;
     use semver::Version;
     use sqlx::types::Json as SqlxJson;
     use tracing::error;
 
+    use crate::cards::CardEnum;
+
     #[derive(Debug)]
     pub struct ServerRegistry {
         sql_client: SqlClientEnum,
+        registry_type: RegistryType,
         pub table_name: CardSQLTableNames,
     }
 
@@ -32,6 +37,7 @@ pub mod server_logic {
             Ok(Self {
                 sql_client,
                 table_name,
+                registry_type,
             })
         }
 
@@ -370,6 +376,13 @@ pub mod server_logic {
                 .map_err(|e| RegistryError::Error(format!("Failed to delete card {}", e)))?;
 
             Ok(())
+        }
+
+        pub async fn check_uid_exists(&mut self, uid: &str) -> Result<bool, RegistryError> {
+            self.sql_client
+                .check_uid_exists(uid, &self.table_name)
+                .await
+                .map_err(|e| RegistryError::Error(format!("Failed to check uid exists {}", e)))
         }
     }
 }

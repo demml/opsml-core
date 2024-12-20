@@ -41,6 +41,9 @@ pub struct ModelCardMetadata {
     pub data_schema: DataSchema,
 
     #[pyo3(get, set)]
+    pub datacard_uid: Option<String>,
+
+    #[pyo3(get, set)]
     pub runcard_uid: Option<String>,
 
     #[pyo3(get, set)]

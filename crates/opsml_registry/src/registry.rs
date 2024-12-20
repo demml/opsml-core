@@ -213,7 +213,7 @@ impl PyCardRegistry {
 
     #[pyo3(signature = (card, version_type, pre_tag="rc".to_string(), build_tag="build".to_string()))]
     pub fn register_card(
-        &self,
+        &mut self,
         card: &Bound<'_, PyAny>,
         version_type: VersionType,
         pre_tag: Option<String>,
@@ -221,7 +221,7 @@ impl PyCardRegistry {
     ) -> PyResult<()> {
         // card comes is
         let py = card.py();
-        let card_enum = if card.is_instance_of::<ModelCard>() {
+        let card = if card.is_instance_of::<ModelCard>() {
             let result: ModelCard = card.extract().unwrap();
             CardEnum::Model(result)
         } else if card.is_instance_of::<DataCard>() {
@@ -231,10 +231,35 @@ impl PyCardRegistry {
             return Err(OpsmlError::new_err("Invalid card type"));
         };
 
-        // verify uid and version
-        card_enum
-            .verify_card_for_registration()
-            .map_err(|e| OpsmlError::new_err(e))?;
+        // verify card
+        self.verify_card(&card)?;
+
+        Ok(())
+    }
+}
+
+impl PyCardRegistry {
+    pub fn verify_card(&mut self, card: &CardEnum) -> Result<(), RegistryError> {
+        card.verify_card_for_registration()
+            .map_err(|e| RegistryError::Error(e.to_string()))?;
+
+        // if card is a model card and has datacard
+        if let CardEnum::Model(model_card) = card {
+            if let Some(datacard_uid) = &model_card.metadata.datacard_uid {
+                let exists = self.runtime.block_on(async {
+                    self.registry
+                        .check_card_uid(datacard_uid)
+                        .await
+                        .map_err(|e| RegistryError::Error(e.to_string()))
+                })?;
+
+                if !exists {
+                    return Err(RegistryError::Error(
+                        "Datacard does not exist in the registry".to_string(),
+                    ));
+                }
+            }
+        }
 
         Ok(())
     }
