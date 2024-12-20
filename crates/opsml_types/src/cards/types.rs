@@ -35,6 +35,21 @@ pub enum CardType {
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum TableType {
+    Data,
+    Model,
+    Run,
+    Project,
+    Audit,
+    Pipeline,
+    Metrics,
+    HardwareMetrics,
+    Parameters,
+    Users,
+}
+
+#[pyclass(eq, eq_int)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum CardSQLTableNames {
     Data,
     Model,

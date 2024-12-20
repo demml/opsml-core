@@ -15,6 +15,7 @@ from ._opsml_core import (  # type: ignore
     OnnxSchema,
     OpsmlConfig,
     OpsmlError,
+    RegistryType,
     SaveName,
     SklearnModelInterfaceArgs,
     Suffix,
@@ -54,4 +55,5 @@ __all__ = [
     "VowpalWabbitInterfaceArgs",
     "XGBoostModelInterfaceArgs",
     "ModelInterfaceArgsEnum",
+    "RegistryType",
 ]

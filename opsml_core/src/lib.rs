@@ -8,7 +8,7 @@ use opsml_types::cards::model::{
 };
 use opsml_types::cards::{
     DataSchema, Description, Feature, HuggingFaceORTModel, HuggingFaceOnnxArgs,
-    HuggingFaceOnnxSaveArgs, OnnxSchema, TorchOnnxArgs, TorchSaveArgs, VersionType,
+    HuggingFaceOnnxSaveArgs, OnnxSchema, RegistryType, TorchOnnxArgs, TorchSaveArgs, VersionType,
 };
 use opsml_types::shared::{CommonKwargs, SaveName, Suffix};
 
@@ -26,6 +26,7 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<CommonKwargs>()?;
     _m.add_class::<SaveName>()?;
     _m.add_class::<Suffix>()?;
+    _m.add_class::<RegistryType>()?;
 
     // cards (types that are used across cards)
     _m.add_class::<HuggingFaceOnnxArgs>()?;
@@ -40,17 +41,17 @@ fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
     _m.add_class::<OnnxSchema>()?;
 
     // Model Interface args
-    _m.add_class::<ModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<CatBoostModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<HuggingFaceModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<LightGBMModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<LightningInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<SklearnModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<TensorFlowInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<TorchInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<VowpalWabbitInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<XGBoostModelInterfaceArgs>()?; // TODO: pyi
-    _m.add_class::<ModelInterfaceArgsEnum>()?; // TODO: pyi
+    _m.add_class::<ModelInterfaceArgs>()?;
+    _m.add_class::<CatBoostModelInterfaceArgs>()?;
+    _m.add_class::<HuggingFaceModelInterfaceArgs>()?;
+    _m.add_class::<LightGBMModelInterfaceArgs>()?;
+    _m.add_class::<LightningInterfaceArgs>()?;
+    _m.add_class::<SklearnModelInterfaceArgs>()?;
+    _m.add_class::<TensorFlowInterfaceArgs>()?;
+    _m.add_class::<TorchInterfaceArgs>()?;
+    _m.add_class::<VowpalWabbitInterfaceArgs>()?;
+    _m.add_class::<XGBoostModelInterfaceArgs>()?;
+    _m.add_class::<ModelInterfaceArgsEnum>()?;
 
     Ok(())
 }

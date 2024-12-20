@@ -1,4 +1,11 @@
-from opsml_core import CommonKwargs, SaveName, Suffix, OpsmlConfig, VersionType
+from opsml_core import (
+    CommonKwargs,
+    SaveName,
+    Suffix,
+    OpsmlConfig,
+    VersionType,
+    RegistryType,
+)
 import pytest
 
 
@@ -121,3 +128,11 @@ def test_version_type_str():
     assert str(VersionType.Pre) == "VersionType.Pre"
     assert str(VersionType.Build) == "VersionType.Build"
     assert str(VersionType.PreBuild) == "VersionType.PreBuild"
+
+
+def test_registry_type_enum():
+    assert RegistryType.Data == RegistryType.Data
+    assert RegistryType.Model == RegistryType.Model
+    assert RegistryType.Project == RegistryType.Project
+    assert RegistryType.Audit == RegistryType.Audit
+    assert RegistryType.Run == RegistryType.Run

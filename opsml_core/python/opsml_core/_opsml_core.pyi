@@ -123,6 +123,14 @@ class Suffix:
             String representation of the Suffix.
         """
 
+class RegistryType:
+    Data: str = "data"
+    Model: str = "model"
+    Run: str = "run"
+    Project: str = "project"
+    Audit: str = "audit"
+    Pipeline: str = "pipeline"
+
 # Errors
 class OpsmlError(Exception):
     def __init__(self, message: str) -> None: ...
