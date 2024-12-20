@@ -211,7 +211,14 @@ impl PyCardRegistry {
         Ok(cards)
     }
 
-    pub fn register_card(&self, card: &Bound<'_, PyAny>) -> PyResult<()> {
+    #[pyo3(signature = (card, version_type, pre_tag="rc".to_string(), build_tag="build".to_string()))]
+    pub fn register_card(
+        &self,
+        card: &Bound<'_, PyAny>,
+        version_type: VersionType,
+        pre_tag: Option<String>,
+        build_tag: Option<String>,
+    ) -> PyResult<()> {
         if card.is_instance_of::<ModelCard>() {
             Ok(())
         } else {

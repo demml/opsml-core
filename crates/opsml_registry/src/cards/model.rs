@@ -1,6 +1,5 @@
 use crate::cards::*;
-use anyhow::{Context, Result as AnyhowResult};
-use opsml_error::error::CardError;
+use opsml_error::error::OpsmlError;
 use opsml_types::*;
 use pyo3::prelude::*;
 use pyo3::{IntoPyObjectExt, PyObject};
@@ -88,7 +87,6 @@ impl ModelCard {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None))]
     pub fn new(
-        py: Python,
         interface: &Bound<'_, PyAny>,
         name: Option<String>,
         repository: Option<String>,
@@ -98,7 +96,7 @@ impl ModelCard {
         info: Option<CardInfo>,
         tags: Option<HashMap<String, String>>,
         metadata: Option<ModelCardMetadata>,
-    ) -> AnyhowResult<Self> {
+    ) -> PyResult<Self> {
         let base_args = BaseArgs::new(
             name,
             repository,
@@ -108,22 +106,24 @@ impl ModelCard {
             info,
             tags.unwrap_or_default(),
         )?;
-
+        let py = interface.py();
         // check if interface is a model interface (should be a bool)
         let is_interface: bool = interface
-            .call_method0("is_model_interface")
-            .with_context(|| "Error calling is_model_interface method on interface")?
+            .call_method0("is_interface")
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?
             .extract()
             .unwrap();
 
         if !is_interface {
-            return Err(CardError::Error("Interface is not a model interface".to_string()).into());
+            return Err(
+                OpsmlError::new_err("Interface is not a model interface".to_string()).into(),
+            );
         }
 
         Ok(Self {
             interface: interface
                 .into_py_any(py)
-                .with_context(|| "Error converting interface to PyObject")?,
+                .map_err(|e| OpsmlError::new_err(e.to_string()))?,
             name: base_args.name,
             repository: base_args.repository,
             contact: base_args.contact,

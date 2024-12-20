@@ -1,6 +1,7 @@
 use opsml_error::error::CardError;
 use opsml_types::*;
 use opsml_utils::{clean_string, validate_name_repository_pattern};
+use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::env;
 
@@ -68,11 +69,11 @@ impl BaseArgs {
 }
 
 pub trait BaseCard {
-    fn name(&self) -> &str;
-    fn repository(&self) -> &str;
-    fn contact(&self) -> &str;
-    fn version(&self) -> &str;
-    fn uid(&self) -> &str;
-    fn tags(&self) -> &HashMap<String, String>;
-    fn card_type(&self) -> CardType;
+    fn register_card(
+        &self,
+        card: &Bound<'_, PyAny>,
+        version_type: VersionType,
+        pre_tag: Option<String>,
+        build_tag: Option<String>,
+    ) -> CardType;
 }
