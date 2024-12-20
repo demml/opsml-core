@@ -1,5 +1,42 @@
 use crate::cards::{DataCard, ModelCard};
+use opsml_error::error::CardError;
+use opsml_types::CommonKwargs;
 pub enum CardEnum {
     Data(DataCard),
     Model(ModelCard),
+}
+
+impl CardEnum {
+    pub fn uid(&self) -> &str {
+        match self {
+            CardEnum::Data(card) => &card.uid,
+            CardEnum::Model(card) => &card.uid,
+        }
+    }
+
+    pub fn version(&self) -> &str {
+        match self {
+            CardEnum::Data(card) => &card.version,
+            CardEnum::Model(card) => &card.version,
+        }
+    }
+
+    pub fn verify_card_for_registration(&self) -> Result<(), CardError> {
+        // assert card.uid != common_kwargs.undefined
+        // assert card.verion != common_kwargs.base_version
+
+        if self.uid() != CommonKwargs::Undefined.to_string()
+            && self.version() != CommonKwargs::BaseVersion.to_string()
+        {
+            let msg = format!(
+                "Card {} already exists. Skipping registration. If you'd like to register
+                a new card, please instantiate a new Card object. If you'd like to update the
+                existing card, please use the update_card method.",
+                self.uid()
+            );
+            return Err(CardError::Error(msg));
+        };
+
+        Ok(())
+    }
 }

@@ -231,6 +231,11 @@ impl PyCardRegistry {
             return Err(OpsmlError::new_err("Invalid card type"));
         };
 
+        // verify uid and version
+        card_enum
+            .verify_card_for_registration()
+            .map_err(|e| OpsmlError::new_err(e))?;
+
         Ok(())
     }
 }
