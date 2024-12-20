@@ -74,6 +74,7 @@ pub struct SklearnModelInterfaceArgs {
 #[pymethods]
 impl SklearnModelInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     fn new(
         task_type: String,
@@ -122,6 +123,7 @@ pub struct CatBoostModelInterfaceArgs {
 #[pymethods]
 impl CatBoostModelInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     fn new(
         task_type: String,
@@ -199,6 +201,7 @@ pub struct HuggingFaceModelInterfaceArgs {
 #[pymethods]
 impl HuggingFaceModelInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, is_pipeline, backend, onnx_args, tokenizer_name, feature_extractor_name, metadata=None))]
     pub fn new(
         task_type: String,
@@ -257,6 +260,7 @@ pub struct LightGBMModelInterfaceArgs {
 #[pymethods]
 impl LightGBMModelInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     pub fn new(
         task_type: String,
@@ -307,6 +311,7 @@ pub struct LightningInterfaceArgs {
 #[pymethods]
 impl LightningInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, onnx_args=None, metadata=None))]
     pub fn new(
         task_type: String,
@@ -361,6 +366,7 @@ pub struct TorchInterfaceArgs {
 #[pymethods]
 impl TorchInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, onnx_args=None, save_args=None, metadata=None))]
     pub fn new(
         task_type: String,
@@ -413,6 +419,7 @@ pub struct TensorFlowInterfaceArgs {
 #[pymethods]
 impl TensorFlowInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, preprocessor_name, sample_data_interface_type, metadata=None))]
     pub fn new(
         task_type: String,
@@ -461,6 +468,7 @@ pub struct VowpalWabbitInterfaceArgs {
 #[pymethods]
 impl VowpalWabbitInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, arguments, sample_data_interface_type, metadata=None))]
     pub fn new(
         task_type: String,
@@ -509,6 +517,7 @@ pub struct XGBoostModelInterfaceArgs {
 #[pymethods]
 impl XGBoostModelInterfaceArgs {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (task_type, model_type, data_type, modelcard_uid, feature_map, sample_data_interface_type, preprocessor_name, metadata=None))]
     pub fn new(
         task_type: String,

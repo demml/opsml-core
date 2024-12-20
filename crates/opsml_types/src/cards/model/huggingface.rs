@@ -83,8 +83,7 @@ impl HuggingFaceOnnxArgs {
         if !is_valid_config {
             return Err(OpsmlError::new_err(
                 "config must be an instance of AutoQuantizationConfig, ORTConfig, or QuantizationConfig".to_string(),
-            )
-            .into());
+            ));
         }
 
         Ok(Some(

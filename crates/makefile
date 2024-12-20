@@ -33,3 +33,7 @@ test.storage.local.server:
 .PHONY: lints
 lints:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+.PHONY: format
+format:
+	cargo fmt --all
