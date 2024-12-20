@@ -120,3 +120,29 @@ impl DataCard {
         })
     }
 }
+
+impl FromPyObject<'_> for DataCard {
+    fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let interface = ob.getattr("interface")?;
+        let name = ob.getattr("name")?.extract()?;
+        let repository = ob.getattr("repository")?.extract()?;
+        let contact = ob.getattr("contact")?.extract()?;
+        let version = ob.getattr("version")?.extract()?;
+        let uid = ob.getattr("uid")?.extract()?;
+        let tags = ob.getattr("tags")?.extract()?;
+        let metadata = ob.getattr("metadata")?.extract()?;
+        let card_type = ob.getattr("card_type")?.extract()?;
+
+        Ok(DataCard {
+            interface: interface.into(),
+            name,
+            repository,
+            contact,
+            version,
+            uid,
+            tags,
+            metadata,
+            card_type,
+        })
+    }
+}
