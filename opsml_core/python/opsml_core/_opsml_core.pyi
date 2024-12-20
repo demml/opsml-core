@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Dict, Union
+from typing import Any, Dict, List, Optional, Union
 
 # shared
 class CommonKwargs:
@@ -39,6 +39,7 @@ class CommonKwargs:
         Returns:
             The CommonKwargs enum.
         """
+
     def as_string(self) -> str:
         """Return the string representation of the CommonKwargs.
 
@@ -231,6 +232,7 @@ class TorchOnnxArgs:
             constant_folding:
                 Whether to use constant folding optimization. Default is True
         """
+
     def model_dump(self) -> dict[str, Any]:
         """Dump onnx args to dictionary
 
@@ -299,6 +301,7 @@ class OnnxSchema:
             onnx_version:
                 The onnx version of the schema
         """
+
     def __str__(self) -> str:
         """Return a string representation of the OnnxSchema.
 
@@ -331,6 +334,7 @@ class DataSchema:
             onnx_schema:
                 The onnx schema of the data schema
         """
+
     def __str__(self) -> str:
         """Return a string representation of the DataSchema.
 
@@ -360,6 +364,7 @@ class Description:
             notes:
                 Any additional notes
         """
+
     def __str__(self) -> str:
         """Return a string representation of the Description.
 
@@ -458,9 +463,7 @@ class HuggingFaceOnnxSaveArgs:
     provider: str
     quantize: bool
 
-    def __init__(
-        self, ort_type: HuggingFaceORTModel, provider: str, quantize: bool
-    ) -> None:
+    def __init__(self, ort_type: HuggingFaceORTModel, provider: str, quantize: bool) -> None:
         """Optional Args to use with a huggingface model
 
         Args:
