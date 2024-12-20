@@ -3,6 +3,7 @@ use crate::enums::OpsmlRegistry;
 use opsml_error::error::OpsmlError;
 use opsml_error::error::RegistryError;
 use opsml_types::*;
+use opsml_utils::VersionValidator;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
@@ -221,7 +222,7 @@ impl PyCardRegistry {
     ) -> PyResult<()> {
         // card comes is
         let py = card.py();
-        let card = if card.is_instance_of::<ModelCard>() {
+        let mut card = if card.is_instance_of::<ModelCard>() {
             let result: ModelCard = card.extract().unwrap();
             CardEnum::Model(result)
         } else if card.is_instance_of::<DataCard>() {
@@ -235,13 +236,18 @@ impl PyCardRegistry {
         self.verify_card(&card)?;
 
         // check for needed dependencies
-        self.check_dependencies(py, &card);
+        self.check_dependencies(py, &card)
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         // check if card and registry type match
         let matched = card.match_registry_type(&self.registry_type);
         if !matched {
             return Err(OpsmlError::new_err("Card and registry type do not match"));
         }
+
+        // get next version
+        self.set_card_version(&mut card, version_type, pre_tag, build_tag)
+            .map_err(|e| OpsmlError::new_err(e.to_string()))?;
 
         // next steps
         // 1. verify card to registry type
@@ -256,20 +262,38 @@ impl PyCardRegistry {
 
 impl PyCardRegistry {
     pub fn set_card_version(
-        &self,
-        card: &CardEnum,
+        &mut self,
+        card: &mut CardEnum,
         version_type: VersionType,
         pre_tag: Option<String>,
         build_tag: Option<String>,
     ) -> Result<(), RegistryError> {
         let version = card.version();
 
-        let mut card_version: Option<String> =
-            if card.version() == CommonKwargs::BaseVersion.to_string() {
-                None
-            } else {
-                Some(card.version().to_string())
-            };
+        let card_version: Option<String> = if version == CommonKwargs::BaseVersion.to_string() {
+            None
+        } else {
+            Some(version.to_string())
+        };
+
+        // get next version
+        let version = self
+            .runtime
+            .block_on(async {
+                self.registry
+                    .get_next_version(
+                        card.name(),
+                        card.repository(),
+                        card_version,
+                        version_type,
+                        pre_tag,
+                        build_tag,
+                    )
+                    .await
+            })
+            .map_err(|e| RegistryError::Error(e.to_string()))?;
+
+        card.update_version(&version);
 
         Ok(())
     }

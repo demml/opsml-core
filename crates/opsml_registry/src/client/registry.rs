@@ -197,19 +197,19 @@ impl ClientRegistry {
         &mut self,
         name: &str,
         repository: &str,
-        version: Option<&str>,
+        version: Option<String>,
         version_type: VersionType,
-        pre_tag: Option<&str>,
-        build_tag: Option<&str>,
+        pre_tag: Option<String>,
+        build_tag: Option<String>,
     ) -> Result<String, RegistryError> {
         let version_request = CardVersionRequest {
             name: name.to_string(),
             repository: repository.to_string(),
-            version: version.map(|v| v.to_string()),
+            version: version,
             registry_type: self.registry_type.clone(),
             version_type,
-            pre_tag: pre_tag.map(|v| v.to_string()),
-            build_tag: build_tag.map(|v| v.to_string()),
+            pre_tag: pre_tag,
+            build_tag: build_tag,
         };
 
         let query_string = serde_qs::to_string(&version_request)

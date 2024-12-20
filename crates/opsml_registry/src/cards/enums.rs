@@ -7,6 +7,20 @@ pub enum CardEnum {
 }
 
 impl CardEnum {
+    pub fn name(&self) -> &str {
+        match self {
+            CardEnum::Data(card) => &card.name,
+            CardEnum::Model(card) => &card.name,
+        }
+    }
+
+    pub fn repository(&self) -> &str {
+        match self {
+            CardEnum::Data(card) => &card.repository,
+            CardEnum::Model(card) => &card.repository,
+        }
+    }
+
     pub fn uid(&self) -> &str {
         match self {
             CardEnum::Data(card) => &card.uid,
@@ -56,6 +70,13 @@ impl CardEnum {
                     return false;
                 }
             }
+        }
+    }
+
+    pub fn update_version(&mut self, version: &str) {
+        match self {
+            CardEnum::Data(card) => card.version = version.to_string(),
+            CardEnum::Model(card) => card.version = version.to_string(),
         }
     }
 }

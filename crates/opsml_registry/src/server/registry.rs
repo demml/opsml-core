@@ -387,14 +387,14 @@ pub mod server_logic {
             &mut self,
             name: &str,
             repository: &str,
-            version: Option<&str>,
+            version: Option<String>,
             version_type: VersionType,
-            pre_tag: Option<&str>,
-            build_tag: Option<&str>,
+            pre_tag: Option<String>,
+            build_tag: Option<String>,
         ) -> Result<String, RegistryError> {
             let versions = self
                 .sql_client
-                .get_versions(&self.table_name, name, repository, version)
+                .get_versions(&self.table_name, name, repository, version.as_deref())
                 .await
                 .map_err(|e| RegistryError::Error(format!("Failed to get versions {}", e)))?;
 
