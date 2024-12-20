@@ -405,7 +405,7 @@ pub mod server_logic {
 
             let args = VersionArgs {
                 version: version.to_string(),
-                version_type: version_type,
+                version_type,
                 pre: pre_tag.map(|s| s.to_string()),
                 build: build_tag.map(|s| s.to_string()),
             };

@@ -56,20 +56,8 @@ impl CardEnum {
 
     pub fn match_registry_type(&self, registry_type: &RegistryType) -> bool {
         match self {
-            CardEnum::Data(_) => {
-                if registry_type == &RegistryType::Data {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            CardEnum::Model(_) => {
-                if registry_type == &RegistryType::Model {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
+            CardEnum::Data(_) => registry_type == &RegistryType::Data,
+            CardEnum::Model(_) => registry_type == &RegistryType::Model,
         }
     }
 

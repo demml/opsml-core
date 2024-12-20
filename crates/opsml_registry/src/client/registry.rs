@@ -205,11 +205,11 @@ impl ClientRegistry {
         let version_request = CardVersionRequest {
             name: name.to_string(),
             repository: repository.to_string(),
-            version: version,
+            version,
             registry_type: self.registry_type.clone(),
             version_type,
-            pre_tag: pre_tag,
-            build_tag: build_tag,
+            pre_tag,
+            build_tag,
         };
 
         let query_string = serde_qs::to_string(&version_request)

@@ -36,6 +36,7 @@ impl CardRegistry {
         self.registry.mode()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn list_cards(
         &mut self,
         info: Option<CardInfo>,

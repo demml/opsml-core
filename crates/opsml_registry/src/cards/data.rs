@@ -100,9 +100,9 @@ impl DataCard {
             .unwrap_or(false);
 
         if !is_interface {
-            return Err(
-                OpsmlError::new_err("Interface is not a data interface".to_string()).into(),
-            );
+            return Err(OpsmlError::new_err(
+                "Interface is not a data interface".to_string(),
+            ));
         }
 
         Ok(Self {
