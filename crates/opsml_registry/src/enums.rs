@@ -75,4 +75,23 @@ impl OpsmlRegistry {
             }
         }
     }
+
+    pub async fn get_versions(
+        &mut self,
+        name: &str,
+        repository: &str,
+        version: &str,
+    ) -> Result<Vec<String>, RegistryError> {
+        match self {
+            Self::ClientRegistry(client_registry) => {
+                let versions = client_registry.get_versions(uid).await?;
+                Ok(versions)
+            }
+            #[cfg(feature = "server")]
+            Self::ServerRegistry(server_registry) => {
+                let versions = server_registry.get_versions(uid).await?;
+                Ok(versions)
+            }
+        }
+    }
 }

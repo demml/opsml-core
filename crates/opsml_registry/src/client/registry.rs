@@ -192,4 +192,46 @@ impl ClientRegistry {
 
         Ok(exists.exists)
     }
+
+    pub async fn get_next_version(
+        &mut self,
+        name: &str,
+        repository: &str,
+        version: Option<&str>,
+        version_type: VersionType,
+        pre_tag: Option<&str>,
+        build_tag: Option<&str>,
+    ) -> Result<String, RegistryError> {
+        let version_request = CardVersionRequest {
+            name: name.to_string(),
+            repository: repository.to_string(),
+            version: version.map(|v| v.to_string()),
+            registry_type: self.registry_type.clone(),
+            version_type,
+            pre_tag: pre_tag.map(|v| v.to_string()),
+            build_tag: build_tag.map(|v| v.to_string()),
+        };
+
+        let query_string = serde_qs::to_string(&version_request)
+            .map_err(|e| RegistryError::Error(format!("Failed to serialize query args {}", e)))?;
+
+        let response = self
+            .api_client
+            .request_with_retry(
+                Routes::CardVersion,
+                RequestType::Get,
+                None,
+                Some(query_string),
+                None,
+            )
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to check uid exists {}", e)))?;
+
+        let version = response
+            .json::<CardVersionResponse>()
+            .await
+            .map_err(|e| RegistryError::Error(format!("Failed to parse response {}", e)))?;
+
+        Ok(version.version)
+    }
 }

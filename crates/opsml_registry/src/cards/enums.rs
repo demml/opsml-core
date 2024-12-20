@@ -1,6 +1,6 @@
 use crate::cards::{DataCard, ModelCard};
 use opsml_error::error::CardError;
-use opsml_types::CommonKwargs;
+use opsml_types::{CommonKwargs, RegistryType};
 pub enum CardEnum {
     Data(DataCard),
     Model(ModelCard),
@@ -38,5 +38,24 @@ impl CardEnum {
         };
 
         Ok(())
+    }
+
+    pub fn match_registry_type(&self, registry_type: &RegistryType) -> bool {
+        match self {
+            CardEnum::Data(_) => {
+                if registry_type == &RegistryType::Data {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            CardEnum::Model(_) => {
+                if registry_type == &RegistryType::Model {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
     }
 }

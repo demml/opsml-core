@@ -82,13 +82,16 @@ pub struct ModelCard {
 
     #[pyo3(get)]
     pub card_type: CardType,
+
+    #[pyo3(get)]
+    pub to_onnx: bool,
 }
 
 #[pymethods]
 impl ModelCard {
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None))]
+    #[pyo3(signature = (interface, name=None, repository=None, contact=None, version=None, uid=None, info=None, tags=None, metadata=None, to_onnx=None))]
     pub fn new(
         interface: &Bound<'_, PyAny>,
         name: Option<String>,
@@ -99,6 +102,7 @@ impl ModelCard {
         info: Option<CardInfo>,
         tags: Option<HashMap<String, String>>,
         metadata: Option<ModelCardMetadata>,
+        to_onnx: Option<bool>,
     ) -> PyResult<Self> {
         let base_args = BaseArgs::new(
             name,
@@ -139,6 +143,7 @@ impl ModelCard {
             tags: base_args.tags,
             metadata: metadata.unwrap_or_default(),
             card_type: CardType::Data,
+            to_onnx: to_onnx.unwrap_or(false),
         })
     }
 }
@@ -154,6 +159,7 @@ impl FromPyObject<'_> for ModelCard {
         let tags = ob.getattr("tags")?.extract()?;
         let metadata = ob.getattr("metadata")?.extract()?;
         let card_type = ob.getattr("card_type")?.extract()?;
+        let to_onnx = ob.getattr("to_onnx")?.extract()?;
 
         Ok(ModelCard {
             interface: interface.into(),
@@ -165,6 +171,7 @@ impl FromPyObject<'_> for ModelCard {
             tags,
             metadata,
             card_type,
+            to_onnx,
         })
     }
 }

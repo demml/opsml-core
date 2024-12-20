@@ -384,5 +384,17 @@ pub mod server_logic {
                 .await
                 .map_err(|e| RegistryError::Error(format!("Failed to check uid exists {}", e)))
         }
+
+        pub async fn get_versions(
+            &mut self,
+            name: &str,
+            repository: &str,
+            version: Option<&str>,
+        ) -> Result<Vec<String>, RegistryError> {
+            self.sql_client
+                .get_versions(&self.table_name, name, repository, version)
+                .await
+                .map_err(|e| RegistryError::Error(format!("Failed to get versions {}", e)))
+        }
     }
 }

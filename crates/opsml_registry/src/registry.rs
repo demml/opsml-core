@@ -231,14 +231,49 @@ impl PyCardRegistry {
             return Err(OpsmlError::new_err("Invalid card type"));
         };
 
-        // verify card
+        // verify card arguments
         self.verify_card(&card)?;
+
+        // check for needed dependencies
+        self.check_dependencies(py, &card);
+
+        // check if card and registry type match
+        let matched = card.match_registry_type(&self.registry_type);
+        if !matched {
+            return Err(OpsmlError::new_err("Card and registry type do not match"));
+        }
+
+        // next steps
+        // 1. verify card to registry type
+        // 2. set card version
+        // 3. set card uid (server may do this for us)
+        // 4. save the artifacts of the card
+        // 5. registry the card
 
         Ok(())
     }
 }
 
 impl PyCardRegistry {
+    pub fn set_card_version(
+        &self,
+        card: &CardEnum,
+        version_type: VersionType,
+        pre_tag: Option<String>,
+        build_tag: Option<String>,
+    ) -> Result<(), RegistryError> {
+        let version = card.version();
+
+        let mut card_version: Option<String> =
+            if card.version() == CommonKwargs::BaseVersion.to_string() {
+                None
+            } else {
+                Some(card.version().to_string())
+            };
+
+        Ok(())
+    }
+
     pub fn verify_card(&mut self, card: &CardEnum) -> Result<(), RegistryError> {
         card.verify_card_for_registration()
             .map_err(|e| RegistryError::Error(e.to_string()))?;
@@ -257,6 +292,32 @@ impl PyCardRegistry {
                     return Err(RegistryError::Error(
                         "Datacard does not exist in the registry".to_string(),
                     ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_dependencies(&self, py: Python, card: &CardEnum) -> Result<(), RegistryError> {
+        if let CardEnum::Model(modelcard) = card {
+            if modelcard.to_onnx {
+                let find_spec = py
+                    .import("importlib")
+                    .unwrap()
+                    .getattr("util")
+                    .unwrap()
+                    .getattr("find_spec")
+                    .unwrap();
+
+                let exists = find_spec.call1(("onnx",)).unwrap().is_none();
+
+                if !exists {
+                    return Err(RegistryError::Error(
+                    "To convert a model to onnx, please install onnx via one of the extras
+                    (opsml[sklearn_onnx], opsml[tf_onnx], opsml[torch_onnx]) or set to_onnx to False.
+                    ".to_string(),
+                ));
                 }
             }
         }
