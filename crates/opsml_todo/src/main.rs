@@ -1,5 +1,5 @@
 use clap::Parser;
-use opsml_utils::color::LogColors;
+use opsml_types::shared::LogColors;
 use rayon::prelude::*;
 use std::env;
 use std::fs::File;

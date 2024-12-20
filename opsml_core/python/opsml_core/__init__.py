@@ -27,6 +27,8 @@ from ._opsml_core import (  # type: ignore
     VowpalWabbitInterfaceArgs,
     XGBoostModelInterfaceArgs,
     CardInfo,
+    CardRegistry,
+    CardList,
 )
 
 __all__ = [
@@ -58,4 +60,6 @@ __all__ = [
     "ModelInterfaceArgsEnum",
     "RegistryType",
     "CardInfo",
+    "CardRegistry",
+    "CardList",
 ]

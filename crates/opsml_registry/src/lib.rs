@@ -4,4 +4,4 @@ pub mod enums;
 pub mod registry;
 pub mod server;
 
-pub use registry::{CardRegistry, PyCardRegistry};
+pub use registry::{CardRegistry, PyCardRegistry, RegistryTestHelper};

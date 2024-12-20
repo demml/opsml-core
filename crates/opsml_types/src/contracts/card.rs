@@ -1,10 +1,17 @@
 use crate::cards::types::{RegistryType, VersionType};
 use crate::shared::PyHelperFuncs;
 use chrono::NaiveDateTime;
+use owo_colors::OwoColorize;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
+use tabled::settings::{
+    format::Format,
+    object::{Columns, Rows},
+    Alignment, Color, Style, Width,
+};
+use tabled::{Table, Tabled};
 
 #[derive(Serialize, Deserialize)]
 pub struct UidRequest {
@@ -350,14 +357,7 @@ pub enum Card {
 #[pymethods]
 impl Card {
     pub fn __str__(&self) -> String {
-        match self {
-            Self::Data(card) => PyHelperFuncs::__str__(card),
-            Self::Model(card) => PyHelperFuncs::__str__(card),
-            Self::Run(card) => PyHelperFuncs::__str__(card),
-            Self::Audit(card) => PyHelperFuncs::__str__(card),
-            Self::Pipeline(card) => PyHelperFuncs::__str__(card),
-            Self::Project(card) => PyHelperFuncs::__str__(card),
-        }
+        PyHelperFuncs::__str__(self)
     }
 
     #[getter]
@@ -589,6 +589,73 @@ impl Card {
             Self::Pipeline(_) => None,
             Self::Project(_) => None,
         }
+    }
+}
+
+#[derive(Tabled)]
+struct CardTableEntry {
+    created_at: String,
+    name: String,
+    repository: String,
+    contact: String,
+    version: String,
+    uid: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[pyclass]
+pub struct CardList {
+    #[pyo3(get)]
+    pub cards: Vec<Card>,
+}
+
+#[pymethods]
+impl CardList {
+    pub fn __str__(&self) -> String {
+        PyHelperFuncs::__str__(self)
+    }
+
+    pub fn as_table(&self) {
+        let entries: Vec<CardTableEntry> = self
+            .cards
+            .iter()
+            .map(|card| {
+                let created_at = card.created_at().unwrap().to_string();
+                let name = card.name();
+                let repository = card.repository();
+                let contact = card.contact();
+                let version = card.version();
+                let uid = card.uid();
+                CardTableEntry {
+                    created_at,
+                    name: name.to_string(),
+                    repository: repository.to_string(),
+                    contact: contact.to_string(),
+                    version: version.to_string(),
+                    uid: uid.unwrap().purple().to_string(),
+                }
+            })
+            .collect();
+
+        let mut table = Table::new(entries);
+
+        table.with(Style::sharp());
+        table.modify(Columns::single(0), Width::wrap(20).keep_words(true));
+        table.modify(Columns::single(1), Width::wrap(15).keep_words(true));
+        table.modify(Columns::single(2), Width::wrap(15).keep_words(true));
+        table.modify(Columns::single(3), Width::wrap(15).keep_words(true));
+        table.modify(Columns::single(4), Width::wrap(30).keep_words(true));
+        table.modify(Columns::single(5), Width::wrap(50));
+        table.modify(
+            Rows::new(0..1),
+            (
+                Format::content(|s| s.green().to_string()),
+                Alignment::center(),
+                Color::BOLD,
+            ),
+        );
+
+        println!("{}", &table);
     }
 }
 

@@ -5,7 +5,7 @@ use anyhow::Ok;
 use anyhow::Result;
 use axum::Router;
 use opsml_auth::auth::AuthManager;
-use opsml_utils::color::LogColors;
+use opsml_types::shared::LogColors;
 use std::sync::Arc;
 use tracing::{info, warn};
 

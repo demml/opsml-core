@@ -5,13 +5,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 use opsml_error::error::ApiError;
 use opsml_error::error::StorageError;
 use opsml_settings::config::{ApiSettings, OpsmlStorageSettings};
+use opsml_types::shared::LogColors;
 use opsml_types::{
     DeleteFileQuery, DeleteFileResponse, DownloadFileQuery, FileInfo, JwtToken,
     ListFileInfoResponse, ListFileQuery, ListFileResponse, MultiPartQuery, MultiPartSession,
     PresignedQuery, PresignedUrl, RequestType, Routes, StorageSettings, StorageType,
     DOWNLOAD_CHUNK_SIZE,
 };
-use opsml_utils::color::LogColors;
 use reqwest::multipart::Form;
 use reqwest::Response;
 use reqwest::{

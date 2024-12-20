@@ -15,7 +15,7 @@ impl PyHelperFuncs {
         match ColoredFormatter::with_styler(
             PrettyFormatter::default(),
             Styler {
-                key: Color::Rgb(75, 57, 120).bold(),
+                key: Color::Rgb(75, 57, 120).foreground(),
                 string_value: Color::Rgb(4, 205, 155).foreground(),
                 float_value: Color::Rgb(4, 205, 155).foreground(),
                 integer_value: Color::Rgb(4, 205, 155).foreground(),

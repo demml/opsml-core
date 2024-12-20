@@ -716,6 +716,12 @@ class Card:
             String representation of the Card.
         """
 
+class CardList:
+    cards: List[Card]
+
+    def as_table(self) -> None:
+        """Print cards as a table"""
+
 class CardInfo:
     name: Optional[str]
     repository: Optional[str]
@@ -801,9 +807,16 @@ class CardRegistry:
         tags: Optional[Dict[str, str]] = None,
         limit: Optional[int] = None,
         sort_by_time: Optional[bool] = None,
-    ) -> List[Card]:
+    ) -> CardList:
         """List all cards in the registry.
 
         Returns:
             A list of card names.
         """
+
+class RegistryTestHelper:
+    """Helper class for testing the registry"""
+
+    def __init__(self) -> None: ...
+    def setup(self) -> None: ...
+    def cleanup(self) -> None: ...

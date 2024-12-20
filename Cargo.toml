@@ -46,7 +46,6 @@ axum = { version = "0.7.7", features = ["multipart", "macros"] }
 axum-extra = { version =  "0.*", features = ["cookie"] }
 clap = { version = "4.*", features = ["derive"] }
 chrono = { version = "0.*", features = ["serde"] }
-colored = "2.*"
 colored_json = "5.*"
 futures = "0.*"
 futures-util = "0.*"
@@ -55,6 +54,7 @@ google-cloud-auth = "0.*"
 google-cloud-token = "0.*"
 indicatif = "0.*"
 jsonwebtoken = "9.*"
+owo-colors = "4.*"
 password-auth = "1.*"
 pyo3 = { version = "0.23", features = ["extension-module", "anyhow", "serde", "chrono"] }
 rand = "0.8.5"

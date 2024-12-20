@@ -3,7 +3,7 @@ use opsml_logging::logging::setup_logging;
 use opsml_settings::config::OpsmlConfig;
 use opsml_sql::enums::client::{get_sql_client, SqlClientEnum};
 use opsml_storage::storage::enums::client::{get_storage_system, StorageClientEnum};
-use opsml_utils::color::LogColors;
+use opsml_types::shared::LogColors;
 use tracing::{debug, info};
 
 pub async fn setup_components() -> AnyhowResult<(OpsmlConfig, StorageClientEnum, SqlClientEnum)> {

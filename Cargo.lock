@@ -3131,7 +3131,6 @@ dependencies = [
 name = "opsml-settings"
 version = "0.1.0"
 dependencies = [
- "colored",
  "opsml-error",
  "opsml-types",
  "pyo3",
@@ -3209,7 +3208,7 @@ name = "opsml-todo"
 version = "0.1.0"
 dependencies = [
  "clap",
- "opsml-utils",
+ "opsml-types",
  "rayon",
  "tabled",
  "walkdir",
@@ -3223,9 +3222,11 @@ dependencies = [
  "chrono",
  "colored_json",
  "opsml-error",
+ "owo-colors",
  "pyo3",
  "serde",
  "serde_json",
+ "tabled",
  "walkdir",
 ]
 
@@ -3234,7 +3235,6 @@ name = "opsml-utils"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "colored",
  "opsml-error",
  "opsml-types",
  "regex",
@@ -3253,6 +3253,12 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
+name = "owo-colors"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb37767f6569cd834a413442455e0f066d0d522de8630436e2a1761d9726ba56"
 
 [[package]]
 name = "p256"

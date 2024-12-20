@@ -11,7 +11,6 @@ from opsml_core import (
 )
 from optimum.onnxruntime.configuration import AutoQuantizationConfig  # type: ignore
 import pytest
-import os
 
 
 @pytest.mark.parametrize(
