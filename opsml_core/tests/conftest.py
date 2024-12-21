@@ -1,5 +1,6 @@
 import pytest
 from opsml_core import Feature
+from opsml_core._opsml_core import RegistryTestHelper
 from typing import Tuple, Dict
 from pydantic import BaseModel
 
@@ -21,3 +22,14 @@ def mock_interface(
 ) -> MockInterface:
     feature_map, metadata = card_args
     return MockInterface()
+
+
+@pytest.fixture
+def mock_db():
+    helper = RegistryTestHelper()
+
+    helper.setup()
+
+    yield
+
+    helper.cleanup()

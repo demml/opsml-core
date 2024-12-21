@@ -2,11 +2,7 @@ from opsml_core._opsml_core import RegistryTestHelper
 from opsml_core import CardRegistry, RegistryType
 
 
-def test_helper():
-    helper = RegistryTestHelper()
-    assert helper is not None
-    helper.setup()
-
+def test_registry(mock_db):
     registry = CardRegistry(RegistryType.Data)
     assert registry is not None
 
@@ -15,4 +11,12 @@ def test_helper():
 
     cards.as_table()
 
-    helper.cleanup()
+
+def test_registry_version(mock_db):
+    registry = CardRegistry(RegistryType.Data)
+    assert registry is not None
+
+    cards = registry.list_cards()
+    assert len(cards.cards) == 10
+
+    cards.as_table()

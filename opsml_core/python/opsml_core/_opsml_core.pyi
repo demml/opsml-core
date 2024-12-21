@@ -124,12 +124,12 @@ class Suffix:
         """
 
 class RegistryType:
-    Data: str = "data"
-    Model: str = "model"
-    Run: str = "run"
-    Project: str = "project"
-    Audit: str = "audit"
-    Pipeline: str = "pipeline"
+    Data: "RegistryType"
+    Model: "RegistryType"
+    Run: "RegistryType"
+    Project: "RegistryType"
+    Audi: "RegistryType"
+    Pipeline: "RegistryType"
 
 # Errors
 class OpsmlError(Exception):
@@ -820,9 +820,3 @@ class RegistryTestHelper:
     def __init__(self) -> None: ...
     def setup(self) -> None: ...
     def cleanup(self) -> None: ...
-
-# Logging
-
-class OpsmlLogger:
-    def __init__(self) -> None:
-        """Initialize the OpsmlLogger"""

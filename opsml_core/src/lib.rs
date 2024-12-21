@@ -2,7 +2,6 @@
 use opsml_registry::RegistryTestHelper;
 
 use opsml_error::error::OpsmlError;
-use opsml_logging::logging::OpsmlLogger;
 use opsml_registry::PyCardRegistry;
 use opsml_settings::config::OpsmlConfig;
 use opsml_types::cards::model::{
@@ -21,9 +20,6 @@ use pyo3::prelude::*;
 
 #[pymodule]
 fn _opsml_core(_m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // logging
-    _m.add_class::<OpsmlLogger>()?;
-
     // errors
     _m.add("OpsmlError", _m.py().get_type::<OpsmlError>())?;
 
