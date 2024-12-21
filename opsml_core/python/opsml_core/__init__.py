@@ -29,7 +29,11 @@ from ._opsml_core import (  # type: ignore
     CardInfo,
     CardRegistry,
     CardList,
+    OpsmlLogger,
 )
+
+# start logging for entire package
+OpsmlLogger()
 
 __all__ = [
     "CommonKwargs",

@@ -820,3 +820,9 @@ class RegistryTestHelper:
     def __init__(self) -> None: ...
     def setup(self) -> None: ...
     def cleanup(self) -> None: ...
+
+# Logging
+
+class OpsmlLogger:
+    def __init__(self) -> None:
+        """Initialize the OpsmlLogger"""

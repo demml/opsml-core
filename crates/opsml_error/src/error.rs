@@ -100,6 +100,12 @@ pub enum LoggingError {
     Error(String),
 }
 
+impl From<LoggingError> for PyErr {
+    fn from(err: LoggingError) -> PyErr {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(err.to_string())
+    }
+}
+
 #[derive(Error, Debug, Serialize, Deserialize)]
 pub enum ServerError {
     #[error("Failed to delete file: {0}")]

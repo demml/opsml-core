@@ -66,7 +66,7 @@ impl SqlClient for MySqlClient {
             .map_err(|e| SqlError::ConnectionError(format!("{}", e)))?;
 
         // attempt to start logging, silently fail if it fails
-        let _ = (setup_logging().await).is_ok();
+        let _ = setup_logging().is_ok();
 
         let client = Self { pool };
 

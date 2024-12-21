@@ -11,10 +11,7 @@ version = "0.1.0"
 description = ""
 authors = [{name = "Thorrester", email = "<support@demmlai.com>"}]
 readme = "README.md"
-dependencies = [
-    "onnx>=1.17.0",
-    "onnxruntime>=1.20.1",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
@@ -31,6 +28,8 @@ dev = [
     "transformers>=4.46.3",
     "optimum>=1.23.3",
     "pydantic>=2.10.4",
+    "onnx>=1.17.0",
+    "onnxruntime>=1.20.1",
 ]
 
 [tool.isort]

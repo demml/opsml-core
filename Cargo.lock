@@ -3039,6 +3039,7 @@ name = "opsml-core"
 version = "0.1.0"
 dependencies = [
  "opsml-error",
+ "opsml-logging",
  "opsml-registry",
  "opsml-settings",
  "opsml-storage",
@@ -3061,6 +3062,7 @@ name = "opsml-logging"
 version = "0.1.0"
 dependencies = [
  "opsml-error",
+ "pyo3",
  "time",
  "tracing",
  "tracing-subscriber",

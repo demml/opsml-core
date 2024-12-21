@@ -1736,10 +1736,6 @@ wheels = [
 name = "opsml-core"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
-    { name = "onnx" },
-    { name = "onnxruntime" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -1748,6 +1744,8 @@ dev = [
     { name = "isort" },
     { name = "maturin" },
     { name = "mypy" },
+    { name = "onnx" },
+    { name = "onnxruntime" },
     { name = "optimum" },
     { name = "pip" },
     { name = "pydantic" },
@@ -1762,10 +1760,6 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "onnx", specifier = ">=1.17.0" },
-    { name = "onnxruntime", specifier = ">=1.20.1" },
-]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1773,6 +1767,8 @@ dev = [
     { name = "isort", specifier = ">=5.13.2,<6.0.0" },
     { name = "maturin", specifier = ">=1.4.0,<2.0.0" },
     { name = "mypy", specifier = ">=1.0.0,<2.0.0" },
+    { name = "onnx", specifier = ">=1.17.0" },
+    { name = "onnxruntime", specifier = ">=1.20.1" },
     { name = "optimum", specifier = ">=1.23.3" },
     { name = "pip", specifier = ">=24.3.1" },
     { name = "pydantic", specifier = ">=2.10.4" },
