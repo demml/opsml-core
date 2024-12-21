@@ -1118,6 +1118,19 @@ mod tests {
             .unwrap();
         assert_eq!(versions.len(), 2);
 
+        let versions = client
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("2.0.0"))
+            .await
+            .unwrap();
+        assert_eq!(versions.len(), 1);
+
+        let versions = client
+            .get_versions(&CardSQLTableNames::Data, "Data1", "repo1", Some("2"))
+            .await
+            .unwrap();
+
+        assert_eq!(versions.len(), 4);
+
         cleanup();
     }
 

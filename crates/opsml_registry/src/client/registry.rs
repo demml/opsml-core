@@ -67,8 +67,6 @@ impl ClientRegistry {
             .await
             .map_err(|e| RegistryError::Error(format!("Failed to list cards {}", e)))?;
 
-        println!("{:?}", response);
-
         response
             .json::<Vec<Card>>()
             .await

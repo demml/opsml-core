@@ -265,8 +265,6 @@ impl VersionParser {
                 }
             }
             VersionParser::Caret => {
-                // must bea  full semver version for caret
-
                 if num_parts >= 2 {
                     Ok(VersionBounds {
                         lower_bound: Version::parse(&format!(
@@ -290,15 +288,58 @@ impl VersionParser {
                     ))
                 }
             }
-            VersionParser::Exact => Version::parse(&cleaned_version)
-                .map(|v| VersionBounds {
-                    lower_bound: v.clone(),
-                    upper_bound: v,
-                    no_upper_bound: true,
-                    parser_type: VersionParser::Exact,
-                    num_parts,
-                })
-                .map_err(|e| VersionError::InvalidVersion(e.to_string())),
+            VersionParser::Exact => {
+                if num_parts == 1 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!("{}.0.0", version_parts[0]))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!("{}.0.0", version_parts[0] + 1))
+                            .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Exact,
+                        num_parts,
+                    })
+                } else if num_parts == 2 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0], version_parts[1]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.0",
+                            version_parts[0],
+                            version_parts[1] + 1
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Exact,
+                        num_parts,
+                    })
+                } else if num_parts == 3 {
+                    Ok(VersionBounds {
+                        lower_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0], version_parts[1], version_parts[2]
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        upper_bound: Version::parse(&format!(
+                            "{}.{}.{}",
+                            version_parts[0],
+                            version_parts[1],
+                            version_parts[2] + 1
+                        ))
+                        .map_err(|e| VersionError::InvalidVersion(e.to_string()))?,
+                        no_upper_bound: false,
+                        parser_type: VersionParser::Exact,
+                        num_parts,
+                    })
+                } else {
+                    Err(VersionError::InvalidVersion(
+                        "Invalid version provided with exact syntax".to_string(),
+                    ))
+                }
+            }
         }
     }
 }
